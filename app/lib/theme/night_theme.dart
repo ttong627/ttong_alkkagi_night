@@ -61,7 +61,6 @@ class MurimCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
       decoration: BoxDecoration(
         color: backgroundColor ?? NightPalette.bgCard.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(14),
@@ -77,12 +76,20 @@ class MurimCard extends StatelessWidget {
           ),
         ],
       ),
-      child: child,
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: padding,
+          child: child,
+        ),
+      ),
     );
   }
 }
 
-/// 상단 재화 요약 알약 배지.
+/// 상단 재화 요약 알약 배지 (코덱스 원화 아이콘 우선 표시 + 폴백 머티리얼 아이콘).
 class ResourcePill extends StatelessWidget {
   const ResourcePill({
     super.key,
@@ -90,12 +97,14 @@ class ResourcePill extends StatelessWidget {
     required this.label,
     required this.value,
     required this.color,
+    this.iconAsset,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final Color color;
+  final String? iconAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -109,14 +118,29 @@ class ResourcePill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: color),
+          if (iconAsset != null && iconAsset!.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.asset(
+                iconAsset!,
+                width: 18,
+                height: 18,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => Icon(icon, size: 15, color: color),
+              ),
+            )
+          else
+            Icon(icon, size: 15, color: color),
           const SizedBox(width: 5),
-          Text(
-            '$label $value',
-            style: TextStyle(
-              fontSize: 13,
-              color: NightPalette.textPrimary,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              '$label $value',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                color: NightPalette.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

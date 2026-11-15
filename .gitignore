@@ -16,3 +16,5 @@ __pycache__/
 
 **/.flutter-plugins-dependencies
 **/build/
+app/tool/art/gen/
+app/tool/motion/out/

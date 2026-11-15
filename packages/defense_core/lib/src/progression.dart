@@ -3,8 +3,10 @@ import 'dart:math';
 
 import 'allies.dart';
 import 'campaign.dart';
+import 'daily_quests_codex.dart';
 import 'launchers.dart';
 import 'materials.dart';
+import 'mutants.dart';
 
 /// 초간단 기명 심법 수련 — 3대 원터치 핵심 능력치.
 enum CoreStatType {
@@ -298,22 +300,27 @@ class LoadoutPreset {
       };
 
   factory LoadoutPreset.fromJson(Map<String, dynamic> j) {
-    final base = LoadoutPreset.starter(name: (j['name'] as String?) ?? '수호 진법');
+    final rawName = j['name'];
+    final safeName = (rawName is String && rawName.trim().isNotEmpty) ? rawName.trim() : '수호 진법';
+    final base = LoadoutPreset.starter(name: safeName);
     base.primaryStone = StoneMaterial.values.firstWhere(
-      (e) => e.id == j['stone'],
+      (e) => e.id == j['stone'] || e.name == j['stone'],
       orElse: () => StoneMaterial.cheongok,
     );
     base.primaryShape = StoneShape.values.firstWhere(
-      (e) => e.id == j['shape'],
+      (e) => e.id == j['shape'] || e.name == j['shape'],
       orElse: () => StoneShape.round,
     );
     base.sectTechnique = SectTechnique.values.firstWhere(
-      (e) => e.id == j['sect'],
+      (e) => e.id == j['sect'] || e.name == j['sect'],
       orElse: () => SectTechnique.swordQi,
     );
     if (j['mounts'] is List) {
       final parsed = (j['mounts'] as List)
-          .map((id) => LauncherType.values.firstWhere((e) => e.id == id, orElse: () => LauncherType.rapid))
+          .map((id) => LauncherType.values.firstWhere(
+                (e) => e.id == id || e.name == id,
+                orElse: () => LauncherType.rapid,
+              ))
           .toList();
       if (parsed.isNotEmpty) {
         while (parsed.length < 5) {
@@ -323,7 +330,7 @@ class LoadoutPreset {
       }
     }
     base.equippedBeast = SpiritBeast.values.firstWhere(
-      (e) => e.id == j['beast'],
+      (e) => e.id == j['beast'] || e.name == j['beast'],
       orElse: () => SpiritBeast.nalssaendol,
     );
     base.beastCondition = AutoTriggerCondition.values.firstWhere(
@@ -332,7 +339,10 @@ class LoadoutPreset {
     );
     if (j['companions'] is List) {
       final parsed = (j['companions'] as List)
-          .map((id) => CompanionHero.values.firstWhere((e) => e.id == id, orElse: () => CompanionHero.seokdu))
+          .map((id) => CompanionHero.values.firstWhere(
+                (e) => e.id == id || e.name == id,
+                orElse: () => CompanionHero.seokdu,
+              ))
           .toSet()
           .toList();
       if (parsed.isNotEmpty) {
@@ -341,16 +351,17 @@ class LoadoutPreset {
     }
     if (j['compConds'] is Map) {
       (j['compConds'] as Map).forEach((k, v) {
-        final hero = CompanionHero.values.where((e) => e.id == k).firstOrNull;
+        final hero = CompanionHero.values.where((e) => e.id == k || e.name == k).firstOrNull;
         final cond = AutoTriggerCondition.values.where((e) => e.name == v).firstOrNull;
         if (hero != null && cond != null) {
           base.companionConditions[hero] = cond;
         }
       });
     }
-    base.supportSlotCount = ((j['supportSlots'] as num?)?.toInt() ?? 3).clamp(0, 3);
-    base.supportTriggerShieldRatio = ((j['supportRatio'] as num?)?.toDouble() ?? 0.45).clamp(0.20, 0.80);
-    base.autoUpgradeInBattle = (j['autoUpg'] as bool?) ?? true;
+    base.supportSlotCount = PlayerProgress._safeInt(j['supportSlots'], 3).clamp(0, 3);
+    base.supportTriggerShieldRatio =
+        PlayerProgress._safeDouble(j['supportRatio'], 0.45).clamp(0.20, 0.80);
+    base.autoUpgradeInBattle = PlayerProgress._safeBool(j['autoUpg'], true);
     return base;
   }
 }
@@ -377,6 +388,22 @@ class PlayerProgress {
     this.exploreActive = false,
     this.exploreBattlesRemaining = 0,
     this.activePresetIndex = 0,
+    this.attendanceDayKey = '',
+    this.attendanceStepCount = 0,
+    this.dailyQuestDayKey = '',
+    this.weeklyQuestKey = '',
+    this.monthlyQuestKey = '',
+    this.dailyAllClearClaimed = false,
+    this.totalMutantKills = 0,
+    this.totalPporokCount = 0,
+    this.totalBankShotCount = 0,
+    this.totalChainShatterCount = 0,
+    this.bestEndlessWave = 0,
+    this.tutorialSeen = false,
+    this.bgmVolume = 0.38,
+    this.sfxVolume = 0.72,
+    this.vibrationEnabled = true,
+    this.vibrationStrength = 2,
     Map<LauncherType, int>? launcherPermanentLevels,
     Set<StoneMaterial>? unlockedStones,
     Map<StoneMaterial, int>? stoneShards,
@@ -385,6 +412,14 @@ class PlayerProgress {
     Map<CoreStatType, int>? coreStatLevels,
     Map<String, int>? stageStars,
     List<LoadoutPreset>? presets,
+    Map<CraftMaterial, int>? materials,
+    Map<TacticalConsumable, int>? consumables,
+    Map<NightDeed, int>? dailyDeeds,
+    Map<NightDeed, int>? weeklyDeeds,
+    Map<NightDeed, int>? monthlyDeeds,
+    Set<String>? claimedQuestIds,
+    Set<String>? claimedAchievements,
+    Set<MutantKind>? seenMutants,
   })  : launcherPermanentLevels = launcherPermanentLevels ??
             {for (final t in LauncherType.values) t: 1},
         unlockedStones = unlockedStones ?? {StoneMaterial.cheongok},
@@ -420,7 +455,26 @@ class PlayerProgress {
               LoadoutPreset.starter(name: '3번 빙결 도탄 진법')
                 ..sectTechnique = SectTechnique.taiji
                 ..primaryShape = StoneShape.flat,
-            ];
+            ],
+        materials = materials ??
+            {
+              CraftMaterial.hyeoncheolOre: 2,
+              CraftMaterial.moonHerb: 2,
+              CraftMaterial.frostJade: 1,
+              CraftMaterial.thunderPowder: 1,
+            },
+        consumables = consumables ??
+            {
+              TacticalConsumable.qiSurgePill: 1,
+              TacticalConsumable.guardianRepairSeal: 1,
+              TacticalConsumable.auroraCritCharm: 1,
+            },
+        dailyDeeds = dailyDeeds ?? {},
+        weeklyDeeds = weeklyDeeds ?? {},
+        monthlyDeeds = monthlyDeeds ?? {},
+        claimedQuestIds = claimedQuestIds ?? {},
+        claimedAchievements = claimedAchievements ?? {},
+        seenMutants = seenMutants ?? {MutantKind.swarmRat};
 
   /// 돌연변이 처치 드롭 「증표」 — 발사대 및 중앙 보호 장치 강화·업그레이드 전용.
   int tokens;
@@ -468,6 +522,24 @@ class PlayerProgress {
 
   int activePresetIndex;
 
+  /// 출석 · 임무 · 누적 통계 · 도감 · 환경 설정 상태.
+  String attendanceDayKey;
+  int attendanceStepCount;
+  String dailyQuestDayKey;
+  String weeklyQuestKey;
+  String monthlyQuestKey;
+  bool dailyAllClearClaimed;
+  int totalMutantKills;
+  int totalPporokCount;
+  int totalBankShotCount;
+  int totalChainShatterCount;
+  int bestEndlessWave;
+  bool tutorialSeen;
+  double bgmVolume;
+  double sfxVolume;
+  bool vibrationEnabled;
+  int vibrationStrength;
+
   final Map<LauncherType, int> launcherPermanentLevels;
   final Set<StoneMaterial> unlockedStones;
   final Map<StoneMaterial, int> stoneShards;
@@ -476,6 +548,14 @@ class PlayerProgress {
   final Map<CoreStatType, int> coreStatLevels;
   final Map<String, int> stageStars;
   final List<LoadoutPreset> presets;
+  final Map<CraftMaterial, int> materials;
+  final Map<TacticalConsumable, int> consumables;
+  final Map<NightDeed, int> dailyDeeds;
+  final Map<NightDeed, int> weeklyDeeds;
+  final Map<NightDeed, int> monthlyDeeds;
+  final Set<String> claimedQuestIds;
+  final Set<String> claimedAchievements;
+  final Set<MutantKind> seenMutants;
 
   NaegongRealm get realm => NaegongRealm.values[realmIndex.clamp(0, 7)];
   LoadoutPreset get activePreset => presets[activePresetIndex.clamp(0, presets.length - 1)];
@@ -487,6 +567,28 @@ class PlayerProgress {
   }
 
   bool isStageUnlocked(StageSpec stage) => stage.globalIndex <= highestClearedGlobalStage + 1;
+
+  // --- 수호 도감 수집률 및 세트 가산치 (최대 +12% 화력·방어막 보너스) ---
+  int get unlockedLauncherCount =>
+      LauncherType.values.where((t) => t.unlockChapter <= highestUnlockedChapter + 1).length;
+  int get unlockedBeastCount => beastLevels.values.where((v) => v > 0).length;
+  int get unlockedCompanionCount => companionLevels.values.where((v) => v > 0).length;
+
+  int get codexCollectedCount =>
+      unlockedStones.length +
+      unlockedLauncherCount +
+      unlockedBeastCount +
+      unlockedCompanionCount +
+      seenMutants.length;
+
+  int get codexTotalCount =>
+      StoneMaterial.values.length +
+      LauncherType.values.length +
+      SpiritBeast.values.length +
+      CompanionHero.values.length +
+      MutantKind.values.length;
+
+  double get codexPowerBonus => (codexCollectedCount / codexTotalCount).clamp(0.0, 1.0) * 0.12;
 
   // --- 경맥 & 3대 수련 능력치 누적 보너스 ---
   double get meridianLauncherDmgBonus =>
@@ -512,7 +614,7 @@ class PlayerProgress {
     String? todayKey,
   }) {
     final day = todayKey ?? _todayString();
-    if (lastMeditationDayKey != day) {
+    if (lastMeditationDayKey.isEmpty || day.compareTo(lastMeditationDayKey) > 0) {
       lastMeditationDayKey = day;
       dailyEnlightenmentUsed = 0;
     }
@@ -541,6 +643,10 @@ class PlayerProgress {
     naegongPoints += baseNaegong;
     trainingSeals += baseSeals;
     moonOmenGauge = (moonOmenGauge + 4).clamp(0, 100);
+    recordDeed(NightDeed.meditate, 1, todayKey: day);
+    if (isCrit || isOneMore) {
+      recordDeed(NightDeed.serendipityHit, 1, todayKey: day);
+    }
 
     return MeditationResult(
       gainedNaegong: baseNaegong,
@@ -554,7 +660,9 @@ class PlayerProgress {
 
   /// 2) 십대 경맥 개통 (혈자리 구슬만 다 누르면 실패 0% 즉시 개통!).
   bool canOpenNextMeridian() {
-    if (openedMeridianStep >= MeridianStepSpec.steps.length) return false;
+    if (openedMeridianStep < 0 || openedMeridianStep >= MeridianStepSpec.steps.length) {
+      return false;
+    }
     final nextSpec = MeridianStepSpec.steps[openedMeridianStep];
     return naegongPoints >= nextSpec.reqNaegong;
   }
@@ -682,6 +790,11 @@ class PlayerProgress {
     elixirs += gainElixirs;
     supportTokens += gainSupport;
     _grantRandomShards(gainShards, rng);
+    final bonusMat = CraftMaterial.values[rng.nextInt(CraftMaterial.values.length)];
+    materials[bonusMat] = (materials[bonusMat] ?? 0) + 1;
+    if (isCrit || isEncore) {
+      recordDeed(NightDeed.serendipityHit, 1);
+    }
 
     return DispatchClaimResult(
       title: '구출 마을 식량·영약 호송 마차 도착!',
@@ -728,6 +841,11 @@ class PlayerProgress {
     elixirs += gainElixirs;
     supportTokens += gainSupport;
     _grantRandomShards(gainShards, rng);
+    final bonusMat = CraftMaterial.values[rng.nextInt(CraftMaterial.values.length)];
+    materials[bonusMat] = (materials[bonusMat] ?? 0) + 1;
+    if (isCrit || isEncore) {
+      recordDeed(NightDeed.serendipityHit, 1);
+    }
 
     return DispatchClaimResult(
       title: '심야 산야 탐색대 귀환!',
@@ -766,6 +884,7 @@ class PlayerProgress {
     elixirs += gainElixirs;
     supportTokens += gainSupport;
     _grantRandomShards(gainShards, rng);
+    recordDeed(NightDeed.serendipityHit, 1);
 
     return DispatchClaimResult(
       title: '보름달 대길조 특급 기연 발동!',
@@ -778,6 +897,231 @@ class PlayerProgress {
     );
   }
 
+  /// 8) 공통 보상 꾸러미 지급.
+  void applyRewardBundle(NightRewardBundle bundle, [Random? rng]) {
+    tokens += bundle.tokens;
+    elixirs += bundle.elixirs;
+    trainingSeals += bundle.trainingSeals;
+    supportTokens += bundle.supportTokens;
+    if (bundle.shards > 0) {
+      _grantRandomShards(bundle.shards, rng ?? Random());
+    }
+    for (final e in bundle.materials.entries) {
+      materials[e.key] = (materials[e.key] ?? 0) + e.value;
+    }
+    for (final e in bundle.consumables.entries) {
+      consumables[e.key] = (consumables[e.key] ?? 0) + e.value;
+    }
+  }
+
+  /// 9) 7일 순환 출석부 (빠진 날이 있어도 초기화되지 않고 이어짐).
+  int get currentAttendanceDayIndex => (attendanceStepCount < 0 ? 0 : attendanceStepCount) % 7;
+
+  bool canClaimAttendance({String? todayKey}) {
+    final day = todayKey ?? _todayString();
+    final sane = NightAttendance.saneDayKey(attendanceDayKey, day);
+    return sane != day;
+  }
+
+  NightRewardBundle? claimAttendance({Random? rng, String? todayKey}) {
+    final day = todayKey ?? _todayString();
+    if (!canClaimAttendance(todayKey: day)) return null;
+    final reward = NightAttendance.sevenDayRewards[currentAttendanceDayIndex];
+    attendanceDayKey = day;
+    attendanceStepCount = (attendanceStepCount < 0 ? 0 : attendanceStepCount) + 1;
+    applyRewardBundle(reward, rng);
+    return reward;
+  }
+
+  /// 10) 일일·주간·월간 수호 임무 기록 및 수령 (기기 시계 역행 남용 차단).
+  void syncQuestPeriods({String? todayKey}) {
+    final day = todayKey ?? _todayString();
+    final saneDaily = NightAttendance.saneDayKey(dailyQuestDayKey, day);
+    if (saneDaily != day) {
+      dailyQuestDayKey = day;
+      dailyDeeds.clear();
+      dailyAllClearClaimed = false;
+      claimedQuestIds.removeWhere((id) => id.startsWith('d_'));
+    }
+    final wk = NightQuestCatalog.weekKeyOf(day);
+    if (weeklyQuestKey.isEmpty || wk.compareTo(weeklyQuestKey) > 0) {
+      weeklyQuestKey = wk;
+      weeklyDeeds.clear();
+      claimedQuestIds.removeWhere((id) => id.startsWith('w_'));
+    }
+    final mk = NightQuestCatalog.monthKeyOf(day);
+    if (monthlyQuestKey.isEmpty || mk.compareTo(monthlyQuestKey) > 0) {
+      monthlyQuestKey = mk;
+      monthlyDeeds.clear();
+      claimedQuestIds.removeWhere((id) => id.startsWith('m_'));
+    }
+  }
+
+  void recordDeed(NightDeed deed, int amount, {String? todayKey}) {
+    if (amount <= 0) return;
+    syncQuestPeriods(todayKey: todayKey);
+    dailyDeeds[deed] = (dailyDeeds[deed] ?? 0) + amount;
+    weeklyDeeds[deed] = (weeklyDeeds[deed] ?? 0) + amount;
+    monthlyDeeds[deed] = (monthlyDeeds[deed] ?? 0) + amount;
+  }
+
+  List<NightMissionSpec> todayDailyMissions({String? todayKey}) {
+    final day = todayKey ?? _todayString();
+    syncQuestPeriods(todayKey: day);
+    return NightQuestCatalog.dailyOf(day);
+  }
+
+  int deedProgress(NightMissionSpec m, {String? todayKey}) {
+    syncQuestPeriods(todayKey: todayKey);
+    return switch (m.period) {
+      QuestPeriodKind.daily => dailyDeeds[m.deed] ?? 0,
+      QuestPeriodKind.weekly => weeklyDeeds[m.deed] ?? 0,
+      QuestPeriodKind.monthly => monthlyDeeds[m.deed] ?? 0,
+    };
+  }
+
+  bool isMissionClaimed(NightMissionSpec m, {String? todayKey}) {
+    syncQuestPeriods(todayKey: todayKey);
+    return claimedQuestIds.contains(m.id);
+  }
+
+  bool canClaimMission(NightMissionSpec m, {String? todayKey}) {
+    return !isMissionClaimed(m, todayKey: todayKey) &&
+        deedProgress(m, todayKey: todayKey) >= m.goal;
+  }
+
+  NightRewardBundle? claimMission(NightMissionSpec m, {Random? rng, String? todayKey}) {
+    if (!canClaimMission(m, todayKey: todayKey)) return null;
+    claimedQuestIds.add(m.id);
+    applyRewardBundle(m.reward, rng);
+    return m.reward;
+  }
+
+  bool canClaimDailyAllClear({String? todayKey}) {
+    final day = todayKey ?? _todayString();
+    syncQuestPeriods(todayKey: day);
+    if (dailyAllClearClaimed) return false;
+    final dailies = NightQuestCatalog.dailyOf(day);
+    return dailies.every((m) => claimedQuestIds.contains(m.id));
+  }
+
+  NightRewardBundle? claimDailyAllClear({Random? rng, String? todayKey}) {
+    if (!canClaimDailyAllClear(todayKey: todayKey)) return null;
+    dailyAllClearClaimed = true;
+    applyRewardBundle(NightQuestCatalog.dailyAllClearBonus, rng);
+    return NightQuestCatalog.dailyAllClearBonus;
+  }
+
+  /// 11) 전술 비약 제조 (수호 재료 조합).
+  bool canCraftConsumable(TacticalConsumable item) {
+    for (final req in item.recipe.entries) {
+      if ((materials[req.key] ?? 0) < req.value) return false;
+    }
+    return true;
+  }
+
+  bool craftConsumable(TacticalConsumable item) {
+    if (!canCraftConsumable(item)) return false;
+    for (final req in item.recipe.entries) {
+      materials[req.key] = (materials[req.key] ?? 0) - req.value;
+    }
+    consumables[item] = (consumables[item] ?? 0) + 1;
+    return true;
+  }
+
+  /// 12) 영구 업적 달성 확인 및 수령.
+  bool isAchievementMet(NightAchievementSpec a) {
+    switch (a.id) {
+      case 'ach_first_dawn':
+        return highestClearedGlobalStage >= 1;
+      case 'ach_ch1_clear':
+        return highestClearedGlobalStage >= CampaignCatalog.stagesOfChapter(1).last.globalIndex;
+      case 'ach_ch3_clear':
+        return highestClearedGlobalStage >= CampaignCatalog.stagesOfChapter(3).last.globalIndex;
+      case 'ach_ch6_clear':
+        return highestClearedGlobalStage >= CampaignCatalog.stagesOfChapter(6).last.globalIndex;
+      case 'ach_ch10_clear':
+        return highestClearedGlobalStage >= CampaignCatalog.allStages.length;
+      case 'ach_meridian_5':
+        return openedMeridianStep >= 5;
+      case 'ach_meridian_10':
+        return openedMeridianStep >= 10;
+      case 'ach_pporok_20':
+        return totalPporokCount >= 20;
+      case 'ach_bank_15':
+        return totalBankShotCount >= 15;
+      case 'ach_chain_15':
+        return totalChainShatterCount >= 15;
+      case 'ach_convoy_5':
+        return convoyCompletedCount >= 5;
+      case 'ach_endless_10':
+        return bestEndlessWave >= 10;
+      default:
+        return false;
+    }
+  }
+
+  bool canClaimAchievement(NightAchievementSpec a) =>
+      !claimedAchievements.contains(a.id) && isAchievementMet(a);
+
+  NightRewardBundle? claimAchievement(NightAchievementSpec a, {Random? rng}) {
+    if (!canClaimAchievement(a)) return null;
+    claimedAchievements.add(a.id);
+    applyRewardBundle(a.reward, rng);
+    return a.reward;
+  }
+
+  /// 출석·임무·업적 중 즉시 받을 수 있는 보상이 있는지 여부 (홈 알림 배지용).
+  bool hasClaimableRewards({String? todayKey}) {
+    if (canClaimAttendance(todayKey: todayKey)) return true;
+    if (canClaimDailyAllClear(todayKey: todayKey)) return true;
+    for (final m in todayDailyMissions(todayKey: todayKey)) {
+      if (canClaimMission(m, todayKey: todayKey)) return true;
+    }
+    for (final m in NightQuestCatalog.weeklyMissions) {
+      if (canClaimMission(m, todayKey: todayKey)) return true;
+    }
+    for (final m in NightQuestCatalog.monthlyMissions) {
+      if (canClaimMission(m, todayKey: todayKey)) return true;
+    }
+    for (final a in NightAchievementSpec.all) {
+      if (canClaimAchievement(a)) return true;
+    }
+    return false;
+  }
+
+  /// 13) 기기 변경용 오프라인 백업 부호 내보내기 / 복원 (위변조 검증 합산값 포함).
+  static String _fnv1aHex(String text) {
+    int hash = 0x811c9dc5;
+    for (final b in utf8.encode(text)) {
+      hash ^= b;
+      hash = (hash * 0x01000193) & 0xffffffff;
+    }
+    return hash.toRadixString(16).padLeft(8, '0').toUpperCase();
+  }
+
+  String exportBackupCode() {
+    final b64 = base64Url.encode(utf8.encode(encodeJson()));
+    final checksum = _fnv1aHex(b64);
+    return 'SUHO1:$checksum:$b64';
+  }
+
+  static PlayerProgress? tryDecodeBackupCode(String rawCode) {
+    try {
+      final trimmed = rawCode.trim();
+      if (!trimmed.startsWith('SUHO1:')) return null;
+      final parts = trimmed.split(':');
+      if (parts.length != 3) return null;
+      final expectedSum = parts[1].toUpperCase();
+      final payload = parts[2];
+      if (_fnv1aHex(payload) != expectedSum) return null;
+      final decodedJson = utf8.decode(base64Url.decode(base64Url.normalize(payload)));
+      return PlayerProgress.decodeJson(decodedJson);
+    } catch (_) {
+      return null;
+    }
+  }
+
   void onBattleFinished({
     required StageSpec stage,
     required bool victory,
@@ -785,17 +1129,57 @@ class PlayerProgress {
     required int earnedTokens,
     required int earnedElixirs,
     required int usedSupportCount,
+    int killCount = 0,
+    int pporokCount = 0,
+    int bankShotCount = 0,
+    int chainShatterCount = 0,
+    int serendipityCount = 0,
+    Set<MutantKind> encounteredMutants = const {},
+    int endlessWavesCleared = 0,
+    String? todayKey,
   }) {
-    supportTokens = (supportTokens - usedSupportCount).clamp(0, 999);
-    tokens += earnedTokens;
-    elixirs += earnedElixirs;
+    final safeUsedSupport = max(0, usedSupportCount);
+    final safeEarnedTokens = max(0, earnedTokens);
+    final safeEarnedElixirs = max(0, earnedElixirs);
+    final safeKillCount = max(0, killCount);
+    final safePporok = max(0, pporokCount);
+    final safeBank = max(0, bankShotCount);
+    final safeChain = max(0, chainShatterCount);
+    final safeSeren = max(0, serendipityCount);
+
+    supportTokens = (supportTokens - safeUsedSupport).clamp(0, 9999);
+    tokens += safeEarnedTokens;
+    elixirs += safeEarnedElixirs;
     moonOmenGauge = (moonOmenGauge + (victory ? 28 : 14)).clamp(0, 100);
+
+    totalMutantKills += safeKillCount;
+    totalPporokCount += safePporok;
+    totalBankShotCount += safeBank;
+    totalChainShatterCount += safeChain;
+    seenMutants.addAll(encounteredMutants);
+    if (endlessWavesCleared > bestEndlessWave) {
+      bestEndlessWave = endlessWavesCleared;
+    }
+
+    recordDeed(NightDeed.mutantKills, safeKillCount, todayKey: todayKey);
+    recordDeed(NightDeed.cliffPporok, safePporok, todayKey: todayKey);
+    recordDeed(NightDeed.serendipityHit, safeSeren, todayKey: todayKey);
 
     if (convoySupplyBuffBattles > 0) {
       convoySupplyBuffBattles--;
     }
 
     if (victory) {
+      recordDeed(NightDeed.battleWin, 1, todayKey: todayKey);
+      if (stars >= 3) {
+        recordDeed(NightDeed.perfectDefense, 1, todayKey: todayKey);
+      }
+
+      // 승리 시 수호 재료 1종 확정 획득
+      final dropMat = CraftMaterial.values[
+          (stage.chapterNumber + totalMutantKills) % CraftMaterial.values.length];
+      materials[dropMat] = (materials[dropMat] ?? 0) + 1;
+
       if (convoyActive && convoyBattlesRemaining > 0) {
         convoyBattlesRemaining--;
       }
@@ -803,28 +1187,35 @@ class PlayerProgress {
         exploreBattlesRemaining--;
       }
 
-      final prevStars = stageStars[stage.code] ?? 0;
-      if (stars > prevStars) {
-        stageStars[stage.code] = stars;
-        // 조건 달성 경로: 마을 식량/농산물/가축 무피해 ★3 첫 달성 시 지원패 수여!
-        if (stars == 3 && prevStars < 3) {
-          supportTokens += 1;
+      if (stage.globalIndex <= CampaignCatalog.allStages.length) {
+        final prevStars = stageStars[stage.code] ?? 0;
+        if (stars > prevStars) {
+          stageStars[stage.code] = stars;
+          // 조건 달성 경로: 마을 식량/농산물/가축 무피해 ★3 첫 달성 시 지원패 수여!
+          if (stars == 3 && prevStars < 3) {
+            supportTokens += 1;
+          }
         }
-      }
 
-      if (stage.globalIndex > highestClearedGlobalStage) {
-        highestClearedGlobalStage = stage.globalIndex;
-        // 스토리 동료 자동 합류 처리!
-        if (stage.chapterNumber == 2 && stage.stageNumber == 11) {
-          companionLevels[CompanionHero.bandal] = max(1, companionLevels[CompanionHero.bandal] ?? 0);
-        } else if (stage.chapterNumber == 4 && stage.stageNumber == 12) {
-          companionLevels[CompanionHero.gurumi] = max(1, companionLevels[CompanionHero.gurumi] ?? 0);
-        } else if (stage.chapterNumber == 5 && stage.stageNumber == 11) {
-          companionLevels[CompanionHero.jeonggak] = max(1, companionLevels[CompanionHero.jeonggak] ?? 0);
-        } else if (stage.chapterNumber == 6 && stage.stageNumber == 12) {
-          companionLevels[CompanionHero.yonga] = max(1, companionLevels[CompanionHero.yonga] ?? 0);
-          companionLevels[CompanionHero.mukhyeon] = max(1, companionLevels[CompanionHero.mukhyeon] ?? 0);
-          supportTokens += 2;
+        if (stage.globalIndex > highestClearedGlobalStage) {
+          highestClearedGlobalStage = stage.globalIndex;
+          // 스토리 동료 자동 합류 처리!
+          if (stage.chapterNumber == 2 && stage.stageNumber == 11) {
+            companionLevels[CompanionHero.bandal] =
+                max(1, companionLevels[CompanionHero.bandal] ?? 0);
+          } else if (stage.chapterNumber == 4 && stage.stageNumber == 12) {
+            companionLevels[CompanionHero.gurumi] =
+                max(1, companionLevels[CompanionHero.gurumi] ?? 0);
+          } else if (stage.chapterNumber == 5 && stage.stageNumber == 11) {
+            companionLevels[CompanionHero.jeonggak] =
+                max(1, companionLevels[CompanionHero.jeonggak] ?? 0);
+          } else if (stage.chapterNumber == 6 && stage.stageNumber == 12) {
+            companionLevels[CompanionHero.yonga] =
+                max(1, companionLevels[CompanionHero.yonga] ?? 0);
+            companionLevels[CompanionHero.mukhyeon] =
+                max(1, companionLevels[CompanionHero.mukhyeon] ?? 0);
+            supportTokens += 2;
+          }
         }
       }
     }
@@ -863,6 +1254,22 @@ class PlayerProgress {
         'exploreOn': exploreActive,
         'exploreRem': exploreBattlesRemaining,
         'presetIdx': activePresetIndex,
+        'attDay': attendanceDayKey,
+        'attStep': attendanceStepCount,
+        'qDay': dailyQuestDayKey,
+        'qWeek': weeklyQuestKey,
+        'qMonth': monthlyQuestKey,
+        'qAllClear': dailyAllClearClaimed,
+        'totKills': totalMutantKills,
+        'totPporok': totalPporokCount,
+        'totBank': totalBankShotCount,
+        'totChain': totalChainShatterCount,
+        'bestEndless': bestEndlessWave,
+        'tutSeen': tutorialSeen,
+        'bgmVol': bgmVolume,
+        'sfxVol': sfxVolume,
+        'vibOn': vibrationEnabled,
+        'vibStr': vibrationStrength,
         'launcherLvs': launcherPermanentLevels.map((k, v) => MapEntry(k.id, v)),
         'stones': unlockedStones.map((e) => e.id).toList(),
         'shards': stoneShards.map((k, v) => MapEntry(k.id, v)),
@@ -871,81 +1278,212 @@ class PlayerProgress {
         'coreStats': coreStatLevels.map((k, v) => MapEntry(k.name, v)),
         'stars': stageStars,
         'presets': presets.map((p) => p.toJson()).toList(),
+        'materials': materials.map((k, v) => MapEntry(k.name, v)),
+        'consumables': consumables.map((k, v) => MapEntry(k.name, v)),
+        'dDeeds': dailyDeeds.map((k, v) => MapEntry(k.name, v)),
+        'wDeeds': weeklyDeeds.map((k, v) => MapEntry(k.name, v)),
+        'mDeeds': monthlyDeeds.map((k, v) => MapEntry(k.name, v)),
+        'claimedQ': claimedQuestIds.toList(),
+        'claimedAch': claimedAchievements.toList(),
+        'seenMutants': seenMutants.map((e) => e.name).toList(),
       });
 
+  static int _safeInt(dynamic v, int fallback) {
+    if (v is num && v.isFinite) return v.toInt();
+    return fallback;
+  }
+
+  static double _safeDouble(dynamic v, double fallback) {
+    if (v is num && v.isFinite) return v.toDouble();
+    return fallback;
+  }
+
+  static bool _safeBool(dynamic v, bool fallback) {
+    if (v is bool) return v;
+    return fallback;
+  }
+
+  static String _safeDayKey(dynamic v) {
+    if (v is String) {
+      final trimmed = v.trim();
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) return trimmed;
+    }
+    return '';
+  }
+
+  static String _safePeriodKey(dynamic v, String prefixPattern) {
+    if (v is String) {
+      final trimmed = v.trim();
+      if (RegExp(prefixPattern).hasMatch(trimmed)) return trimmed;
+    }
+    return '';
+  }
+
   factory PlayerProgress.decodeJson(String raw) {
-    final j = jsonDecode(raw) as Map<String, dynamic>;
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      throw const FormatException('Root JSON must be an object');
+    }
+    final j = Map<String, dynamic>.from(decoded);
+    final maxStage = CampaignCatalog.allStages.length;
+    final maxMeridian = MeridianStepSpec.steps.length;
+    final maxRealm = NaegongRealm.values.length - 1;
+
     final p = PlayerProgress(
-      tokens: (j['tokens'] as num?)?.toInt() ?? 120,
-      elixirs: (j['elixirs'] as num?)?.toInt() ?? 4,
-      trainingSeals: (j['seals'] as num?)?.toInt() ?? 15,
-      naegongPoints: (j['naegong'] as num?)?.toInt() ?? 20,
-      realmIndex: (j['realm'] as num?)?.toInt() ?? 0,
-      centralGuardianLevel: (j['centralLv'] as num?)?.toInt() ?? 1,
-      supportTokens: (j['support'] as num?)?.toInt() ?? 2,
-      moonOmenGauge: (j['moon'] as num?)?.toInt() ?? 35,
-      highestClearedGlobalStage: (j['cleared'] as num?)?.toInt() ?? 0,
-      openedMeridianStep: (j['meridian'] as num?)?.toInt() ?? 0,
-      dailyEnlightenmentUsed: (j['dailyUsed'] as num?)?.toInt() ?? 0,
-      lastMeditationDayKey: (j['lastDay'] as String?) ?? '',
-      convoyActive: (j['convoyOn'] as bool?) ?? false,
-      convoyBattlesRemaining: (j['convoyRem'] as num?)?.toInt() ?? 0,
-      convoySupplyBuffBattles: (j['convoyBuff'] as num?)?.toInt() ?? 0,
-      convoyCompletedCount: (j['convoyCnt'] as num?)?.toInt() ?? 0,
-      exploreActive: (j['exploreOn'] as bool?) ?? false,
-      exploreBattlesRemaining: (j['exploreRem'] as num?)?.toInt() ?? 0,
-      activePresetIndex: (j['presetIdx'] as num?)?.toInt() ?? 0,
+      tokens: _safeInt(j['tokens'], 120).clamp(0, 999999999),
+      elixirs: _safeInt(j['elixirs'], 4).clamp(0, 999999999),
+      trainingSeals: _safeInt(j['seals'] ?? j['trainingSeals'], 15).clamp(0, 999999999),
+      naegongPoints: _safeInt(j['naegong'] ?? j['naegongPoints'], 20).clamp(0, 999999999),
+      realmIndex: _safeInt(j['realm'] ?? j['realmIndex'], 0).clamp(0, maxRealm),
+      centralGuardianLevel:
+          _safeInt(j['centralLv'] ?? j['centralGuardianLevel'], 1).clamp(1, 999),
+      supportTokens: _safeInt(j['support'] ?? j['supportTokens'], 2).clamp(0, 9999),
+      moonOmenGauge: _safeInt(j['moon'] ?? j['moonOmenGauge'], 35).clamp(0, 100),
+      highestClearedGlobalStage: _safeInt(
+        j['cleared'] ?? j['highestClearedStage'] ?? j['highestClearedGlobalStage'],
+        0,
+      ).clamp(0, maxStage),
+      openedMeridianStep: _safeInt(
+        j['meridian'] ?? j['meridianStep'] ?? j['openedMeridianStep'],
+        0,
+      ).clamp(0, maxMeridian),
+      dailyEnlightenmentUsed: _safeInt(j['dailyUsed'], 0).clamp(0, 10),
+      lastMeditationDayKey: _safeDayKey(j['lastDay']),
+      convoyActive: _safeBool(j['convoyOn'], false),
+      convoyBattlesRemaining: _safeInt(j['convoyRem'], 0).clamp(0, 10),
+      convoySupplyBuffBattles: _safeInt(j['convoyBuff'], 0).clamp(0, 99),
+      convoyCompletedCount: _safeInt(j['convoyCnt'], 0).clamp(0, 999999),
+      exploreActive: _safeBool(j['exploreOn'], false),
+      exploreBattlesRemaining: _safeInt(j['exploreRem'], 0).clamp(0, 10),
+      activePresetIndex: _safeInt(j['presetIdx'], 0).clamp(0, 99),
+      attendanceDayKey: _safeDayKey(j['attDay']),
+      attendanceStepCount: _safeInt(j['attStep'], 0).clamp(0, 999999),
+      dailyQuestDayKey: _safeDayKey(j['qDay']),
+      weeklyQuestKey: _safePeriodKey(j['qWeek'], r'^W\d{4}-\d{2}-\d{2}$'),
+      monthlyQuestKey: _safePeriodKey(j['qMonth'], r'^M\d{4}-\d{2}$'),
+      dailyAllClearClaimed: _safeBool(j['qAllClear'], false),
+      totalMutantKills: _safeInt(j['totKills'], 0).clamp(0, 999999999),
+      totalPporokCount: _safeInt(j['totPporok'], 0).clamp(0, 999999999),
+      totalBankShotCount: _safeInt(j['totBank'], 0).clamp(0, 999999999),
+      totalChainShatterCount: _safeInt(j['totChain'], 0).clamp(0, 999999999),
+      bestEndlessWave: _safeInt(j['bestEndless'], 0).clamp(0, 9999),
+      tutorialSeen: _safeBool(j['tutSeen'], false),
+      bgmVolume: _safeDouble(j['bgmVol'] ?? j['bgmVolume'], 0.38).clamp(0.0, 1.0),
+      sfxVolume: _safeDouble(j['sfxVol'] ?? j['sfxVolume'], 0.72).clamp(0.0, 1.0),
+      vibrationEnabled: _safeBool(j['vibOn'], true),
+      vibrationStrength: _safeInt(j['vibStr'] ?? j['vibrationStrength'], 2).clamp(1, 3),
     );
 
     if (j['launcherLvs'] is Map) {
       (j['launcherLvs'] as Map).forEach((k, v) {
-        final lt = LauncherType.values.where((e) => e.id == k).firstOrNull;
-        if (lt != null) p.launcherPermanentLevels[lt] = (v as num).toInt();
+        final lt = LauncherType.values.where((e) => e.id == k || e.name == k).firstOrNull;
+        if (lt != null) {
+          p.launcherPermanentLevels[lt] = _safeInt(v, 1).clamp(1, 999);
+        }
       });
     }
     if (j['stones'] is List) {
       for (final id in (j['stones'] as List)) {
-        final sm = StoneMaterial.values.where((e) => e.id == id).firstOrNull;
+        final sm = StoneMaterial.values.where((e) => e.id == id || e.name == id).firstOrNull;
         if (sm != null) p.unlockedStones.add(sm);
       }
     }
     if (j['shards'] is Map) {
       (j['shards'] as Map).forEach((k, v) {
-        final sm = StoneMaterial.values.where((e) => e.id == k).firstOrNull;
-        if (sm != null) p.stoneShards[sm] = (v as num).toInt();
+        final sm = StoneMaterial.values.where((e) => e.id == k || e.name == k).firstOrNull;
+        if (sm != null) {
+          p.stoneShards[sm] = _safeInt(v, 0).clamp(0, 999999);
+        }
       });
     }
     if (j['beasts'] is Map) {
       (j['beasts'] as Map).forEach((k, v) {
-        final sb = SpiritBeast.values.where((e) => e.id == k).firstOrNull;
-        if (sb != null) p.beastLevels[sb] = (v as num).toInt();
+        final sb = SpiritBeast.values.where((e) => e.id == k || e.name == k).firstOrNull;
+        if (sb != null) {
+          final minLv = sb == SpiritBeast.nalssaendol ? 1 : 0;
+          p.beastLevels[sb] = _safeInt(v, minLv).clamp(minLv, 10);
+        }
       });
     }
     if (j['companions'] is Map) {
       (j['companions'] as Map).forEach((k, v) {
-        final ch = CompanionHero.values.where((e) => e.id == k).firstOrNull;
-        if (ch != null) p.companionLevels[ch] = (v as num).toInt();
+        final ch = CompanionHero.values.where((e) => e.id == k || e.name == k).firstOrNull;
+        if (ch != null) {
+          p.companionLevels[ch] = _safeInt(v, 0).clamp(0, 10);
+        }
       });
     }
     if (j['coreStats'] is Map) {
       (j['coreStats'] as Map).forEach((k, v) {
         final cs = CoreStatType.values.where((e) => e.name == k).firstOrNull;
-        if (cs != null) p.coreStatLevels[cs] = (v as num).toInt();
+        if (cs != null) {
+          p.coreStatLevels[cs] = _safeInt(v, 0).clamp(0, 999);
+        }
       });
     }
     if (j['stars'] is Map) {
       (j['stars'] as Map).forEach((k, v) {
-        p.stageStars[k.toString()] = (v as num).toInt();
+        p.stageStars[k.toString()] = _safeInt(v, 0).clamp(0, 3);
       });
     }
     if (j['presets'] is List) {
       final list = (j['presets'] as List)
-          .map((e) => LoadoutPreset.fromJson(Map<String, dynamic>.from(e as Map)))
+          .whereType<Map>()
+          .map((e) => LoadoutPreset.fromJson(Map<String, dynamic>.from(e)))
           .toList();
       if (list.isNotEmpty) {
         p.presets
           ..clear()
           ..addAll(list);
+      }
+    }
+    p.activePresetIndex = p.activePresetIndex.clamp(0, p.presets.length - 1);
+
+    if (j['materials'] is Map) {
+      (j['materials'] as Map).forEach((k, v) {
+        final cm = CraftMaterial.values.where((e) => e.name == k).firstOrNull;
+        if (cm != null) {
+          p.materials[cm] = _safeInt(v, 0).clamp(0, 999999);
+        }
+      });
+    }
+    if (j['consumables'] is Map) {
+      (j['consumables'] as Map).forEach((k, v) {
+        final tc = TacticalConsumable.values.where((e) => e.name == k).firstOrNull;
+        if (tc != null) {
+          p.consumables[tc] = _safeInt(v, 0).clamp(0, 999999);
+        }
+      });
+    }
+    void readDeeds(dynamic rawMap, Map<NightDeed, int> dest) {
+      if (rawMap is Map) {
+        rawMap.forEach((k, v) {
+          final nd = NightDeed.values.where((e) => e.name == k).firstOrNull;
+          if (nd != null) {
+            dest[nd] = _safeInt(v, 0).clamp(0, 999999999);
+          }
+        });
+      }
+    }
+    readDeeds(j['dDeeds'], p.dailyDeeds);
+    readDeeds(j['wDeeds'], p.weeklyDeeds);
+    readDeeds(j['mDeeds'], p.monthlyDeeds);
+    if (j['claimedQ'] is List) {
+      for (final item in (j['claimedQ'] as List)) {
+        if (item != null) p.claimedQuestIds.add(item.toString());
+      }
+    }
+    if (j['claimedAch'] is List) {
+      for (final item in (j['claimedAch'] as List)) {
+        if (item != null) p.claimedAchievements.add(item.toString());
+      }
+    }
+    if (j['seenMutants'] is List) {
+      for (final item in (j['seenMutants'] as List)) {
+        final mk = MutantKind.values
+            .where((e) => e.name == item || e.id == item)
+            .firstOrNull;
+        if (mk != null) p.seenMutants.add(mk);
       }
     }
     return p;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
+import 'screens/splash_and_tutorial.dart';
 import 'state/game_controller.dart';
 import 'theme/night_theme.dart';
 
@@ -12,8 +13,14 @@ Future<void> main() async {
 }
 
 class SuhoAlkkagiNightApp extends StatelessWidget {
-  const SuhoAlkkagiNightApp({super.key, required this.controller});
+  const SuhoAlkkagiNightApp({
+    super.key,
+    required this.controller,
+    this.skipSplash = false,
+  });
+
   final GameController controller;
+  final bool skipSplash;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +28,9 @@ class SuhoAlkkagiNightApp extends StatelessWidget {
       title: '수호알까기 · 탄지무림 심야기습',
       debugShowCheckedModeBanner: false,
       theme: NightPalette.buildTheme(),
-      home: HomeScreen(controller: controller),
+      home: skipSplash
+          ? HomeScreen(controller: controller)
+          : SplashScreen(controller: controller),
     );
   }
 }

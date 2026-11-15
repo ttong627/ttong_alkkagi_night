@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'launchers.dart';
 import 'materials.dart';
 import 'mutants.dart';
@@ -13,26 +15,19 @@ class Vec2 {
   Vec2 operator *(double s) => Vec2(x * s, y * s);
 
   double get length {
+    if (!x.isFinite || !y.isFinite) return 0;
     final l2 = x * x + y * y;
-    if (l2 <= 0) return 0;
-    return _sqrt(l2);
+    if (l2 <= 0 || !l2.isFinite) return 0;
+    return math.sqrt(l2);
   }
 
   Vec2 get normalized {
     final l = length;
-    if (l < 1e-6) return const Vec2(0, -1);
+    if (l < 1e-6 || !l.isFinite) return const Vec2(0, -1);
     return Vec2(x / l, y / l);
   }
 
   double distanceTo(Vec2 o) => (this - o).length;
-
-  static double _sqrt(double v) {
-    double x = v > 1 ? v * 0.5 : 1.0;
-    for (int i = 0; i < 12; i++) {
-      x = 0.5 * (x + v / x);
-    }
-    return x;
-  }
 }
 
 /// 줄거리 대사 한 줄.
@@ -246,8 +241,8 @@ class CampaignCatalog {
       title: '제1장 · 하산의 길',
       villageName: '흙먼지 마을',
       actLabel: '【기 · 생존 기반 구출】',
-      bgAsset: 'assets/images/scenes/bg_dustyYard.webp',
-      floorAsset: 'assets/images/scenes/floor_dustyYard.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch1.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch1.webp',
       bgmAsset: 'bgm_dustyYard.ogg',
       bossName: '독기에 미친 산군',
       bossPortraitPrefix: 'chonjang',
@@ -279,8 +274,8 @@ class CampaignCatalog {
       title: '제2장 · 기름진 난장',
       villageName: '통통 객잔 식량창고',
       actLabel: '【기 · 생존 기반 구출】',
-      bgAsset: 'assets/images/scenes/bg_oilyTable.webp',
-      floorAsset: 'assets/images/scenes/floor_oilyTable.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch2.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch2.webp',
       bgmAsset: 'bgm_oilyTable.ogg',
       bossName: '탐식 거대 변이주방장',
       bossPortraitPrefix: 'tongtong',
@@ -313,8 +308,8 @@ class CampaignCatalog {
       title: '제3장 · 거북 장터 야습',
       villageName: '거북 장터 종자·우시장',
       actLabel: '【기 · 생존 기반 구출】',
-      bgAsset: 'assets/images/scenes/bg_turtleMarket.webp',
-      floorAsset: 'assets/images/scenes/floor_turtleMarket.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch3.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch3.webp',
       bgmAsset: 'bgm_turtleMarket.ogg',
       bossName: '그림자 변이 자객단주',
       bossPortraitPrefix: 'jagaek',
@@ -347,8 +342,8 @@ class CampaignCatalog {
       title: '제4장 · 야성의 숲',
       villageName: '쿠비 산채 봉화대',
       actLabel: '【승 · 반격 진법과 구원군】',
-      bgAsset: 'assets/images/scenes/bg_kubiForest.webp',
-      floorAsset: 'assets/images/scenes/floor_kubiForest.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch4.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch4.webp',
       bgmAsset: 'bgm_kubiForest.ogg',
       bossName: '숲의 천년 역병주',
       bossPortraitPrefix: 'kubi',
@@ -383,8 +378,8 @@ class CampaignCatalog {
       title: '제5장 · 철벽의 진인',
       villageName: '로직 학당 기관전',
       actLabel: '【승 · 반격 진법과 구원군】',
-      bgAsset: 'assets/images/scenes/bg_logicMarble.webp',
-      floorAsset: 'assets/images/scenes/floor_logicMarble.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch5.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch5.webp',
       bgmAsset: 'bgm_logicMarble.ogg',
       bossName: '폭주 기관 거신병',
       bossPortraitPrefix: 'logic',
@@ -419,8 +414,8 @@ class CampaignCatalog {
       title: '제6장 · 무림맹 본단 혈전',
       villageName: '무림맹 대광장',
       actLabel: '【승 · 1부 절정 결전】',
-      bgAsset: 'assets/images/scenes/bg_murimIce.webp',
-      floorAsset: 'assets/images/scenes/floor_murimIce.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch6.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch6.webp',
       bgmAsset: 'bgm_murimIce.ogg',
       bossName: '심야 흑화 마룡수',
       bossPortraitPrefix: 'maengju',
@@ -455,8 +450,8 @@ class CampaignCatalog {
       title: '제7장 · 열사의 협곡',
       villageName: '사막 오아시스 성채',
       actLabel: '【전 · 독기 근원 대원정】',
-      bgAsset: 'assets/images/scenes/bg_sandCanyon.webp',
-      floorAsset: 'assets/images/scenes/floor_sandCanyon.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch7.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch7.webp',
       bgmAsset: 'bgm_dustyYard.ogg',
       bossName: '모래폭풍 사막 역병왕',
       bossPortraitPrefix: 'sawang',
@@ -491,8 +486,8 @@ class CampaignCatalog {
       title: '제8장 · 흑룡 해적선 구호항',
       villageName: '구호 곡식 함대 갑판',
       actLabel: '【전 · 독기 근원 대원정】',
-      bgAsset: 'assets/images/scenes/bg_pirateDeck.webp',
-      floorAsset: 'assets/images/scenes/floor_pirateDeck.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch8.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch8.webp',
       bgmAsset: 'bgm_oilyTable.ogg',
       bossName: '심해 흑독 대촉수왕',
       bossPortraitPrefix: 'haejeok',
@@ -526,8 +521,8 @@ class CampaignCatalog {
       title: '제9장 · 화염산 봉인굴',
       villageName: '화염산 봉인 제단',
       actLabel: '【전 · 독기 근원 대원정】',
-      bgAsset: 'assets/images/scenes/bg_lavaCave.webp',
-      floorAsset: 'assets/images/scenes/floor_lavaCave.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch9.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch9.webp',
       bgmAsset: 'bgm_clash.ogg',
       bossName: '분화구 심연 염마왕',
       bossPortraitPrefix: 'hongryeon',
@@ -563,8 +558,8 @@ class CampaignCatalog {
       title: '제10장 · 천상 탄신전',
       villageName: '태초 태극석 신전 (보스 10연전)',
       actLabel: '【결 · 최종 정화 결전】',
-      bgAsset: 'assets/images/scenes/bg_heavenTemple.webp',
-      floorAsset: 'assets/images/scenes/floor_heavenTemple.webp',
+      bgAsset: 'assets/images/scenes/bg_night_ch10.webp',
+      floorAsset: 'assets/images/scenes/floor_night_ch10.webp',
       bgmAsset: 'bgm_boss.ogg',
       bossName: '심야에 물든 태초 탄신',
       bossPortraitPrefix: 'tansin',
@@ -646,7 +641,7 @@ class CampaignCatalog {
                 LauncherType.curveSpin,
                 LauncherType.rapid,
               ],
-              startingFieldTokens: 155 + st * 8,
+              startingFieldTokens: 175 + st * 10,
               clearElixirBonus: isFinalGod ? 10 : 4,
               isBossStage: true,
               waves: _buildChapter10BossWaves(st, laneCount, refChapter),
@@ -706,7 +701,12 @@ class CampaignCatalog {
               : '어긋난 힘으로 폭주하는 사형 묵현의 야간 기습!';
         } else {
           stageTitle = '${ch.number}-$st 야간 길목 수호 ($st차 밤)';
-          sub = '${ch.villageName} 외곽 산·들 길목 기습 방어';
+          if (st >= 2) {
+            final midKind = _midBossKindFor(ch.number, st);
+            sub = '${ch.villageName} 길목 방어 · 중간보스 [${midKind.name}(${midKind.roleTag})] 동반 침략!';
+          } else {
+            sub = '${ch.villageName} 외곽 산·들 길목 기습 방어';
+          }
         }
 
         final recStoneIndex = ((ch.number - 1) + (st ~/ 4)).clamp(0, 9);
@@ -722,7 +722,7 @@ class CampaignCatalog {
             tacticalHint: _hintForStage(ch.number, st, isChapterBoss, isHeukpungStage),
             recommendedStone: recStone,
             recommendedLaunchers: ch.mounts.map((m) => m.recommendedType).toList(),
-            startingFieldTokens: 90 + ch.number * 14 + st * 4,
+            startingFieldTokens: 112 + ch.number * 16 + st * 5,
             clearElixirBonus: isChapterBoss ? 5 : (isHeukpungStage || isMukhyeonStage ? 2 : 1),
             isBossStage: isChapterBoss || isHeukpungStage || isMukhyeonStage,
             waves: _buildNormalChapterWaves(
@@ -742,18 +742,83 @@ class CampaignCatalog {
     return result;
   }
 
+  static MutantKind _midBossKindFor(int ch, int stage) {
+    switch ((ch + stage) % 3) {
+      case 0:
+        return MutantKind.swiftShadowBoss;
+      case 1:
+        return MutantKind.ironColossusBoss;
+      default:
+        return MutantKind.crimsonBreakerBoss;
+    }
+  }
+
+  static String _midBossCustomTitle(int ch, MutantKind midKind) {
+    const swiftPrefixes = [
+      '산비탈 기습 선봉',
+      '기름길 질풍대장',
+      '장터 골목 암습장',
+      '야성림 그림자',
+      '기관 회랑 쾌속귀',
+      '빙설 폭풍 기습장',
+      '모래바람 추격왕',
+      '검은 파도 쾌속귀',
+      '화염 협곡 섬광귀',
+      '천상 운해 기습장',
+    ];
+    const colossusPrefixes = [
+      '바위고개 철벽장',
+      '객잔 창고 중갑병',
+      '우시장 철벽 수문장',
+      '천년고목 중장갑',
+      '로직 학당 강철수',
+      '무림맹 빙갑 거수',
+      '열사 암벽 거신',
+      '심해 철갑 거수',
+      '용암 외피 중갑수',
+      '천상 금강 수문장',
+    ];
+    const breakerPrefixes = [
+      '성책 파괴자',
+      '대곡창 파성병',
+      '장터 성문 파괴자',
+      '봉화대 파성귀',
+      '기관진 분쇄자',
+      '대광장 결계 파괴자',
+      '오아시스 파성왕',
+      '구호함대 갑판 파쇄자',
+      '분화구 업화 파성귀',
+      '천상 신전 파성귀',
+    ];
+    final idx = (ch - 1).clamp(0, 9);
+    switch (midKind) {
+      case MutantKind.swiftShadowBoss:
+        return '${swiftPrefixes[idx]} 혈영 질풍귀';
+      case MutantKind.ironColossusBoss:
+        return '${colossusPrefixes[idx]} 현철 중갑거수';
+      case MutantKind.crimsonBreakerBoss:
+        return '${breakerPrefixes[idx]} 적염 파성귀';
+      default:
+        return midKind.name;
+    }
+  }
+
   static String _hintForStage(int ch, int st, bool boss, bool heukpung) {
     if (boss) {
-      return '중앙 근처에 내공·한빙 보조를 두고 중포 탄지기 버전을 올려 우두머리를 밀어내세요!';
+      return '제2물결 특화 중간보스에 이어 최종 우두머리가 강림합니다! 내공·한빙 보조와 중포 승급으로 돌파하세요!';
     }
     if (heukpung) {
-      return '약탈 선봉 흑풍은 돌진력이 강합니다. 중포 탄지기와 석두·영수 방어 조건을 활용하세요!';
+      return '중간보스 기습 뒤 약탈 선봉 흑풍이 돌격합니다. 중포 탄지기와 석두·영수 방어 조건을 활용하세요!';
     }
-    if (st % 3 == 0) {
-      return '뼈방패 야차와 독안개 두꺼비가 섞여 옵니다. 곡사 회전기와 회전 기둥 도탄이 큰 위력을 발휘합니다!';
-    }
-    if (st % 2 == 0) {
-      return '철피 멧돼지가 앞장섭니다. 현철 이상 무거운 알과 중포 탄지기로 절벽 뽀록 추락을 노리세요!';
+    if (st >= 2) {
+      final mid = _midBossKindFor(ch, st);
+      if (mid == MutantKind.swiftShadowBoss) {
+        return '초고속 기습 중간보스 [혈영 질풍귀]가 고속 무리와 동반 침략합니다! 한빙 역장기와 속사 탄지기로 기동력을 꺾으세요!';
+      } else if (mid == MutantKind.ironColossusBoss) {
+        return '난공불락 맷집 중간보스 [현철 중갑거수]가 중갑 무리와 함께 진격합니다! 중포 탄지기와 무거운 수호석으로 장갑을 반관통하세요!';
+      } else {
+        return '파성 강타 중간보스 [적염 파성귀]가 방어막을 노리고 강습합니다! 방어막 접근 전 내공탄과 어기어석으로 집중 타격하세요!';
+      }
     }
     return '속사 탄지기로 독쥐·들개 무리를 빠르게 정리해 현장 증표를 모으고 발사대 버전을 올리세요!';
   }
@@ -786,28 +851,98 @@ class CampaignCatalog {
       ),
     ]);
 
-    // 2웨이브: 중견 압박 기습
-    waves.add([
-      WaveSpawnGroup(
-        kind: (ch >= 2 && stage >= 3) ? MutantKind.ironBoar : MutantKind.sickHound,
-        count: (2 + ch ~/ 2 + stage ~/ 4).clamp(2, 8),
-        laneIndex: (stage % laneCount),
-        intervalSec: 1.75,
-      ),
-      if (ch >= 2 && stage >= 4)
+    // 2웨이브: 중견 압박 기습 — 2단계 이상 모든 스테이지에서 스피드·맷집·공격력 특화 중간보스가 일반 무리와 동반 침략!
+    if (stage >= 2) {
+      final midKind = _midBossKindFor(ch, stage);
+      final midTitle = _midBossCustomTitle(ch, midKind);
+      final bossLane = (stage + 1) % laneCount;
+
+      if (midKind == MutantKind.swiftShadowBoss) {
+        // 스피드 특화 중간보스 + 들개·독쥐 초고속 기습대 동시 침공
+        waves.add([
+          WaveSpawnGroup(
+            kind: MutantKind.sickHound,
+            count: (2 + ch ~/ 2 + stage ~/ 4).clamp(2, 8),
+            laneIndex: stage % laneCount,
+            intervalSec: 1.25,
+          ),
+          WaveSpawnGroup(
+            kind: MutantKind.swarmRat,
+            count: (baseCount - 1).clamp(3, 14),
+            laneIndex: (stage + 2) % laneCount,
+            intervalSec: 0.98,
+          ),
+          WaveSpawnGroup(
+            kind: MutantKind.swiftShadowBoss,
+            count: 1,
+            laneIndex: bossLane,
+            intervalSec: 1.50,
+            customBossTitle: midTitle,
+          ),
+        ]);
+      } else if (midKind == MutantKind.ironColossusBoss) {
+        // 맷집 특화 중간보스 + 멧돼지·야차 중갑 돌파대 동시 침공
+        waves.add([
+          WaveSpawnGroup(
+            kind: ch >= 2 ? MutantKind.ironBoar : MutantKind.sickHound,
+            count: (2 + ch ~/ 3 + stage ~/ 5).clamp(2, 6),
+            laneIndex: stage % laneCount,
+            intervalSec: 1.75,
+          ),
+          WaveSpawnGroup(
+            kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.swarmRat,
+            count: (2 + ch ~/ 3).clamp(2, 6),
+            laneIndex: (stage + 2) % laneCount,
+            intervalSec: 1.65,
+          ),
+          WaveSpawnGroup(
+            kind: MutantKind.ironColossusBoss,
+            count: 1,
+            laneIndex: bossLane,
+            intervalSec: 1.80,
+            customBossTitle: midTitle,
+          ),
+        ]);
+      } else {
+        // 공격력 특화 중간보스 + 분열충·두꺼비 파성 강습대 동시 침공
+        waves.add([
+          WaveSpawnGroup(
+            kind: ch >= 3 ? MutantKind.bloodCocoon : MutantKind.sickHound,
+            count: (2 + ch ~/ 3 + stage ~/ 5).clamp(2, 6),
+            laneIndex: stage % laneCount,
+            intervalSec: 1.60,
+          ),
+          WaveSpawnGroup(
+            kind: ch >= 2 ? MutantKind.plagueToad : MutantKind.swarmRat,
+            count: (2 + ch ~/ 3).clamp(2, 6),
+            laneIndex: (stage + 2) % laneCount,
+            intervalSec: 1.70,
+          ),
+          WaveSpawnGroup(
+            kind: MutantKind.crimsonBreakerBoss,
+            count: 1,
+            laneIndex: bossLane,
+            intervalSec: 1.70,
+            customBossTitle: midTitle,
+          ),
+        ]);
+      }
+    } else {
+      waves.add([
         WaveSpawnGroup(
-          kind: stage % 2 == 0 ? MutantKind.shieldYacha : MutantKind.plagueToad,
-          count: (2 + ch ~/ 3).clamp(2, 6),
-          laneIndex: ((stage + 1) % laneCount),
-          intervalSec: 1.85,
+          kind: MutantKind.sickHound,
+          count: (2 + ch ~/ 2).clamp(2, 6),
+          laneIndex: (stage % laneCount),
+          intervalSec: 1.75,
         ),
-      WaveSpawnGroup(
-        kind: MutantKind.swarmRat,
-        count: baseCount,
-        laneIndex: ((stage + 2) % laneCount),
-        intervalSec: 1.05,
-      ),
-    ]);
+        WaveSpawnGroup(
+          kind: MutantKind.swarmRat,
+          count: baseCount,
+          laneIndex: ((stage + 2) % laneCount),
+          intervalSec: 1.05,
+        ),
+      ]);
+    }
 
     // 3웨이브: 심야 본대 또는 보스 강림
     final thirdWave = <WaveSpawnGroup>[
@@ -870,20 +1005,29 @@ class CampaignCatalog {
     ChapterSpec refChapter,
   ) {
     final isFinal = stage == 10;
+    final vanguardMidBoss = _midBossKindFor(10, stage);
     return [
       [
         WaveSpawnGroup(
           kind: MutantKind.sickHound,
-          count: 7 + stage ~/ 2,
+          count: 6 + stage ~/ 2,
           laneIndex: 0,
           intervalSec: 1.05,
         ),
         WaveSpawnGroup(
           kind: MutantKind.shieldYacha,
-          count: 4 + stage ~/ 3,
+          count: 3 + stage ~/ 3,
           laneIndex: laneCount - 1,
           intervalSec: 1.45,
         ),
+        if (stage >= 2)
+          WaveSpawnGroup(
+            kind: vanguardMidBoss,
+            count: 1,
+            laneIndex: stage % laneCount,
+            intervalSec: 1.65,
+            customBossTitle: _midBossCustomTitle(10, vanguardMidBoss),
+          ),
       ],
       [
         WaveSpawnGroup(

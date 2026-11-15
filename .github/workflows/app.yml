@@ -1,4 +1,4 @@
-# 수호알까기 · 탄지무림 심야기습 — 자동 검증(111단계 시뮬레이션) + 안드로이드 설치판/스토어판 빌드
+# 수호알까기 · 탄지무림 심야기습 — 자동 검증(111단계 시뮬레이션) + 안드로이드 설치판/스토어판 빌드 및 권한 검수
 name: app
 
 on:
@@ -51,16 +51,63 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - name: APK 및 스토어 AAB 묶음 파일 빌드
+      - name: 업로드 키스토어 복원 (비밀값 존재 시)
+        if: ${{ env.ALKKAGI_UPLOAD_KEYSTORE_B64 != '' }}
+        env:
+          ALKKAGI_UPLOAD_KEYSTORE_B64: ${{ secrets.ALKKAGI_UPLOAD_KEYSTORE_B64 }}
+        run: |
+          KEYSTORE_FILE="${RUNNER_TEMP}/alkkagi-upload.jks"
+          printf '%s' "$ALKKAGI_UPLOAD_KEYSTORE_B64" | base64 --decode > "$KEYSTORE_FILE"
+          echo "ALKKAGI_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+      - name: 설치판 및 플레이 스토어 꾸러미 빌드
         working-directory: app
+        env:
+          ALKKAGI_KEYSTORE_PASSWORD: ${{ secrets.ALKKAGI_KEYSTORE_PASSWORD }}
+          ALKKAGI_KEY_ALIAS: ${{ secrets.ALKKAGI_KEY_ALIAS }}
+          ALKKAGI_KEY_PASSWORD: ${{ secrets.ALKKAGI_KEY_PASSWORD }}
         run: |
           flutter pub get
           BUILD_NUM=$((100 + GITHUB_RUN_NUMBER))
-          flutter build apk --release --flavor sideload --build-number "$BUILD_NUM"
-          flutter build appbundle --release --flavor play --build-number "$BUILD_NUM"
+          flutter build apk --release --flavor sideload --dart-define=APP_CHANNEL=sideload --target-platform android-arm64 --build-number "$BUILD_NUM"
+          flutter build apk --release --flavor play --dart-define=APP_CHANNEL=play --build-number "$BUILD_NUM"
+          flutter build appbundle --release --flavor play --dart-define=APP_CHANNEL=play --build-number "$BUILD_NUM"
+      - name: 플레이 스토어 꾸러미 권한 및 대상 버전 무결성 검수
+        run: |
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
+          PLAY_APK="app/build/app/outputs/flutter-apk/app-play-release.apk"
+          PERMS=$("$AAPT2" dump permissions "$PLAY_APK")
+          BADGING=$("$AAPT2" dump badging "$PLAY_APK")
+          echo "$PERMS"
+          echo "$BADGING" | head -n 15
+          if echo "$PERMS" | grep -q "android.permission.INTERNET"; then
+            echo "오류: 플레이 스토어 빌드에 INTERNET 권한이 포함되었습니다!" >&2
+            exit 1
+          fi
+          if echo "$PERMS" | grep -q "android.permission.REQUEST_INSTALL_PACKAGES"; then
+            echo "오류: 플레이 스토어 빌드에 자가 설치 권한이 포함되었습니다!" >&2
+            exit 1
+          fi
+          if ! echo "$BADGING" | grep -q "name='ttong.alkkagi.night'"; then
+            echo "오류: 플레이 스토어 패키지 식별자가 일치하지 않습니다!" >&2
+            exit 1
+          fi
+          TARGET_SDK=$(echo "$BADGING" | sed -n "s/.*targetSdkVersion:'\([0-9]*\)'.*/\1/p" | head -n 1)
+          if [ -z "$TARGET_SDK" ] || [ "$TARGET_SDK" -lt 35 ]; then
+            echo "오류: targetSdkVersion($TARGET_SDK)이 35 미만입니다!" >&2
+            exit 1
+          fi
+      - name: 빌드 산출물 해시 기록 및 업로드 준비
+        run: |
+          sha256sum \
+            app/build/app/outputs/flutter-apk/app-sideload-release.apk \
+            app/build/app/outputs/flutter-apk/app-play-release.apk \
+            app/build/app/outputs/bundle/playRelease/app-play-release.aab > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: suho-alkkagi-night-releases
           path: |
             app/build/app/outputs/flutter-apk/app-sideload-release.apk
+            app/build/app/outputs/flutter-apk/app-play-release.apk
             app/build/app/outputs/bundle/playRelease/app-play-release.aab
+            SHA256SUMS.txt

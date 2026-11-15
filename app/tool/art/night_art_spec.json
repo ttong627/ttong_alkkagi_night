@@ -1,0 +1,148 @@
+{
+  "_설명": "《수호알까기 · 탄지무림 심야기습》 전 구역 코덱스 전용 손그림 무협 원화 명세서 (총 71종)",
+  "kinds": {
+    "bg": {
+      "ratio": "9:16",
+      "style": "Vertical midnight background painting for a Korean Joseon-inspired wuxia mobile game, same art direction as premium hand-painted anime cel-shaded wuxia art: atmospheric deep indigo and starry night sky, warm glowing paper lanterns and golden protective qi aura accents, rich painterly East Asian brushwork. Strictly Korean/East Asian wooden tiled roofs and stone walls — NO European arches, NO domes, NO clocks. The lower 60% must stay calm, dark, and low-contrast so game menus and battle boards remain clearly readable on top. No people, no characters, no text, no letters, no calligraphy, no watermark, no frame."
+    },
+    "floor": {
+      "ratio": "1:1",
+      "style": "Seamless top-down midnight game battlefield ground texture seen strictly from directly above (orthographic, zero perspective, no horizon), cool moonlit night tone with subtle warm lantern ambiance, hand-painted wuxia anime cel-shaded texture. Medium-dark low contrast so bright white guardian go stones and glowing mutant tokens stand out crisply on top. Fill the entire square edge to edge. No stones, no characters, no standing objects, no text, no letters, no border, no frame."
+    },
+    "mutant": {
+      "ratio": "1:1",
+      "style": "Single stylized mobile game monster token sprite for a Korean wuxia defense game, seen from slightly elevated 3/4 top-down angle, bold expressive creature design (fierce yet charming game silhouette, readable at 48 pixels), premium hand-painted anime cel shading with crisp thick dark ink outline, rich colors with ZERO green anywhere on the creature, centered and filling about 82% of the square, background is ONE flat solid pure green color (#00FF00) with nothing else — no ground, no cast shadow, no outer glow, no text, no letters, no watermark."
+    },
+    "launcher": {
+      "ratio": "1:1",
+      "style": "Single Korean wuxia automatic go-stone turret or village structure sprite seen from elevated 3/4 top-down game view, intricate wood, bronze, iron and golden qi craftsmanship, premium hand-painted anime cel shading with crisp dark ink outline, ZERO green anywhere on the object, centered and filling about 82% of the square, background is ONE flat solid pure green color (#00FF00) with nothing else — no ground, no cast shadow, no outer glow, no text, no letters, no watermark."
+    },
+    "launcher_magenta": {
+      "ratio": "1:1",
+      "style": "Single Korean wuxia automatic go-stone turret or village structure sprite seen from elevated 3/4 top-down game view, intricate jade, teal, wood and golden qi craftsmanship, premium hand-painted anime cel shading with crisp dark ink outline, ZERO magenta or pink anywhere on the object, centered and filling about 82% of the square, background is ONE flat solid pure magenta color (#FF00FF) with nothing else — no ground, no cast shadow, no outer glow, no text, no letters, no watermark."
+    },
+    "stone": {
+      "ratio": "1:1",
+      "style": "Single round convex wuxia alkkagi guardian go-stone seen from slightly elevated top-down view, glossy polished mineral surface with subtle inner martial-arts qi pattern, bold dark ink rim outline, ZERO green anywhere on the stone, centered and filling about 80% of the square, background is ONE flat solid pure green color (#00FF00) with nothing else — no shadow, no outer halo, no text, no letters, no watermark."
+    },
+    "stone_magenta": {
+      "ratio": "1:1",
+      "style": "Single round convex wuxia alkkagi guardian go-stone seen from slightly elevated top-down view, glossy polished jade or ice crystal surface with luminous inner qi pattern, bold dark ink rim outline, ZERO magenta or pink anywhere on the stone, centered and filling about 80% of the square, background is ONE flat solid pure magenta color (#FF00FF) with nothing else — no shadow, no outer halo, no text, no letters, no watermark."
+    },
+    "icon": {
+      "ratio": "1:1",
+      "style": "Single mobile game UI item icon for a Korean wuxia game, premium hand-painted anime cel shading with bold clean dark ink outline, warm vivid colors with ZERO green anywhere on the object, instantly readable at 32 pixels, centered and filling about 80% of the square, background is ONE flat solid pure green color (#00FF00) with nothing else — no ground, no cast shadow, no outer glow, no text, no letters, no numbers, no watermark."
+    },
+    "icon_magenta": {
+      "ratio": "1:1",
+      "style": "Single mobile game UI item icon for a Korean wuxia game, premium hand-painted anime cel shading with bold clean dark ink outline, vivid jade, emerald and cyan-gold colors with ZERO magenta or pink anywhere on the object, instantly readable at 32 pixels, centered and filling about 80% of the square, background is ONE flat solid pure magenta color (#FF00FF) with nothing else — no ground, no cast shadow, no outer glow, no text, no letters, no numbers, no watermark."
+    },
+    "fx": {
+      "ratio": "1:1",
+      "style": "Single radial game visual effect burst sprite for a Korean wuxia mobile game, bright hand-painted anime energy impact with crisp golden-white shapes centered filling 85% of the square, ZERO green anywhere, background is ONE flat solid pure green color (#00FF00) with nothing else — no text, no letters, no characters, no watermark."
+    },
+    "appicon": {
+      "ratio": "1:1",
+      "style": "Cute and heroic Korean wuxia mobile game app icon artwork, premium hand-painted anime cel-shaded style with thick clean dark outlines, vibrant high-contrast colors instantly readable at 48 pixels, background fills the entire square edge to edge (no white border, no rounded corners). Keep all key elements inside the central 64% safe circle. Strictly NO text, NO letters, NO Chinese characters, NO numbers, NO watermark."
+    }
+  },
+  "items": [
+    {"id": "bg_night_splash", "group": "bg", "kind": "bg", "desc": "Key art night panorama of a peaceful Korean mountain village protected by a radiant golden-amber hemispherical qi barrier dome rising from a carved stone guardian spire in the village square; warm lantern light in thatched and tiled roofs, golden rice paddies and wooden granary inside the dome, deep starry midnight indigo sky with a dramatic crimson-violet full moon above misty mountain ridges."},
+    {"id": "bg_night_lobby", "group": "bg", "kind": "bg", "desc": "Midnight guardian headquarters gate of a Korean wuxia village: sturdy red-wood pavilion gate with traditional curved Korean tiled roof, warm glowing paper lanterns hanging from eaves, subtle golden protective array light on the courtyard below, starry deep blue night sky and moonlit pine mountains behind."},
+    {"id": "bg_night_ch1", "group": "bg", "kind": "bg", "desc": "Chapter 1 'Dusty mountain village at midnight': humble Korean thatched-roof cottages at the foot of misty dark-blue mountains under a pale moon, warm lantern glow from a wooden granary, purple night mist creeping along upper mountain trails."},
+    {"id": "bg_night_ch2", "group": "bg", "kind": "bg", "desc": "Chapter 2 'Tongtong Inn courtyard granary at midnight': traditional Korean wooden inn courtyard at night lit by warm red-gold hanging lanterns, stacked grain sacks under tiled eaves, dark indigo night sky above."},
+    {"id": "bg_night_ch3", "group": "bg", "kind": "bg", "desc": "Chapter 3 'Turtle Market street on a rainy night': old Korean flagstone market street glistening under gentle night rain, stone turtle monument with a glowing lantern, cloth stall awnings in deep blue shadow, misty night rooftops."},
+    {"id": "bg_night_ch4", "group": "bg", "kind": "bg", "desc": "Chapter 4 'Kubi mountain fortress beacon tower at midnight': tall bamboo forest ridges in deep moonlight, a wooden mountain palisade with a blazing orange signal beacon fire on top, floating fireflies in dark blue mist."},
+    {"id": "bg_night_ch5", "group": "bg", "kind": "bg", "desc": "Chapter 5 'Logic Academy mechanism hall at night': serene Korean Confucian academy courtyard of pale moonlit marble and dark blue-grey tiled roofs under starry night sky, subtle bronze gear pillars and warm study lanterns."},
+    {"id": "bg_night_ch6", "group": "bg", "kind": "bg", "desc": "Chapter 6 'Murim Alliance snow fortress at midnight': grand snow-covered martial-arts fortress atop icy peaks under a winter night sky with shimmering cyan-gold aurora qi ribbons and falling snow, lantern-lit tiled halls."},
+    {"id": "bg_night_ch7", "group": "bg", "kind": "bg", "desc": "Chapter 7 'Scorching sand canyon oasis fortress at midnight': towering desert sandstone cliffs under a crescent moon and purple night haze, a glowing blue desert oasis pool protected by stone ramparts and torchlight."},
+    {"id": "bg_night_ch8", "group": "bg", "kind": "bg", "desc": "Chapter 8 'Relief grain fleet flagship deck on a stormy night sea': massive East Asian wooden flagship with dark red sails on a moonlit stormy midnight ocean, warm deck lanterns, crashing dark waves and distant lightning."},
+    {"id": "bg_night_ch9", "group": "bg", "kind": "bg", "desc": "Chapter 9 'Flame Mountain sealing altar cavern at midnight': cavernous black basalt volcanic shrine at night, glowing magma fissures below and a sacred blue-gold sealing stone altar on a rocky terrace, drifting embers."},
+    {"id": "bg_night_ch10", "group": "bg", "kind": "bg", "desc": "Chapter 10 'Heavenly Taegeuk Stone Sanctuary at midnight': majestic celestial Korean palace floating above a midnight sea of violet-blue clouds and starry galaxy, radiant golden jade stairs and yin-yang qi halo in the sky."},
+
+    {"id": "floor_night_ch1", "group": "floor", "kind": "floor", "desc": "Moonlit packed dark-brown village dirt path ground texture with subtle pebble details and faint golden protective array dust lines, cool night tone."},
+    {"id": "floor_night_ch2", "group": "floor", "kind": "floor", "desc": "Dark-walnut lacquered inn courtyard wooden plank floor at night with subtle warm lantern sheen and fine wood grain."},
+    {"id": "floor_night_ch3", "group": "floor", "kind": "floor", "desc": "Rain-wet dark blue-grey stone slab market pavement at night with thin mortar seams and soft moonlit water reflections."},
+    {"id": "floor_night_ch4", "group": "floor", "kind": "floor", "desc": "Midnight mountain forest earth path with scattered dark autumn maple leaves and subtle mossy stone stepping slabs in cool moonlight."},
+    {"id": "floor_night_ch5", "group": "floor", "kind": "floor", "desc": "Moonlit slate-blue and pale-grey academy marble flagstones inlaid with subtle bronze geometric mechanism lines."},
+    {"id": "floor_night_ch6", "group": "floor", "kind": "floor", "desc": "Deep midnight frozen glacier ice plaza floor, dark navy-blue clear ice with subtle frost veins and faint cyan qi cracks."},
+    {"id": "floor_night_ch7", "group": "floor", "kind": "floor", "desc": "Night desert canyon floor of cool moonlit russet-brown compacted sand ripples and weathered sandstone slabs."},
+    {"id": "floor_night_ch8", "group": "floor", "kind": "floor", "desc": "Midnight wooden rescue ship deck planks darkened by ocean spray, iron rivets and subtle wet lantern reflection."},
+    {"id": "floor_night_ch9", "group": "floor", "kind": "floor", "desc": "Dark cooled volcanic basalt stone floor at night with thin dim orange ember cracks and dark ash texture."},
+    {"id": "floor_night_ch10", "group": "floor", "kind": "floor", "desc": "Celestial midnight obsidian-and-starlight jade temple floor with subtle inlaid golden constellations and soft cloud swirls."},
+
+    {"id": "mut_swarmRat", "group": "mutant", "kind": "mutant", "desc": "Midnight Poison Rat mutant ('심야 독쥐'): a mischievous round chubby dark-violet shadow rat monster with glowing magenta eyes, spiky purple fur, tiny fangs, curled dynamically like a rolling battle token."},
+    {"id": "mut_sickHound", "group": "mutant", "kind": "mutant", "desc": "Plague Wild Hound mutant ('역병 들개'): a fierce compact indigo-purple shadow wolf-hound beast lunging forward with glowing violet eyes, dark purple smoky mane, bared fangs."},
+    {"id": "mut_ironBoar", "group": "mutant", "kind": "mutant", "desc": "Iron-Hide Boar mutant ('철피 멧돼지'): a stocky armored wild boar monster clad in dark gunmetal-iron plates with gleaming silver tusks and glowing red eyes, charging stance."},
+    {"id": "mut_shieldYacha", "group": "mutant", "kind": "mutant", "desc": "Bone-Shield Yacha mutant ('뼈방패 야차'): a compact terracotta-red horned night imp warrior holding a large curved ivory bone shield in front, glowing amber eyes."},
+    {"id": "mut_plagueToad", "group": "mutant", "kind": "mutant", "desc": "Miasma Poison Toad mutant ('독안개 두꺼비'): a round puffed-up deep purple-and-crimson spotted giant toad monster with glowing yellow eyes and dark violet poison vapor puffs on its back (strictly purple and crimson skin, zero green)."},
+    {"id": "mut_bloodCocoon", "group": "mutant", "kind": "mutant", "desc": "Blood-Venom Fission Beetle ('혈독 분열충'): a round ruby-crimson armored scarab cocoon monster with glowing red core cracks ready to split, dark chitin shell and mandibles."},
+    {"id": "mut_heukpung", "group": "mutant", "kind": "mutant", "desc": "Raider Vanguard Heukpung boss token ('약탈 선봉 흑풍'): a menacing chibi dark-crimson armored bandit chief monster wearing a black iron wolf helmet, dual iron cleavers and red cape."},
+    {"id": "mut_mukhyeonBoss", "group": "mutant", "kind": "mutant", "desc": "Corrupted Rival Mukhyeon boss token ('독기에 물든 묵현'): a dramatic chibi dark-purple corrupted swordsman shrouded in swirling violet-black shadow flames, glowing purple eyes and dark headband."},
+    {"id": "mut_chapterBoss", "group": "mutant", "kind": "mutant", "desc": "Midnight Great Demon Overlord ('심야 대요마'): an imposing chibi crimson-and-obsidian horned demon king monster with blazing magenta-gold crown horns and dark cosmic cape."},
+
+    {"id": "tower_guardian", "group": "launcher", "kind": "launcher", "desc": "Central Qi Resonance Guardian Tower ('중앙 기명 수호탑'): an ornate octagonal Korean wuxia stone-and-gold pagoda altar topped with a levitating radiant golden-white yin-yang guardian pearl emitting warm protective light."},
+    {"id": "launcher_rapid", "group": "launcher", "kind": "launcher", "desc": "Rapid Alkkagi Stone Repeater Turret ('속사 탄지기'): a sleek cobalt-blue and dark-wood Korean mechanical multi-shot crossbow turret loaded with glossy white go stones, brass gears on the sides."},
+    {"id": "launcher_heavy", "group": "launcher", "kind": "launcher", "desc": "Heavy Siege Breaker Stone Cannon ('중포 탄지기'): a powerful heavy bronze-and-iron tiger-mouth siege catapult cannon glowing with fiery orange-gold runes, cradling a massive heavy stone."},
+    {"id": "launcher_curveSpin", "group": "launcher", "kind": "launcher_magenta", "desc": "Curved Spin Vortex Turret ('곡사 회전기'): an elegant jade-teal and brass curved spiral-rail launcher device with a spinning cyan wind-qi rotor launching a curving stone."},
+    {"id": "launcher_frostField", "group": "launcher", "kind": "launcher", "desc": "Frost Field Glacial Turret ('한빙 역장기'): a crystalline ice-blue and silver lotus turret carved from eternal glacier crystal, radiating cool azure frost snowflakes around a white stone."},
+    {"id": "launcher_qiAmplifier", "group": "launcher", "kind": "launcher", "desc": "Inner Qi Amplifier Array ('내공 증폭기'): a radiant golden eight-trigram bagua resonance drum and floating gold ring pillar pulsing with warm amber martial-arts energy."},
+    {"id": "village_granary", "group": "launcher", "kind": "launcher", "desc": "Protected Village Granary ('식량 창고'): a charming traditional Korean tiled-roof wooden storehouse filled with plump golden-tan tied rice sacks and warm glowing paper lantern."},
+    {"id": "village_crops", "group": "launcher", "kind": "launcher_magenta", "desc": "Protected Village Farmland Crops ('농산물 논밭'): a lush miniature raised wooden planter plot bursting with ripe golden-green rice stalks and plump amber grain ears glowing with warm vitality."},
+    {"id": "village_livestock", "group": "launcher", "kind": "launcher", "desc": "Protected Village Livestock Pen ('가축 외양간'): an adorable healthy tan Korean ox resting peacefully beside hay bales under a cozy lantern-lit wooden thatch shelter."},
+
+    {"id": "stone_cheongok", "group": "stone", "kind": "stone_magenta", "desc": "Grade 1 Cheongok Jade Stone ('청옥'): a smooth round translucent celadon-jade go stone with gentle emerald-teal inner luster."},
+    {"id": "stone_wood", "group": "stone", "kind": "stone", "desc": "Grade 2 Ten-Thousand-Year Spirit Wood Stone ('만년기주'): a warm polished amber-oak wooden go stone with concentric golden tree-ring swirls."},
+    {"id": "stone_hyeoncheol", "group": "stone", "kind": "stone", "desc": "Grade 3 Dark Heavy Iron Stone ('현철'): a dense forged gunmetal-black iron go stone with riveted silver-blue metallic sheen."},
+    {"id": "stone_obsidian", "group": "stone", "kind": "stone", "desc": "Grade 4 Volcanic Obsidian Stone ('흑요석'): a razor-glossy jet-black volcanic glass go stone with sharp violet-purple crystalline reflections."},
+    {"id": "stone_granite", "group": "stone", "kind": "stone", "desc": "Grade 5 Fortress Granite Stone ('반석'): a rugged warm grey-ochre mountain granite go stone carved with a sturdy earth-shield纹 emblem."},
+    {"id": "stone_ice", "group": "stone", "kind": "stone_magenta", "desc": "Grade 6 Glacial White Jade Stone ('빙백한옥'): a pristine translucent ice-cyan crystal go stone with delicate white frost star patterns inside."},
+    {"id": "stone_diamond", "group": "stone", "kind": "stone", "desc": "Grade 7 Vajra Diamond Stone ('금강석'): a brilliant multi-faceted sky-white diamond go stone sparkling with crisp silver-gold starlight."},
+    {"id": "stone_jageum", "group": "stone", "kind": "stone", "desc": "Grade 8 Royal Purple-Gold Stone ('자금석'): a regal deep amethyst-purple go stone veined with gleaming molten gold seams."},
+    {"id": "stone_uncheol", "group": "stone", "kind": "stone", "desc": "Grade 9 Starfall Meteoric Iron Stone ('운철'): a cosmic dark-cobalt meteorite go stone glowing with fiery blue-silver crater patterns."},
+    {"id": "stone_hancheol", "group": "stone", "kind": "stone_magenta", "desc": "Grade 10 Abyssal Cold-Steel Stone ('한철'): a gleaming deep-arctic steel go stone rimmed with sharp cyan-blue frost blades."},
+    {"id": "stone_onok", "group": "stone", "kind": "stone_magenta", "desc": "Grade 11 Millennium Warm Jade Stone ('천년온옥'): a sacred luminous aquamarine-jade go stone with a warm golden lotus heart glowing inside."},
+    {"id": "stone_yongrin", "group": "stone", "kind": "stone", "desc": "Grade 12 Dragon-Scale Sovereign Stone ('용린석'): a radiant golden-amber go stone embossed with layered imperial dragon scales and crimson fire highlights."},
+    {"id": "stone_taegeuk", "group": "stone", "kind": "stone", "desc": "Grade 13 Primordial Taegeuk Sacred Stone ('태극석'): the ultimate supreme guardian go stone swirling with luminous gold, crimson, and celestial sapphire yin-yang harmony."},
+
+    {"id": "night_token", "group": "icon", "kind": "icon", "desc": "Guardian Defense Token ('수호 증표'): a hexagonal bronze-and-gold martial emblem coin embossed with a guardian shield and glowing white stone."},
+    {"id": "night_elixir", "group": "icon", "kind": "icon_magenta", "desc": "Celestial Spirit Elixir ('천기 영약'): an ornate jade-and-gold porcelain gourd bottle uncorked with luminous cyan-gold qi mist swirling inside the neck."},
+    {"id": "night_support_seal", "group": "icon", "kind": "icon", "desc": "Murim Guardian Corps Summon Medallion ('무림수호단 지원패 · 출두 마패'): a gleaming circular Joseon royal secret-inspector brass medallion engraved with three galloping golden horses and a flowing crimson silk tassel."},
+    {"id": "night_convoy_cart", "group": "icon", "kind": "icon", "desc": "Midnight Supply Convoy Wagon ('물자 호송 수레'): a sturdy wooden two-wheeled Korean supply cart piled high with tied golden grain sacks and a warm glowing lantern on the front pole."},
+    {"id": "night_serendipity", "group": "icon", "kind": "icon", "desc": "Fortuitous Serendipity Destiny Orb ('기연 보주'): a radiant golden-amber celestial pearl cradling a four-point star sparkle above red-and-gold silk ribbons."},
+    {"id": "night_meridian", "group": "icon", "kind": "icon", "desc": "Ten-Meridian Qi Meditation Scroll ('기명 심법 수련'): a deep navy silk scroll Diagram showing a golden lotus meditation silhouette with glowing golden acupoint stars connected by lines."},
+    {"id": "night_endless", "group": "icon", "kind": "icon", "desc": "Endless Midnight Survival Emblem ('심야 무한 혈전'): a dramatic dark-iron shield in front of a blazing crimson full moon with two crossed golden spears."},
+    {"id": "potion_qiSurgePill", "group": "icon", "kind": "icon_magenta", "desc": "Qi Surge Pill ('기공 급속단'): a luminous emerald-teal elixir pearl crackling with golden lightning arcs inside an open lacquered pill box."},
+    {"id": "potion_guardianRepairSeal", "group": "icon", "kind": "icon", "desc": "Guardian Tower Repair Talisman ('수호탑 수리패'): a sapphire-blue and gold carved wooden protective talisman plaque bearing a glowing barrier dome symbol and golden hammer."},
+    {"id": "potion_auroraCritCharm", "group": "icon", "kind": "icon", "desc": "Aurora Critical Strike Charm ('극광 회심부'): a blazing amber-crimson paper talisman scroll with painted golden starburst markings and fiery sparks."},
+    {"id": "mat_hyeoncheolOre", "group": "icon", "kind": "icon", "desc": "Dark Heavy Iron Ore Chunk ('현철편'): a jagged chunk of metallic blue-grey meteoric iron ore glinting with silver facets."},
+    {"id": "mat_moonHerb", "group": "icon", "kind": "icon_magenta", "desc": "Moonlight Spirit Herb ('야광초'): a glowing bioluminescent mint-jade spirit plant with three crescent-shaped leaves and silver dew drops."},
+    {"id": "mat_frostJade", "group": "icon", "kind": "icon_magenta", "desc": "Frost Jade Crystal ('한빙옥'): a cluster of sharp translucent sky-blue frost jade crystals."},
+    {"id": "mat_thunderPowder", "group": "icon", "kind": "icon", "desc": "Thunder Essence Powder Pouch ('천뢰화약'): a small open ceramic dish overflowing with glowing golden-yellow lightning dust and tiny electric sparks."},
+
+    {"id": "fx_chuldu", "group": "fx", "kind": "fx", "desc": "Grand Murim Guardian Charge Burst ('무림수호단 출두 충격파'): an explosive radial golden shockwave ring with streaking white-gold comet rays and golden horse-medallion light beams."},
+    {"id": "fx_barrier", "group": "fx", "kind": "fx", "desc": "Central Guardian Shield Resonance Wave ('기명 방어막 파동'): a luminous octagonal golden-blue energy dome ripple ring with crisp geometric protective runes."},
+
+    {"id": "appicon_night_a", "group": "appicon", "kind": "appicon", "desc": "A big glossy white guardian go stone with a determined cute face and a golden martial-arts headband shooting out from a glowing golden pagoda shield on the left, smashing a comical dizzy purple-horned night monster stone off a moonlit stone wall under a crescent moon; dramatic golden shockwave sparks, deep midnight indigo-and-crimson sky filling the square."},
+    {"id": "appicon_night_b", "group": "appicon", "kind": "appicon", "desc": "A cute heroic chibi young Korean wuxia guardian in a navy-and-gold robe standing beside a glowing goldenstone launcher turret at night, cheering as a blazing golden-white go stone blasts a surprised purple shadow-rat monster stone into the starry night sky; crescent moon and warm village lantern glow behind."},
+
+    {"id": "mut_swiftShadowBoss", "group": "mutant", "kind": "mutant", "desc": "Blood-Shadow Gale Oni mid-boss ('혈영 질풍귀'): sleek agile chibi dark-indigo and crimson wolf-masked shadow assassin demon sprinting low with twin glowing violet wind-claws and streaming tattered dark-red scarf, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_ironColossusBoss", "group": "mutant", "kind": "mutant", "desc": "Dark-Iron Juggernaut Behemoth mid-boss ('현철 중갑거수'): massive hulking chibi gunmetal-black layered iron-plate golem beast with golden bull-horns, glowing amber furnace core and heavy iron gauntlets marching unstoppably, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_crimsonBreakerBoss", "group": "mutant", "kind": "mutant", "desc": "Crimson Siege-Breaker Demon General mid-boss ('적염 파성귀'): fierce muscular chibi crimson-and-obsidian horned warlord demon carrying a blazing fiery orange-red spiked siege war-mace on his shoulder, glowing golden eyes, ZERO green anywhere, centered on flat solid #00FF00."},
+
+    {"id": "mut_swarmRat_atk", "group": "mutant", "kind": "mutant", "desc": "Midnight Poison Rat ('심야 독쥐') lunging forward jaws wide open snapping with glowing purple-crimson bite slash, spiky violet fur stretched forward in mid-pounce, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_sickHound_atk", "group": "mutant", "kind": "mutant", "desc": "Plague Wild Hound ('역병 들개') mid-air ferocious pounce with bared fangs and twin violet claw slash arcs extended forward, dark purple smoky mane flaring back, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_ironBoar_atk", "group": "mutant", "kind": "mutant", "desc": "Iron-Hide Boar ('철피 멧돼지') head lowered in explosive battering-ram gore charge with blazing orange-silver shock sparks off its giant tusks, dark iron armor plates, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_shieldYacha_atk", "group": "mutant", "kind": "mutant", "desc": "Bone-Shield Yacha ('뼈방패 야차') slamming its heavy curved ivory bone shield forward with amber qi impact sparks, terracotta-red horned imp roaring, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_plagueToad_atk", "group": "mutant", "kind": "mutant", "desc": "Miasma Poison Toad ('독안개 두꺼비') cheeks puffed and mouth wide open blasting a concentrated deep purple-and-crimson venom orb forward while mid-hop (strictly purple, magenta and crimson colors only, ZERO green and ZERO cyan anywhere), centered on flat solid #00FF00."},
+    {"id": "mut_bloodCocoon_atk", "group": "mutant", "kind": "mutant", "desc": "Blood-Venom Fission Beetle ('혈독 분열충') shell plates flared open glowing incandescent ruby-red with pincers lunging and crimson energy crackling before burst, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_swiftShadowBoss_atk", "group": "mutant", "kind": "mutant", "desc": "Blood-Shadow Gale Oni ('혈영 질풍귀') sleek agile chibi dark-indigo and crimson wolf-masked shadow assassin demon with streaming tattered dark-red scarf in explosive forward X-slash dash, twin crimson-violet wind claws crossing in a fiery crescent arc, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_ironColossusBoss_atk", "group": "mutant", "kind": "mutant", "desc": "Dark-Iron Juggernaut ('현철 중갑거수') massive hulking chibi gunmetal-black layered iron-plate golem beast with golden bull-horns and glowing amber chest furnace core, both giant iron fists raised and slamming down with molten gold shockwave cracks, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_crimsonBreakerBoss_atk", "group": "mutant", "kind": "mutant", "desc": "Crimson Siege-Breaker ('적염 파성귀') swinging his massive blazing crimson-gold spiked siege mace forward in a devastating smash arc, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_heukpung_atk", "group": "mutant", "kind": "mutant", "desc": "Raider Vanguard Heukpung ('약탈 선봉 흑풍') leaping forward slashing both heavy iron cleavers in a fiery crimson cross-strike, black wolf helmet and red cape flying, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_mukhyeonBoss_atk", "group": "mutant", "kind": "mutant", "desc": "Corrupted Rival Mukhyeon ('독기에 물든 묵현') unleashing a sweeping dark-violet and crimson crescent sword-qi slash forward, shadow flames swirling, ZERO green anywhere, centered on flat solid #00FF00."},
+    {"id": "mut_chapterBoss_atk", "group": "mutant", "kind": "mutant", "desc": "Midnight Great Demon Overlord ('심야 대요마') arms thrust forward summoning a catastrophic crimson-gold and violet demonic shockwave orb, blazing crown horns, ZERO green anywhere, centered on flat solid #00FF00."},
+
+    {"id": "fx_breach_gate", "group": "fx", "kind": "fx", "desc": "Midnight Mutant Invasion Rift Gate ('심야 독기 침공 균열문'), swirling top-down vortex portal of dark-crimson, violet shadow flames and jagged golden-red dimensional cracks from which monsters emerge, ZERO green anywhere, centered filling 85% of square on flat solid #00FF00."}
+  ]
+}
