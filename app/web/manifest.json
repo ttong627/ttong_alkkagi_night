@@ -1,0 +1,35 @@
+{
+    "name": "수호알까기 · 탄지무림 심야기습",
+    "short_name": "수호알까기",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0B0F19",
+    "theme_color": "#0B0F19",
+    "description": "자동 탄지 진법과 영수·동료로 심야 돌연변이 기습을 막아 열 마을을 지키는 무협 물리 디펜스",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

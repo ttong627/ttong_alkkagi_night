@@ -1,0 +1,66 @@
+# 수호알까기 · 탄지무림 심야기습 — 자동 검증(111단계 시뮬레이션) + 안드로이드 설치판/스토어판 빌드
+name: app
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: 3.47.6
+
+permissions:
+  contents: read
+
+jobs:
+  verify_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: 방어 물리 엔진 정적 분석 · 단위 시험 · 111단계 구성 검증
+        working-directory: packages/defense_core
+        run: |
+          dart pub get
+          dart analyze --fatal-infos
+          dart test
+          dart run bin/defense_verify_sim.dart
+      - name: 플러터 앱 정적 분석 · 통합 위젯 시험
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter analyze --fatal-infos
+          flutter test
+
+  android_build:
+    needs: verify_and_test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: APK 및 스토어 AAB 묶음 파일 빌드
+        working-directory: app
+        run: |
+          flutter pub get
+          BUILD_NUM=$((100 + GITHUB_RUN_NUMBER))
+          flutter build apk --release --flavor sideload --build-number "$BUILD_NUM"
+          flutter build appbundle --release --flavor play --build-number "$BUILD_NUM"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: suho-alkkagi-night-releases
+          path: |
+            app/build/app/outputs/flutter-apk/app-sideload-release.apk
+            app/build/app/outputs/bundle/playRelease/app-play-release.aab
