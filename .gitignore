@@ -13,3 +13,6 @@ __pycache__/
 
 **/.dart_tool/
 **/.kotlin/
+
+**/.flutter-plugins-dependencies
+**/build/
