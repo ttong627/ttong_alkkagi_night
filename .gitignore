@@ -10,3 +10,6 @@ key.properties
 .claude/
 __pycache__/
 *.pyc
+
+**/.dart_tool/
+**/.kotlin/
