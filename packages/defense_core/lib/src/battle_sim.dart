@@ -414,28 +414,16 @@ class DefenseBattleSim {
       }
     }
 
-    if (!autoBuildForSimVerify) {
-      if (stage.hasRescueReward) {
-        callouts.add(
-          FloatingCallout(
-            pos: const Vec2(200, 178),
-            text: '🆘 ${stage.rescueBadgeText} 작전! 초소(${activeMounts.length}곳)에 발사대를 배치하세요!',
-            colorHex: 0xFF72EFDD,
-            ttlSec: 2.8,
-            isBigBanner: true,
-          ),
-        );
-      } else {
-        callouts.add(
-          FloatingCallout(
-            pos: const Vec2(200, 178),
-            text: '👆 빈 초소(${activeMounts.length}곳)를 눌러 발사대를 직접 배치하세요!',
-            colorHex: 0xFFFFD166,
-            ttlSec: 2.5,
-            isBigBanner: true,
-          ),
-        );
-      }
+    if (!autoBuildForSimVerify && stage.hasRescueReward) {
+      callouts.add(
+        FloatingCallout(
+          pos: const Vec2(200, 126),
+          text: '🆘 ${stage.rescueBadgeText} 작전!',
+          colorHex: 0xFF72EFDD,
+          ttlSec: 2.8,
+          isBigBanner: true,
+        ),
+      );
     }
 
     _enqueueWave(0);

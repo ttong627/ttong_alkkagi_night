@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:defense_core/defense_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -319,7 +321,7 @@ class NightBattleSprites {
     ChapterSpec chapter, {
     VoidCallback? onSpritesUpdated,
   }) async {
-    final paths = <String>[
+    final corePaths = <String>[
       chapter.floorAsset,
       NightArtRegistry.towerGuardian,
       NightArtRegistry.villageGranary,
@@ -334,6 +336,8 @@ class NightBattleSprites {
       NightArtRegistry.fxCombo,
       NightArtRegistry.fxLucky,
       NightArtRegistry.fxQi,
+    ];
+    final unitPaths = <String>[
       for (final lt in LauncherType.values) NightArtRegistry.launcherAsset(lt),
       for (final st in StoneMaterial.values) NightArtRegistry.stoneAsset(st),
       for (final mk in MutantKind.values) NightArtRegistry.mutantAsset(mk),
@@ -341,14 +345,13 @@ class NightBattleSprites {
       for (final sb in SpiritBeast.values) NightArtRegistry.beastAsset(sb),
     ];
 
-    bool newlyDecoded = false;
-    for (final path in paths) {
-      final ok = await _decodeSingleAsset(path);
-      if (ok) {
-        newlyDecoded = true;
-      }
+    final coreResults = await Future.wait(corePaths.map(_decodeSingleAsset));
+    if (coreResults.any((ok) => ok)) {
+      onSpritesUpdated?.call();
     }
-    if (newlyDecoded) {
+
+    final unitResults = await Future.wait(unitPaths.map(_decodeSingleAsset));
+    if (unitResults.any((ok) => ok)) {
       onSpritesUpdated?.call();
     }
   }
@@ -360,6 +363,10 @@ class NightBattleSprites {
     }
     _inFlight.add(assetPath);
     try {
+      if (kIsWeb) {
+        final ok = await _resolveViaImageProvider(assetPath);
+        if (ok) return true;
+      }
       final ByteData raw = await rootBundle.load(assetPath);
       if (raw.lengthInBytes == 0) {
         _missingOnce.add(assetPath);
@@ -374,10 +381,39 @@ class NightBattleSprites {
       _cache[assetPath] = frame.image;
       return true;
     } catch (_) {
+      if (kIsWeb) {
+        final ok = await _resolveViaImageProvider(assetPath);
+        if (ok) return true;
+      }
       _missingOnce.add(assetPath);
       return false;
     } finally {
       _inFlight.remove(assetPath);
     }
+  }
+
+  Future<bool> _resolveViaImageProvider(String assetPath) async {
+    final completer = Completer<bool>();
+    final stream = AssetImage(assetPath).resolve(ImageConfiguration.empty);
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener(
+      (ImageInfo info, bool _) {
+        _cache[assetPath] = info.image;
+        stream.removeListener(listener);
+        if (!completer.isCompleted) completer.complete(true);
+      },
+      onError: (Object _, StackTrace? _) {
+        stream.removeListener(listener);
+        if (!completer.isCompleted) completer.complete(false);
+      },
+    );
+    stream.addListener(listener);
+    return completer.future.timeout(
+      const Duration(seconds: 4),
+      onTimeout: () {
+        stream.removeListener(listener);
+        return false;
+      },
+    );
   }
 }
