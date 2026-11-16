@@ -1,4 +1,5 @@
 import 'campaign.dart';
+import 'mutants.dart';
 
 /// 물결 돌파 비급 카드 희귀도 등급.
 enum RoguePerkRarity {
@@ -259,4 +260,78 @@ class LightningArcFx {
   final Vec2 to;
   double ttlSec;
   final int colorHex;
+}
+
+/// 돌연변이·괴물 처치 순간 뒤로 튕겨 날아가며 산산조각 폭발하는 랙돌·파편 연출 객체!
+class MutantDeathRagdoll {
+  MutantDeathRagdoll({
+    required this.kind,
+    required this.pos,
+    required this.vel,
+    required this.spinVel,
+    required this.visualDiameter,
+    required this.bodyWidthRatio,
+    required this.colorHex,
+    required this.isCriticalKill,
+    this.rotationRad = 0.0,
+    this.durationSec = 0.44,
+  }) : ttlSec = durationSec;
+
+  final MutantKind kind;
+  Vec2 pos;
+  Vec2 vel;
+  double rotationRad;
+  final double spinVel;
+  final double visualDiameter;
+  final double bodyWidthRatio;
+  final int colorHex;
+  final bool isCriticalKill;
+  final double durationSec;
+  double ttlSec;
+
+  double get progress => (1.0 - (ttlSec / durationSec)).clamp(0.0, 1.0);
+}
+
+/// 발사대·중앙 수호탑 포구 화염 섬광 충격파 객체 (시원한 발사 타격감 연출).
+class MuzzleFlashFx {
+  MuzzleFlashFx({
+    required this.pos,
+    required this.angleRad,
+    required this.colorHex,
+    this.scale = 1.0,
+    this.durationSec = 0.14,
+  }) : ttlSec = durationSec;
+
+  final Vec2 pos;
+  final double angleRad;
+  final int colorHex;
+  final double scale;
+  final double durationSec;
+  double ttlSec;
+
+  double get progress => (1.0 - (ttlSec / durationSec)).clamp(0.0, 1.0);
+}
+
+/// 괴물 타격·치명타·격살 순간 머리 위로 튀어 오르는 타격 숫자 팝업 객체.
+class DamagePopupFx {
+  DamagePopupFx({
+    required this.pos,
+    required this.vel,
+    required this.damage,
+    required this.isCrit,
+    required this.isKill,
+    required this.colorHex,
+    this.durationSec = 0.56,
+  }) : ttlSec = durationSec;
+
+  Vec2 pos;
+  Vec2 vel;
+  final int damage;
+  final bool isCrit;
+  final bool isKill;
+  final int colorHex;
+  final double durationSec;
+  double ttlSec;
+
+  double get progress => (1.0 - (ttlSec / durationSec)).clamp(0.0, 1.0);
 }

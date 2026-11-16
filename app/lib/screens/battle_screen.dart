@@ -1716,7 +1716,9 @@ class _BattleScreenState extends State<BattleScreen>
                                     Text(
                                       _sim.feverTimer > 0
                                           ? '🔥피버 무쌍 ${_sim.feverTimer.toStringAsFixed(1)}초!'
-                                          : '${_sim.comboCount}연타 · 열기 ${_sim.feverGauge.round()}%',
+                                          : (_sim.killStreak >= 5
+                                              ? '💀${_sim.killStreak}연속 격살 · 열기 ${_sim.feverGauge.round()}%'
+                                              : '${_sim.comboCount}연타 · 열기 ${_sim.feverGauge.round()}%'),
                                       style: TextStyle(
                                         fontSize: 11.4,
                                         fontWeight: FontWeight.bold,

@@ -1247,12 +1247,13 @@ void main() {
       sim.step(1 / 60);
       expect(sim.projectiles, isEmpty);
 
-      // 도탄 궤적 예측선 및 수동 탄지 발사 검증
+      // 도탄 궤적 예측선 및 수동 탄지 3갈래 파쇄 산탄 발사 검증
       final ray = sim.previewCentralManualRay(-1.15);
       expect(ray.length, greaterThanOrEqualTo(2));
       expect(sim.fireCentralManualAt(const Vec2(200, 320)), isTrue);
-      expect(sim.projectiles.length, 1);
-      expect(sim.projectiles.first.pierceLeft, greaterThanOrEqualTo(2));
+      expect(sim.projectiles.length, 3);
+      expect(sim.muzzleFlashes, isNotEmpty);
+      expect(sim.projectiles.first.pierceLeft, greaterThanOrEqualTo(3));
     });
 
     test('제1장~제9장에 걸쳐 동료 13인과 영수 4종이 지속 구출되어 전원(동료 14인·영수 5종) 합류한다', () {
@@ -1394,6 +1395,39 @@ void main() {
       sim.step(1 / 60);
       expect(sim.projectiles.length, 2);
       expect(sim.cloneSplitCount, greaterThanOrEqualTo(1));
+    });
+
+    test('초고속 다연발 탄막·포구 섬광·괴물 사망 랙돌 파편·타격 숫자 팝업·위기 심장박동 긴장감이 작동한다', () {
+      final p = PlayerProgress();
+      final sim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 2),
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        seed: 77,
+      );
+      expect(LauncherType.rapid.projectilesPerShot(1), 2);
+      expect(LauncherType.rapid.projectilesPerShot(4), 5);
+      expect(LauncherType.rapid.baseCooldownSec, lessThan(0.45));
+
+      expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
+      sim.mutants.add(
+        ActiveMutant(
+          uid: 901,
+          kind: MutantKind.swarmRat,
+          laneIndex: 0,
+          waypoints: sim.chapter.smoothedLane(0),
+          pos: const Vec2(200, 480),
+          maxHp: 5.0,
+          speed: 20.0,
+        ),
+      );
+      for (int f = 0; f < 35; f++) {
+        sim.step(1 / 60);
+      }
+      expect(sim.dangerPulseLevel, greaterThan(0.0));
+      expect(sim.killCount, greaterThanOrEqualTo(1));
+      expect(sim.deathRagdolls, isNotEmpty);
+      expect(sim.damagePopups, isNotEmpty);
     });
   });
 }

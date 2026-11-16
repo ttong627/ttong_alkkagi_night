@@ -32,11 +32,11 @@ class NightBattlePainter extends CustomPainter {
     canvas.save();
     canvas.scale(sx, sy);
 
-    // 우두머리 등장·파성 강타 시 전장 진동 연출
+    // 우두머리 등장·파성 강타·중포 포격 시 전장 진동 연출
     if (sim.screenShakeTimer > 0) {
-      final amp = (sim.screenShakeIntensity * 3.4).clamp(0.0, 5.5);
-      final dx = sin(sim.elapsedSec * 52.0) * amp;
-      final dy = cos(sim.elapsedSec * 41.0) * amp * 0.72;
+      final amp = (sim.screenShakeIntensity * 1.15).clamp(0.0, 6.8);
+      final dx = sin(sim.elapsedSec * 58.0) * amp;
+      final dy = cos(sim.elapsedSec * 47.0) * amp * 0.75;
       canvas.translate(dx, dy);
     }
 
@@ -51,14 +51,18 @@ class NightBattlePainter extends CustomPainter {
     _drawManualAimRay(canvas);
     _drawCentralGuardianTower(canvas);
     _drawPathLaunchers(canvas);
+    _drawMuzzleFlashes(canvas);
     _drawGoldenToad(canvas);
+    _drawDeathRagdollsAndShards(canvas);
     _drawMutants(canvas);
     _drawProjectilesAndTrails(canvas);
     _drawLightningAndFlyingQiOrbs(canvas);
     _drawFxBursts(canvas);
     _drawChulduSweepWave(canvas);
     _drawDawnPurifyWave(canvas);
+    _drawDangerTensionPulse(canvas);
     _drawFeverFrameAura(canvas);
+    _drawDamagePopups(canvas);
     _drawFloatingCallouts(canvas);
 
     canvas.restore();
@@ -1582,18 +1586,29 @@ class NightBattlePainter extends CustomPainter {
     for (final p in sim.projectiles) {
       final col = Color(p.colorHex);
       if (p.trail.length >= 2) {
-        final path = Path()..moveTo(p.trail.first.x, p.trail.first.y);
         for (int i = 1; i < p.trail.length; i++) {
-          path.lineTo(p.trail[i].x, p.trail[i].y);
+          final tRatio = i / p.trail.length;
+          final aPt = Offset(p.trail[i - 1].x, p.trail[i - 1].y);
+          final bPt = Offset(p.trail[i].x, p.trail[i].y);
+          canvas.drawLine(
+            aPt,
+            bPt,
+            Paint()
+              ..color = col.withValues(alpha: 0.58 * tRatio)
+              ..strokeWidth = p.radius * (0.45 + 0.95 * tRatio)
+              ..strokeCap = StrokeCap.round,
+          );
+          if (i >= p.trail.length - 3) {
+            canvas.drawLine(
+              aPt,
+              bPt,
+              Paint()
+                ..color = Colors.white.withValues(alpha: 0.62 * tRatio)
+                ..strokeWidth = p.radius * 0.36 * tRatio
+                ..strokeCap = StrokeCap.round,
+            );
+          }
         }
-        canvas.drawPath(
-          path,
-          Paint()
-            ..color = col.withValues(alpha: 0.45)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = p.radius * 0.9
-            ..strokeCap = StrokeCap.round,
-        );
       }
 
       final c = Offset(p.pos.x, p.pos.y);
@@ -1814,6 +1829,144 @@ class NightBattlePainter extends CustomPainter {
           8.8,
         );
       }
+    }
+  }
+
+  /// 포탑·중앙 수호탑 발사 순간 시원하게 뿜어지는 포구 화염 섬광(MuzzleFlashFx) 연출!
+  void _drawMuzzleFlashes(Canvas canvas) {
+    for (final mf in sim.muzzleFlashes) {
+      final prog = mf.progress;
+      final alpha = (1.0 - prog).clamp(0.0, 1.0);
+      final col = Color(mf.colorHex);
+      canvas.save();
+      canvas.translate(mf.pos.x, mf.pos.y);
+      canvas.rotate(mf.angleRad);
+
+      final len = (20.0 + prog * 14.0) * mf.scale;
+      final wid = (9.5 - prog * 3.0) * mf.scale;
+      final cone = Path()
+        ..moveTo(-2, -wid * 0.45)
+        ..lineTo(len, 0)
+        ..lineTo(-2, wid * 0.45)
+        ..close();
+      canvas.drawPath(
+        cone,
+        Paint()..color = col.withValues(alpha: alpha * 0.72),
+      );
+      final inner = Path()
+        ..moveTo(0, -wid * 0.22)
+        ..lineTo(len * 0.68, 0)
+        ..lineTo(0, wid * 0.22)
+        ..close();
+      canvas.drawPath(
+        inner,
+        Paint()..color = Colors.white.withValues(alpha: alpha * 0.88),
+      );
+      for (final sparkA in const [-0.42, -0.18, 0.18, 0.42]) {
+        final d = len * (0.55 + prog * 0.45);
+        canvas.drawLine(
+          Offset.zero,
+          Offset(cos(sparkA) * d, sin(sparkA) * d),
+          Paint()
+            ..color = NightPalette.accentGold.withValues(alpha: alpha * 0.85)
+            ..strokeWidth = 1.6 * mf.scale
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+      canvas.restore();
+    }
+  }
+
+  /// 돌연변이·괴물이 총탄과 포격에 맞아 죽을 때 회전하며 뒤로 튕겨 나가 산산조각 터지는 랙돌 연출!
+  void _drawDeathRagdollsAndShards(Canvas canvas) {
+    for (final r in sim.deathRagdolls) {
+      final prog = r.progress;
+      final alpha = (1.0 - prog * 0.92).clamp(0.0, 1.0);
+      final c = Offset(r.pos.x, r.pos.y);
+      final shrink = (1.08 - prog * 0.52).clamp(0.35, 1.15);
+      final w = r.visualDiameter * r.bodyWidthRatio * shrink;
+      final h = r.visualDiameter * shrink;
+
+      final sprite = sprites.mutantAttackOf(r.kind) ?? sprites.mutantOf(r.kind);
+      if (sprite != null) {
+        final flashTint = prog < 0.28
+            ? Colors.white.withValues(alpha: (1.0 - prog / 0.28) * 0.80)
+            : Color(r.colorHex).withValues(alpha: 0.55);
+        _drawSpriteCentered(
+          canvas,
+          sprite,
+          c,
+          width: w,
+          height: h,
+          rotationRad: r.rotationRad,
+          opacity: alpha,
+          tintColor: flashTint,
+        );
+      } else {
+        canvas.drawCircle(
+          c,
+          w * 0.42,
+          Paint()..color = Color(r.colorHex).withValues(alpha: alpha),
+        );
+      }
+
+      // 사방으로 튀는 수묵·독기·불꽃 파편 조각 (일반 8조각, 치명·보스 12조각)
+      final shardCount = r.isCriticalKill ? 12 : 8;
+      final burstDist = (14.0 + r.visualDiameter * 0.55) * prog;
+      final shardCol = r.isCriticalKill ? const Color(0xFFFF6B35) : Color(r.colorHex);
+      for (int k = 0; k < shardCount; k++) {
+        final a = (k * 2 * pi / shardCount) + r.spinVel * 0.08;
+        final dist = burstDist * (0.72 + (k % 3) * 0.22);
+        final sc = c + Offset(cos(a) * dist, sin(a) * dist);
+        final sz = (r.isCriticalKill ? 4.4 : 3.1) * (1.0 - prog * 0.65);
+        canvas.drawCircle(
+          sc,
+          sz,
+          Paint()..color = (k.isEven ? shardCol : NightPalette.accentGold).withValues(alpha: alpha * 0.9),
+        );
+      }
+    }
+  }
+
+  /// 본진 위기 긴장감(dangerPulseLevel) 심장박동 적색 비네팅 테두리!
+  void _drawDangerTensionPulse(Canvas canvas) {
+    if (sim.dangerPulseLevel <= 0.05) return;
+    final beat = 0.45 + 0.55 * sin(sim.elapsedSec * 9.5).abs();
+    final intensity = (sim.dangerPulseLevel * beat).clamp(0.0, 1.0);
+    final borderColor = const Color(0xFFE63946).withValues(alpha: 0.55 * intensity);
+
+    canvas.drawRect(
+      const Rect.fromLTWH(3, 3, CampaignCatalog.arenaWidth - 6, CampaignCatalog.arenaHeight - 6),
+      Paint()
+        ..color = borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6.5
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    canvas.drawRect(
+      const Rect.fromLTWH(1.5, 1.5, CampaignCatalog.arenaWidth - 3, CampaignCatalog.arenaHeight - 3),
+      Paint()
+        ..color = const Color(0xFFFF4D6D).withValues(alpha: 0.72 * intensity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4,
+    );
+  }
+
+  /// 괴물 머리 위로 톡톡 튀어 오르는 시원한 타격 데미지 숫자 팝업!
+  void _drawDamagePopups(Canvas canvas) {
+    for (final dp in sim.damagePopups) {
+      final prog = dp.progress;
+      final alpha = prog < 0.70 ? 1.0 : ((1.0 - prog) / 0.30).clamp(0.0, 1.0);
+      final popScale = prog < 0.16 ? (0.85 + (prog / 0.16) * 0.35) : 1.0;
+      final fontSize = (dp.isCrit ? 13.4 : (dp.isKill ? 11.8 : 10.2)) * popScale;
+      final label = dp.isCrit ? '💥${dp.damage}!' : '${dp.damage}';
+      _paintMiniText(
+        canvas,
+        label,
+        Offset(dp.pos.x.clamp(24.0, 376.0), dp.pos.y.clamp(24.0, 640.0)),
+        Color(dp.colorHex).withValues(alpha: alpha),
+        fontSize,
+      );
     }
   }
 

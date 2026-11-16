@@ -358,8 +358,18 @@ class DefenseBattleSim {
   int goblinSpawnsDone = 0;
   final List<FlyingQiOrb> flyingQiOrbs = [];
   final List<LightningArcFx> lightningArcs = [];
+  final List<MutantDeathRagdoll> deathRagdolls = [];
+  final List<MuzzleFlashFx> muzzleFlashes = [];
+  final List<DamagePopupFx> damagePopups = [];
   final Set<int> _earlyCalledWaves = {};
   final Set<int> _waveUnlockAnnounced = {};
+  final Set<int> _waveClimaxAnnounced = {};
+
+  /// 연속 격살 체인(Kill Streak) 및 본진 위기 심장박동 긴장감 지표(0.0 ~ 1.0).
+  int killStreak = 0;
+  int bestKillStreak = 0;
+  double killStreakTimer = 0.0;
+  double dangerPulseLevel = 0.0;
 
   /// 지원패(암행어사 출두) 슬롯 및 연출 타이머.
   int supportChargesLeft = 0;
@@ -831,7 +841,7 @@ class DefenseBattleSim {
     if (isFinished) return false;
     if (currentWaveIndex + 1 >= stage.waves.length) return false;
     if (_earlyCalledWaves.contains(currentWaveIndex + 1)) return false;
-    return _spawnQueue.length <= 4 && elapsedSec >= 3.0;
+    return _spawnQueue.length <= 8 && elapsedSec >= 3.0;
   }
 
   /// 다음 물결을 즉시 앞당겨 호출하고 보너스 건설 기력 +18⚡ 획득!
@@ -1141,7 +1151,7 @@ class DefenseBattleSim {
     return fireCentralManualAngle(rawAngle);
   }
 
-  /// 플레이어가 조준한 각도로 중앙 기명 수호탑 수동 강화 탄지 발사!
+  /// 플레이어가 조준한 각도로 중앙 기명 수호탑 수동 강화 탄지 발사 (3갈래 파쇄 산탄포)!
   bool fireCentralManualAngle(double rawAngleRad) {
     if (!isCentralReadyToFire) return false;
     final angle = sanitizeManualAimAngle(rawAngleRad);
@@ -1149,57 +1159,84 @@ class DefenseBattleSim {
     centralRecoilAnim = 1.0;
     manualResonanceTimer = 7.5; // 수동 탄지 발사 시 7.5초간 동료·영수 공명 활성화!
     final feverBoost = feverTimer > 0 ? 1.65 : 1.0;
-    centralFireTimer = (centralSpec.fireIntervalSec * 0.56) /
+    centralFireTimer = (centralSpec.fireIntervalSec * 0.40) /
         ((auroraCritTimer > 0 ? 1.55 : 1.0) * feverBoost);
-    pendingSounds.add(SoundCue.gearMotion);
+    pendingSounds.add(SoundCue.bowMotion);
+    screenShakeTimer = max(screenShakeTimer, 0.11);
+    screenShakeIntensity = max(screenShakeIntensity, 2.5);
 
     final origin = CampaignCatalog.centralTowerPos;
+    final muzzlePos = origin + Vec2(cos(angle) * 22.0, sin(angle) * 22.0);
+    if (muzzleFlashes.length < 28) {
+      muzzleFlashes.add(
+        MuzzleFlashFx(
+          pos: muzzlePos,
+          angleRad: angle,
+          colorHex: 0xFFFFD166,
+          scale: 1.50,
+        ),
+      );
+    }
 
     if (qiBars >= 2.95) {
       qiBars = 0.0;
-      final count = progress.realm.eogieoseokCount + 2;
+      final count = progress.realm.eogieoseokCount + 4;
+      screenShakeTimer = max(screenShakeTimer, 0.26);
+      screenShakeIntensity = max(screenShakeIntensity, 5.2);
       callouts.add(
         FloatingCallout(
           pos: origin + const Vec2(0, -48),
-          text: '⚡ 수동 어기어석 일제 탄지! ($count기 관통 파쇄!)',
+          text: '⚡ 수동 어기어석 초필살 일제탄지! ($count기 폭풍 파쇄!)',
           colorHex: 0xFFFFD166,
           isBigBanner: true,
         ),
       );
       for (int i = 0; i < count; i++) {
-        final spread = (i - (count - 1) / 2.0) * 0.11;
+        final spread = (i - (count - 1) / 2.0) * 0.10;
         _spawnManualDirectionalShot(
-          origin: origin + Vec2((i - (count - 1) / 2.0) * 8.0, -6),
+          origin: origin + Vec2((i - (count - 1) / 2.0) * 7.0, -6),
           angleRad: angle + spread,
-          baseDamage: centralSpec.baseDamage * 2.55,
-          speed: 415,
-          pierceBonus: 4,
-          aoeRadius: 54,
+          baseDamage: centralSpec.baseDamage * 2.65,
+          speed: 535,
+          pierceBonus: 5,
+          aoeRadius: 58,
           ignoresShield: true,
-          knockbackScale: 1.50,
+          knockbackScale: 1.65,
         );
       }
       return true;
     }
 
     SectTechnique? sectTech;
-    double dmgMult = 1.82; // 수동 직접 탄지 초장거리 정밀 저격 화력 가산!
+    double dmgMult = 1.75; // 수동 직접 탄지 초장거리 파쇄 주포!
     if (qiBars >= 1.0) {
       qiBars -= 1.0;
       sectTech = preset.sectTechnique;
       dmgMult *= 1.35;
     }
 
+    // 정중앙 대구경 파쇄탄 + 좌우 2갈래 호위 비검탄 = 총 3갈래 시원한 일제 탄막!
     _spawnManualDirectionalShot(
       origin: origin + const Vec2(0, -6),
       angleRad: angle,
       baseDamage: centralSpec.baseDamage * dmgMult,
-      speed: 405,
-      pierceBonus: 2,
-      aoeRadius: 30,
-      knockbackScale: 1.35,
+      speed: 520,
+      pierceBonus: 3,
+      aoeRadius: 38,
+      knockbackScale: 1.50,
       sectTech: sectTech,
     );
+    for (final wing in const [-0.13, 0.13]) {
+      _spawnManualDirectionalShot(
+        origin: origin + Vec2(wing * 45.0, -6),
+        angleRad: angle + wing,
+        baseDamage: centralSpec.baseDamage * dmgMult * 0.56,
+        speed: 495,
+        pierceBonus: 2,
+        aoeRadius: 0,
+        knockbackScale: 1.10,
+      );
+    }
     return true;
   }
 
@@ -1214,7 +1251,7 @@ class DefenseBattleSim {
     double knockbackScale = 1.0,
     SectTechnique? sectTech,
   }) {
-    if (projectiles.length >= 64) {
+    if (projectiles.length >= 180) {
       projectiles.removeAt(0);
     }
     final stone = preset.primaryStone;
@@ -1524,6 +1561,26 @@ class DefenseBattleSim {
       comboResetTimer = max(0, comboResetTimer - dt);
       if (comboResetTimer <= 0) comboCount = 0;
     }
+    if (killStreakTimer > 0) {
+      killStreakTimer = max(0, killStreakTimer - dt);
+      if (killStreakTimer <= 0) killStreak = 0;
+    }
+
+    // 본진 위기 긴장감(dangerPulseLevel) 계산: 괴물이 마을 코앞(y >= 445)에 육박하거나 방어막이 45% 이하일 때 적색 심장박동 점등!
+    double targetDanger = 0.0;
+    if (shieldMaxHpDynamic > 0) {
+      final shieldRatio = shieldHp / shieldMaxHpDynamic;
+      if (shieldRatio < 0.45) {
+        targetDanger = max(targetDanger, ((0.45 - shieldRatio) / 0.45).clamp(0.25, 1.0));
+      }
+    }
+    for (final m in mutants) {
+      if (m.pos.y >= 445.0) {
+        final prox = ((m.pos.y - 445.0) / 115.0).clamp(0.20, 1.0);
+        targetDanger = max(targetDanger, m.kind.isBoss ? min(1.0, prox + 0.25) : prox);
+      }
+    }
+    dangerPulseLevel += (targetDanger - dangerPulseLevel) * min(1.0, dt * 5.5);
 
     for (int i = 0; i < chapter.pillars.length; i++) {
       pillarAngles[i] += chapter.pillars[i].rotationSpeedRad * dt;
@@ -1702,6 +1759,20 @@ class DefenseBattleSim {
       while (_spawnQueue.isNotEmpty && _spawnQueue.first.delaySec <= 0) {
         final item = _spawnQueue.removeAt(0);
         _spawnMutant(item);
+      }
+      // 각 물결 중반부 대군 쇄도 긴장감 경보 연출!
+      if (_spawnQueue.length <= 16 &&
+          mutants.length >= 8 &&
+          _waveClimaxAnnounced.add(currentWaveIndex)) {
+        callouts.add(
+          FloatingCallout(
+            pos: const Vec2(200, 92),
+            text: '🚨 제${currentWaveIndex + 1}물결 변이 대군 총돌격 쇄도!!',
+            colorHex: 0xFFFF595E,
+            ttlSec: 1.7,
+            isBigBanner: true,
+          ),
+        );
       }
     } else if (mutants.isEmpty && currentWaveIndex + 1 < stage.waves.length) {
       wavePauseTimer -= dt;
@@ -2300,6 +2371,16 @@ class DefenseBattleSim {
       final dir = (target.pos - l.pos).normalized;
       l.aimAngleRad = atan2(dir.y, dir.x);
       pendingSounds.add(SoundCue.bowMotion);
+      if (muzzleFlashes.length < 28) {
+        muzzleFlashes.add(
+          MuzzleFlashFx(
+            pos: l.pos + dir * 18.0,
+            angleRad: l.aimAngleRad,
+            colorHex: l.type.colorHex,
+            scale: l.type == LauncherType.heavy ? 1.38 : 0.96,
+          ),
+        );
+      }
 
       final permScale = 1.0 + (l.permanentLevel - 1) * 0.14;
       final dmg = l.type.baseDamage *
@@ -2316,32 +2397,40 @@ class DefenseBattleSim {
       final shotCount = l.type.projectilesPerShot(l.tier);
       final launcherPierce = synPierce +
           switch (l.type) {
-            LauncherType.rapid => l.tier >= 2 ? 1 : 0,
-            LauncherType.curveSpin => 1 + (l.tier >= 3 ? 1 : 0),
+            LauncherType.rapid => 1 + (l.tier >= 3 ? 1 : 0),
+            LauncherType.curveSpin => 2 + (l.tier >= 3 ? 2 : 0),
+            LauncherType.qiAmplifier => 2,
             _ => 0,
           };
       final launcherSplash = switch (l.type) {
-        LauncherType.heavy => 28.0 + l.tier * 8.0,
-        LauncherType.frostField => 36.0 + l.tier * 6.5,
+        LauncherType.heavy => 48.0 + l.tier * 10.0,
+        LauncherType.frostField => 44.0 + l.tier * 8.0,
         _ => 0.0,
       };
+      final spreadStep = switch (l.type) {
+        LauncherType.rapid => 0.11,
+        LauncherType.frostField => 0.16,
+        LauncherType.curveSpin => 0.18,
+        _ => 0.12,
+      };
       for (int s = 0; s < shotCount; s++) {
-        final spreadRad = shotCount == 1 ? 0.0 : (s - (shotCount - 1) / 2) * 0.14;
+        final spreadRad = shotCount == 1 ? 0.0 : (s - (shotCount - 1) / 2) * spreadStep;
+        final curveSign = (s.isEven ? 1.0 : -1.0);
         _spawnStoneShot(
           sourceKey: 'launcher_${l.slotIndex}',
           sourceLabel: '${l.type.name}(${l.slotIndex + 1}거점)',
           origin: l.pos,
           target: target,
-          baseDamage: dmg / (shotCount > 1 ? 1.20 : 1.0),
+          baseDamage: dmg,
           speed: l.type.projectileSpeed * synSpeedMult,
           spreadAngleRad: spreadRad,
           extraCrit: ampCrit,
-          spinCurve: l.type == LauncherType.curveSpin ? (1.1 + l.tier * 0.25) : 0.0,
+          spinCurve: l.type == LauncherType.curveSpin ? (1.15 + l.tier * 0.25) * curveSign : 0.0,
           pierceBonus: launcherPierce,
           ignoresShield: l.type == LauncherType.curveSpin || (l.type == LauncherType.heavy && l.tier >= 3),
           aoeRadius: launcherSplash,
           freezesOnHit: l.type == LauncherType.frostField,
-          knockbackScale: l.type == LauncherType.heavy ? (1.48 + l.tier * 0.18) : 1.0,
+          knockbackScale: l.type == LauncherType.heavy ? (1.65 + l.tier * 0.22) : 1.15,
         );
       }
     }
@@ -2708,7 +2797,7 @@ class DefenseBattleSim {
     double knockbackScale = 1.0,
     SectTechnique? sectTech,
   }) {
-    if (projectiles.length >= 64) {
+    if (projectiles.length >= 180) {
       projectiles.removeAt(0);
     }
 
@@ -2828,7 +2917,7 @@ class DefenseBattleSim {
         continue;
       }
 
-      if (p.trail.length >= 6) p.trail.removeAt(0);
+      if (p.trail.length >= 9) p.trail.removeAt(0);
       p.trail.add(p.pos);
 
       if (p.spinCurve.abs() > 0.05) {
@@ -2840,7 +2929,7 @@ class DefenseBattleSim {
 
       // 1) ×2 쌍류 복제 마법진 통과 시 알이 2개로 복제 증식!
       if (!p.clonedByGate &&
-          projectiles.length + spawnedClones.length < 72 &&
+          projectiles.length + spawnedClones.length < 180 &&
           p.pos.distanceTo(cloneGate.center) <= cloneGate.radius + p.radius * 0.5) {
         p.clonedByGate = true;
         cloneGate.pulseAnim = 1.0;
@@ -3148,7 +3237,7 @@ class DefenseBattleSim {
 
     // [비급: 쌍탄 분열비급] 첫 적 적중 시 2갈래 분열탄 생성!
     final splitStacks = perkStacks(RoguePerk.splitShot);
-    if (splitStacks > 0 && !p.splitChild && projectiles.length + spawnedClones.length < 72) {
+    if (splitStacks > 0 && !p.splitChild && projectiles.length + spawnedClones.length < 180) {
       final spd = p.vel.length * 0.92;
       final baseA = atan2(p.vel.y, p.vel.x);
       final splitDmg = p.damage * (0.52 + (splitStacks - 1) * 0.35);
@@ -3215,7 +3304,19 @@ class DefenseBattleSim {
     }
 
     if (p.aoeSplashRadius > 0) {
-      bursts.add(FxBurst(pos: m.pos, colorHex: p.colorHex, maxRadius: p.aoeSplashRadius));
+      final isHeavyCannon = p.sourceLabel.contains('중포') || p.aoeSplashRadius >= 48.0;
+      bursts.add(
+        FxBurst(
+          pos: m.pos,
+          colorHex: p.colorHex,
+          maxRadius: p.aoeSplashRadius,
+          isTriangleShatter: isHeavyCannon,
+        ),
+      );
+      if (isHeavyCannon) {
+        screenShakeTimer = max(screenShakeTimer, 0.10);
+        screenShakeIntensity = max(screenShakeIntensity, 2.4);
+      }
       for (final other in List<ActiveMutant>.from(mutants)) {
         if (other.uid != m.uid && other.pos.distanceTo(m.pos) <= p.aoeSplashRadius) {
           _applyDamageToMutant(
@@ -3266,6 +3367,25 @@ class DefenseBattleSim {
     final dealt = min(m.hp, effectiveDmg);
     m.hp -= effectiveDmg;
     m.knockbackVel = m.knockbackVel + knockDir * (knockForce / sqrt(m.kind.mass));
+    final isKillingBlow = m.hp <= 0;
+
+    // 찰진 타격 숫자 팝업 (치명타·격살·중대형 타격 위주로 최대 38개 풀 유지!)
+    final shownDmg = effectiveDmg.round().clamp(1, 99999);
+    if ((isCritical || isKillingBlow || shownDmg >= 18) && damagePopups.length < 38) {
+      final jitterX = (rng.nextDouble() - 0.5) * 28.0;
+      damagePopups.add(
+        DamagePopupFx(
+          pos: m.pos + Vec2(jitterX * 0.35, -m.kind.radius * 0.7),
+          vel: Vec2(jitterX * 1.4, isCritical ? -62.0 : -46.0),
+          damage: shownDmg,
+          isCrit: isCritical,
+          isKill: isKillingBlow,
+          colorHex: isCritical
+              ? 0xFFFFD166
+              : (isKillingBlow ? 0xFFFF6B35 : 0xFFF8F9FA),
+        ),
+      );
+    }
 
     final entry = _contribMap.putIfAbsent(
       sourceKey,
@@ -3273,10 +3393,62 @@ class DefenseBattleSim {
     );
     entry.totalDamage += dealt;
 
-    if (m.hp <= 0) {
+    if (isKillingBlow) {
       final wasChilled = m.freezeTimer > 0 || m.slowTimer > 0;
       entry.kills++;
       mutants.remove(m);
+
+      // ★ 돌연변이·괴물 격살 랙돌 날아가기 & 산산조각 파편 폭발 연출!
+      if (deathRagdolls.length >= 44) {
+        deathRagdolls.removeAt(0);
+      }
+      final safeDir = knockDir.length > 0.05 ? knockDir.normalized : const Vec2(0, -1);
+      final flySpeed = (210.0 + knockForce * 2.2).clamp(185.0, 460.0);
+      final sideKick = (rng.nextDouble() - 0.5) * 95.0;
+      final perp = Vec2(-safeDir.y, safeDir.x);
+      deathRagdolls.add(
+        MutantDeathRagdoll(
+          kind: m.kind,
+          pos: m.pos,
+          vel: safeDir * flySpeed + perp * sideKick,
+          spinVel: (rng.nextBool() ? 1.0 : -1.0) * (8.5 + rng.nextDouble() * 8.0),
+          visualDiameter: m.kind.visualDiameter,
+          bodyWidthRatio: m.kind.bodyWidthRatio,
+          colorHex: m.kind.colorHex,
+          isCriticalKill: isCritical || m.kind.isBoss,
+          durationSec: m.kind.isBoss ? 0.65 : 0.44,
+        ),
+      );
+
+      // 모든 변이 처치 시 시원한 수묵·독기 파열 이펙트 (보스 처치 시 3중 대폭발 지진!)
+      bursts.add(
+        FxBurst(
+          pos: m.pos,
+          colorHex: m.kind.isBoss
+              ? 0xFFFFD166
+              : (isCritical ? 0xFFFF6B35 : m.kind.colorHex),
+          maxRadius: m.kind.isBoss
+              ? 88.0
+              : (m.kind.visualDiameter * 0.72).clamp(20.0, 48.0),
+          ttlSec: m.kind.isBoss ? 0.55 : 0.28,
+          durationSec: m.kind.isBoss ? 0.55 : 0.28,
+          isTriangleShatter: isCritical || m.kind.isBoss || m.kind.visualDiameter >= 35.0,
+        ),
+      );
+      if (m.kind.isBoss) {
+        pendingSounds.add(SoundCue.criticalShatter);
+        screenShakeTimer = max(screenShakeTimer, 0.42);
+        screenShakeIntensity = max(screenShakeIntensity, 7.8);
+        callouts.add(
+          FloatingCallout(
+            pos: m.pos + const Vec2(0, -24),
+            text: '💥 [${m.displayName}] 완전 격파!!',
+            colorHex: 0xFFFFD166,
+            ttlSec: 1.9,
+            isBigBanner: true,
+          ),
+        );
+      }
 
       if (preset.primaryStone == StoneMaterial.onok && shieldHp > 0 && launchers.isNotEmpty) {
         shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.022);
@@ -3398,8 +3570,34 @@ class DefenseBattleSim {
     required String sourceLabel,
   }) {
     killCount++;
+    killStreak++;
+    if (killStreak > bestKillStreak) bestKillStreak = killStreak;
+    killStreakTimer = 3.2;
+
+    // 연속 격살 체인 달성 시 보너스 기력 & 피버 열기 급상승 & 무쌍 배너!
+    if (killStreak == 12 || killStreak == 25 || killStreak == 45 || (killStreak >= 70 && killStreak % 30 == 0)) {
+      final streakBonus = killStreak >= 45 ? 10 : (killStreak >= 25 ? 7 : 4);
+      fieldTokens += streakBonus;
+      feverGauge = (feverGauge + 16.0).clamp(0.0, 100.0);
+      _spawnFlyingQiOrb(m.pos, streakBonus, colorHex: 0xFFFF6B35);
+      screenShakeTimer = max(screenShakeTimer, 0.16);
+      screenShakeIntensity = max(screenShakeIntensity, 3.6);
+      callouts.add(
+        FloatingCallout(
+          pos: const Vec2(200, 132),
+          text: '🔥 $killStreak연속 무쌍 학살!! (+$streakBonus⚡ · 열기 급상승!)',
+          colorHex: 0xFFFF6B35,
+          ttlSec: 1.5,
+          isBigBanner: true,
+        ),
+      );
+    }
+
     final warChestMult = 1.0 + perkStacks(RoguePerk.warChest) * 0.30;
-    final drop = (m.kind.dropTokens *
+    final baseDrop = m.kind == MutantKind.sickHound && killCount.isEven
+        ? 2
+        : m.kind.dropTokens;
+    final drop = (baseDrop *
             bonusTokenMult *
             warChestMult *
             (1.0 + progress.meridianTokenDropBonus) *
@@ -3407,12 +3605,15 @@ class DefenseBattleSim {
         .round()
         .clamp(1, 200);
     fieldTokens += drop;
-    earnedPermanentTokens += (drop * 0.65).round().clamp(1, 150);
-    _spawnFlyingQiOrb(
-      m.pos,
-      drop,
-      colorHex: m.kind.isBoss ? 0xFF72EFDD : 0xFFFFD166,
-    );
+    earnedPermanentTokens += (drop * 0.55).round().clamp(1, 150);
+    // 화면이 지저분해지지 않도록 1⚡ 소형 구슬은 2마리당 1번씩 묶어 쏘고 중대형·보스는 즉시 발사!
+    if (drop >= 2 || killCount.isEven) {
+      _spawnFlyingQiOrb(
+        m.pos,
+        drop,
+        colorHex: m.kind.isBoss ? 0xFF72EFDD : 0xFFFFD166,
+      );
+    }
   }
 
   ActiveMutant? _pickMostThreateningMutant(Vec2 origin, {required double maxRange}) {
@@ -3494,6 +3695,31 @@ class DefenseBattleSim {
     for (int i = lightningArcs.length - 1; i >= 0; i--) {
       lightningArcs[i].ttlSec -= dt;
       if (lightningArcs[i].ttlSec <= 0) lightningArcs.removeAt(i);
+    }
+    for (int i = muzzleFlashes.length - 1; i >= 0; i--) {
+      muzzleFlashes[i].ttlSec -= dt;
+      if (muzzleFlashes[i].ttlSec <= 0) muzzleFlashes.removeAt(i);
+    }
+    for (int i = deathRagdolls.length - 1; i >= 0; i--) {
+      final r = deathRagdolls[i];
+      r.ttlSec -= dt;
+      if (r.ttlSec <= 0) {
+        deathRagdolls.removeAt(i);
+      } else {
+        r.pos = r.pos + r.vel * dt;
+        r.vel = r.vel * max(0.0, 1.0 - 4.2 * dt);
+        r.rotationRad += r.spinVel * dt;
+      }
+    }
+    for (int i = damagePopups.length - 1; i >= 0; i--) {
+      final dp = damagePopups[i];
+      dp.ttlSec -= dt;
+      if (dp.ttlSec <= 0) {
+        damagePopups.removeAt(i);
+      } else {
+        dp.pos = dp.pos + dp.vel * dt;
+        dp.vel = Vec2(dp.vel.x * 0.92, dp.vel.y + 82.0 * dt);
+      }
     }
     for (int i = callouts.length - 1; i >= 0; i--) {
       callouts[i].ttlSec -= dt;

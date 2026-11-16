@@ -86,7 +86,7 @@ class NightAudioController {
     if (scaledVol <= 0.01) return;
 
     try {
-      if (_sfxPool.length < 6) {
+      if (_sfxPool.length < 8) {
         final p = AudioPlayer();
         await p.setReleaseMode(ReleaseMode.stop);
         _sfxPool.add(p);
@@ -113,26 +113,26 @@ class NightAudioController {
           playAsset('motion_gear.wav', volume: 0.35, minGapMs: 320);
           break;
         case SoundCue.bowMotion:
-          playAsset('motion_bow.wav', volume: 0.32, minGapMs: 220);
+          playAsset('motion_bow.wav', volume: 0.36, minGapMs: 125);
           break;
         case SoundCue.shieldWave:
           playAsset('motion_shield.wav', volume: 0.55, minGapMs: 260);
           NightHaptics.instance.lightTap();
           break;
         case SoundCue.stoneHitCheongok:
-          playAsset('hit_cheongok.ogg', volume: 0.50, minGapMs: 90);
+          playAsset('hit_cheongok.ogg', volume: 0.56, minGapMs: 65);
           break;
         case SoundCue.stoneHitHeavy:
-          playAsset('hit_hyeoncheol.ogg', volume: 0.56, minGapMs: 90);
+          playAsset('hit_hyeoncheol.ogg', volume: 0.62, minGapMs: 65);
           break;
         case SoundCue.stoneHitIce:
-          playAsset('hit_ice.ogg', volume: 0.52, minGapMs: 90);
+          playAsset('hit_ice.ogg', volume: 0.56, minGapMs: 65);
           break;
         case SoundCue.stoneHitWood:
-          playAsset('hit_wood.ogg', volume: 0.48, minGapMs: 90);
+          playAsset('hit_wood.ogg', volume: 0.52, minGapMs: 65);
           break;
         case SoundCue.criticalShatter:
-          playAsset('critical.ogg', volume: 0.68, minGapMs: 140);
+          playAsset('critical.ogg', volume: 0.74, minGapMs: 115);
           NightHaptics.instance.heavyImpact();
           break;
         case SoundCue.pporokFall:

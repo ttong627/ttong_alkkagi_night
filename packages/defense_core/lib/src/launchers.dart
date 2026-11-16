@@ -3,11 +3,11 @@ enum LauncherType {
   rapid(
     id: 'rapid',
     name: '속사 탄지기',
-    roleSummary: '떼 지어 몰려오는 초소형·소형 독쥐·들개 대군 연속 관통 소탕',
-    tierNames: ['1형 단발 목제기', '2형 쌍발 연노기', '3형 삼연속 회전기', '4형 폭풍 만발 탄지진'],
-    baseCooldownSec: 1.02,
-    baseDamage: 26.0,
-    projectileSpeed: 365.0,
+    roleSummary: '초고속 다연발(2~5갈래) 관통 탄막으로 몰려오는 독쥐·들개 대군을 순식간에 갈아버림',
+    tierNames: ['1형 쌍발 속사기', '2형 삼연발 연노기', '3형 사연속 폭풍기', '4형 오발 천뢰 기관진'],
+    baseCooldownSec: 0.38,
+    baseDamage: 14.5,
+    projectileSpeed: 495.0,
     unlockChapter: 1,
     buildCostTokens: 45,
     colorHex: 0xFF4EA8DE,
@@ -15,11 +15,11 @@ enum LauncherType {
   heavy(
     id: 'heavy',
     name: '중포 탄지기',
-    roleSummary: '대형 중갑 변이체 장갑 파쇄·범위 충격파 및 절벽 추락 유도',
-    tierNames: ['1형 외발 투석기', '2형 철심 강타포', '3형 파쇄 관통대포', '4형 천추 파성포'],
-    baseCooldownSec: 1.98,
-    baseDamage: 60.0,
-    projectileSpeed: 305.0,
+    roleSummary: '묵직한 대구경 포탄으로 중갑 변이체 장갑 파쇄·대폭발 충격파 및 절벽 추락 유도',
+    tierNames: ['1형 강타 투석포', '2형 철심 폭렬포', '3형 파쇄 진동대포', '4형 천추 파성 거포'],
+    baseCooldownSec: 1.08,
+    baseDamage: 52.0,
+    projectileSpeed: 430.0,
     unlockChapter: 1,
     buildCostTokens: 55,
     colorHex: 0xFFF77F00,
@@ -27,11 +27,11 @@ enum LauncherType {
   curveSpin(
     id: 'curveSpin',
     name: '곡사 회전기',
-    roleSummary: '휘어 치는 관통 회전탄으로 방패병 측면 타격 및 대열 교란',
-    tierNames: ['1형 스핀 발사기', '2형 곡선 탄지기', '3형 갈고리 견인포', '4형 태극 회오리포'],
-    baseCooldownSec: 1.62,
-    baseDamage: 32.0,
-    projectileSpeed: 315.0,
+    roleSummary: 'S자로 휘어 치는 고속 다중 관통 회전 칼날탄으로 방패병 측면과 적 대열을 통째로 훑음',
+    tierNames: ['1형 회전 비검기', '2형 쌍류 부메랑포', '3형 갈고리 파쇄포', '4형 태극 칼날 회오리포'],
+    baseCooldownSec: 0.76,
+    baseDamage: 24.0,
+    projectileSpeed: 450.0,
     unlockChapter: 2,
     buildCostTokens: 52,
     colorHex: 0xFF72EFDD,
@@ -39,11 +39,11 @@ enum LauncherType {
   frostField(
     id: 'frostField',
     name: '한빙 역장기',
-    roleSummary: '서리 한파 범위 감속·빙결로 구불길 굽이에 적 대군을 묶어 집중 타격',
-    tierNames: ['1형 냉기 조약돌기', '2형 서리 안개기', '3형 빙결 족쇄포', '4형 만년 빙옥 결계포'],
-    baseCooldownSec: 1.78,
-    baseDamage: 24.0,
-    projectileSpeed: 305.0,
+    roleSummary: '부채꼴 냉기 산탄(2~3발)으로 적 대군을 얼려 묶고 서리 폭발로 연쇄 쇄빙 타격',
+    tierNames: ['1형 쌍발 냉기포', '2형 서리 산탄기', '3형 삼발 빙결 족쇄포', '4형 만년 빙옥 폭풍포'],
+    baseCooldownSec: 0.90,
+    baseDamage: 16.5,
+    projectileSpeed: 415.0,
     unlockChapter: 3,
     buildCostTokens: 50,
     colorHex: 0xFF90E0EF,
@@ -51,11 +51,11 @@ enum LauncherType {
   qiAmplifier(
     id: 'qiAmplifier',
     name: '내공 증폭기',
-    roleSummary: '주변 초소 연사·화력·회심 증폭 + 중앙 수호탑 내공 충전 및 결계 수복',
-    tierNames: ['1형 기운 공명석', '2형 문파 기운 주입기', '3형 회심 증폭 진법', '4형 기명 사방진'],
-    baseCooldownSec: 2.35,
-    baseDamage: 26.0,
-    projectileSpeed: 330.0,
+    roleSummary: '고속 관통 기공탄 사격 + 주변 초소 폭풍 가속·화력 증폭 및 중앙탑 내공 급속 충전',
+    tierNames: ['1형 기운 공명석', '2형 문파 가속 주입기', '3형 회심 폭주 진법', '4형 기명 천하 사방진'],
+    baseCooldownSec: 1.05,
+    baseDamage: 23.0,
+    projectileSpeed: 460.0,
     unlockChapter: 5,
     buildCostTokens: 60,
     colorHex: 0xFFFFD166,
@@ -133,13 +133,24 @@ enum LauncherType {
     }
   }
 
-  /// 속사 탄지기 버전별 동시 발사 수.
+  /// 발사대 종류 및 버전(1~4형)별 1회 사격당 동시 발사 탄알 수 (시원한 탄막 일제사격!).
   int projectilesPerShot(int tier) {
-    if (this == LauncherType.rapid) {
-      if (tier >= 4) return 3;
-      if (tier >= 2) return 2;
+    final t = tier.clamp(1, 4);
+    switch (this) {
+      case LauncherType.rapid:
+        if (t >= 4) return 5;
+        if (t >= 3) return 4;
+        if (t >= 2) return 3;
+        return 2;
+      case LauncherType.frostField:
+        return t >= 3 ? 3 : 2;
+      case LauncherType.curveSpin:
+        return t >= 2 ? 2 : 1;
+      case LauncherType.heavy:
+        return t >= 4 ? 2 : 1;
+      case LauncherType.qiAmplifier:
+        return t >= 3 ? 2 : 1;
     }
-    return 1;
   }
 
   /// 대장간 영구 강화 비용 (돌연변이 처치 드롭 증표 전용).

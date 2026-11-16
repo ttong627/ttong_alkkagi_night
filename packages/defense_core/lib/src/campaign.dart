@@ -1340,29 +1340,29 @@ class CampaignCatalog {
     required bool isMukhyeon,
   }) {
     final ch = chapter.number;
-    final swarmCount = 11 + ch * 2 + stage;
-    final mediumCount = (4 + ch ~/ 2 + stage ~/ 3).clamp(4, 14);
+    final swarmCount = 22 + ch * 3 + stage * 2;
+    final mediumCount = (5 + ch ~/ 2 + stage ~/ 2).clamp(5, 18);
     final waves = <List<WaveSpawnGroup>>[];
 
-    // 1웨이브: 심야 선봉 탐색대 (약 8.8~10초간 지속 출몰 → 초반 건설 자금 확보 및 호흡 형성)
+    // 1웨이브: 심야 선봉 대군 쇄도 (약 9.5~11초간 사방 균열문에서 변이 무리가 까맣게 쏟아져 긴장감 형성!)
     waves.add([
       WaveSpawnGroup(
         kind: MutantKind.swarmRat,
         count: swarmCount,
         laneIndex: 0,
-        intervalSec: (0.68 - ch * 0.018).clamp(0.46, 0.68),
+        intervalSec: (0.40 - ch * 0.010).clamp(0.24, 0.40),
       ),
       WaveSpawnGroup(
         kind: MutantKind.sickHound,
-        count: (swarmCount * 0.65).round().clamp(7, 22),
+        count: (swarmCount * 0.62).round().clamp(12, 34),
         laneIndex: 1 % laneCount,
-        intervalSec: (0.88 - ch * 0.020).clamp(0.62, 0.88),
+        intervalSec: (0.50 - ch * 0.012).clamp(0.32, 0.50),
       ),
       WaveSpawnGroup(
         kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.bloodCocoon,
-        count: (mediumCount - 1).clamp(3, 10),
+        count: (mediumCount - 1).clamp(4, 14),
         laneIndex: 2 % laneCount,
-        intervalSec: 1.28,
+        intervalSec: 0.96,
       ),
     ]);
 
@@ -1376,21 +1376,21 @@ class CampaignCatalog {
         waves.add([
           WaveSpawnGroup(
             kind: MutantKind.sickHound,
-            count: (8 + ch + stage ~/ 2).clamp(8, 22),
+            count: (15 + ch * 2 + stage).clamp(15, 38),
             laneIndex: stage % laneCount,
-            intervalSec: 0.66,
+            intervalSec: 0.36,
           ),
           WaveSpawnGroup(
             kind: MutantKind.swarmRat,
-            count: (swarmCount + 3).clamp(13, 30),
+            count: (swarmCount + 6).clamp(24, 52),
             laneIndex: (stage + 2) % laneCount,
-            intervalSec: 0.56,
+            intervalSec: 0.28,
           ),
           WaveSpawnGroup(
             kind: ch >= 2 ? MutantKind.ironBoar : MutantKind.bloodCocoon,
-            count: (3 + ch ~/ 2).clamp(3, 9),
+            count: (4 + ch ~/ 2).clamp(4, 12),
             laneIndex: (stage + 1) % laneCount,
-            intervalSec: 1.32,
+            intervalSec: 1.05,
           ),
           WaveSpawnGroup(
             kind: MutantKind.swiftShadowBoss,
@@ -1404,21 +1404,21 @@ class CampaignCatalog {
         waves.add([
           WaveSpawnGroup(
             kind: MutantKind.swarmRat,
-            count: (swarmCount + 1).clamp(12, 28),
+            count: (swarmCount + 4).clamp(22, 48),
             laneIndex: (stage + 1) % laneCount,
-            intervalSec: 0.58,
+            intervalSec: 0.30,
           ),
           WaveSpawnGroup(
             kind: ch >= 2 ? MutantKind.ironBoar : MutantKind.sickHound,
-            count: (4 + ch ~/ 2 + stage ~/ 4).clamp(4, 11),
+            count: (6 + ch ~/ 2 + stage ~/ 3).clamp(6, 16),
             laneIndex: stage % laneCount,
-            intervalSec: 1.18,
+            intervalSec: 0.88,
           ),
           WaveSpawnGroup(
             kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.bloodCocoon,
-            count: (5 + ch ~/ 2).clamp(5, 12),
+            count: (7 + ch ~/ 2).clamp(7, 16),
             laneIndex: (stage + 2) % laneCount,
-            intervalSec: 1.08,
+            intervalSec: 0.84,
           ),
           WaveSpawnGroup(
             kind: MutantKind.ironColossusBoss,
@@ -1432,21 +1432,21 @@ class CampaignCatalog {
         waves.add([
           WaveSpawnGroup(
             kind: MutantKind.swarmRat,
-            count: (swarmCount + 1).clamp(12, 28),
+            count: (swarmCount + 4).clamp(22, 48),
             laneIndex: (stage + 1) % laneCount,
-            intervalSec: 0.58,
+            intervalSec: 0.30,
           ),
           WaveSpawnGroup(
             kind: ch >= 3 ? MutantKind.bloodCocoon : MutantKind.sickHound,
-            count: (6 + ch ~/ 2 + stage ~/ 4).clamp(6, 14),
+            count: (10 + ch + stage ~/ 3).clamp(10, 24),
             laneIndex: stage % laneCount,
-            intervalSec: 0.96,
+            intervalSec: 0.62,
           ),
           WaveSpawnGroup(
             kind: ch >= 2 ? MutantKind.plagueToad : MutantKind.ironBoar,
-            count: (4 + ch ~/ 2).clamp(4, 11),
+            count: (5 + ch ~/ 2).clamp(5, 14),
             laneIndex: (stage + 2) % laneCount,
-            intervalSec: 1.16,
+            intervalSec: 0.94,
           ),
           WaveSpawnGroup(
             kind: MutantKind.crimsonBreakerBoss,
@@ -1461,51 +1461,51 @@ class CampaignCatalog {
       waves.add([
         WaveSpawnGroup(
           kind: MutantKind.swarmRat,
-          count: swarmCount + 2,
+          count: swarmCount + 6,
           laneIndex: ((stage + 1) % laneCount),
-          intervalSec: 0.62,
+          intervalSec: 0.32,
         ),
         WaveSpawnGroup(
           kind: MutantKind.sickHound,
-          count: (8 + ch).clamp(8, 18),
+          count: (14 + ch * 2).clamp(14, 32),
           laneIndex: (stage % laneCount),
-          intervalSec: 0.82,
+          intervalSec: 0.46,
         ),
         WaveSpawnGroup(
           kind: MutantKind.ironBoar,
-          count: (3 + ch ~/ 3).clamp(3, 7),
+          count: (4 + ch ~/ 3).clamp(4, 9),
           laneIndex: 1 % laneCount,
-          intervalSec: 1.45,
+          intervalSec: 1.18,
         ),
       ]);
     }
 
-    // 3웨이브: 다방면 포위 압박 (초소 확장 및 승급 타이밍 · 6장 이후에는 부보스 추가 동반 침공!)
+    // 3웨이브: 다방면 포위 압박 총쇄도!
     final thirdWave = <WaveSpawnGroup>[
       WaveSpawnGroup(
         kind: MutantKind.swarmRat,
-        count: (swarmCount + 3).clamp(13, 30),
+        count: (swarmCount + 8).clamp(26, 56),
         laneIndex: ((stage + 2) % laneCount),
-        intervalSec: (0.58 - ch * 0.012).clamp(0.42, 0.58),
+        intervalSec: (0.30 - ch * 0.008).clamp(0.20, 0.30),
       ),
       WaveSpawnGroup(
         kind: MutantKind.sickHound,
-        count: (7 + ch + stage ~/ 3).clamp(8, 20),
+        count: (13 + ch * 2 + stage ~/ 2).clamp(14, 36),
         laneIndex: ((stage + 1) % laneCount),
-        intervalSec: 0.74,
+        intervalSec: 0.42,
       ),
       WaveSpawnGroup(
         kind: ch >= 3 ? MutantKind.plagueToad : MutantKind.bloodCocoon,
-        count: (3 + ch ~/ 2).clamp(3, 10),
+        count: (5 + ch ~/ 2).clamp(5, 14),
         laneIndex: (stage % laneCount),
-        intervalSec: 1.25,
+        intervalSec: 0.92,
       ),
       if (ch >= 2)
         WaveSpawnGroup(
           kind: MutantKind.shieldYacha,
-          count: (3 + ch ~/ 2).clamp(3, 10),
+          count: (5 + ch ~/ 2).clamp(5, 14),
           laneIndex: (laneCount - 1),
-          intervalSec: 1.18,
+          intervalSec: 0.88,
         ),
     ];
     if (ch >= 6 && stage >= 4) {
@@ -1522,31 +1522,31 @@ class CampaignCatalog {
     }
     waves.add(thirdWave);
 
-    // 4웨이브: 심야 대군 총공세 + 최종 우두머리 강림 (가장 쉬운 1-1도 한 판 최소 35초 이상 알차게 지속!)
+    // 4웨이브: 심야 대군 클라이맥스 총공세 + 최종 우두머리 강림!
     final fourthWave = <WaveSpawnGroup>[
       WaveSpawnGroup(
         kind: MutantKind.swarmRat,
-        count: (swarmCount + 5).clamp(14, 34),
+        count: (swarmCount + 12).clamp(30, 64),
         laneIndex: (stage % laneCount),
-        intervalSec: (0.56 - ch * 0.014).clamp(0.38, 0.56),
+        intervalSec: (0.28 - ch * 0.008).clamp(0.18, 0.28),
       ),
       WaveSpawnGroup(
         kind: ch >= 4 ? MutantKind.bloodCocoon : MutantKind.sickHound,
-        count: (7 + ch).clamp(8, 18),
+        count: (13 + ch * 2).clamp(14, 32),
         laneIndex: 1 % laneCount,
-        intervalSec: 0.78,
+        intervalSec: 0.46,
       ),
       WaveSpawnGroup(
         kind: MutantKind.ironBoar,
-        count: (3 + ch ~/ 2 + stage ~/ 5).clamp(3, 11),
+        count: (4 + ch ~/ 2 + stage ~/ 4).clamp(4, 14),
         laneIndex: 0,
-        intervalSec: 1.22,
+        intervalSec: 0.98,
       ),
       WaveSpawnGroup(
         kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.plagueToad,
-        count: (4 + ch ~/ 2).clamp(4, 11),
+        count: (5 + ch ~/ 2).clamp(5, 14),
         laneIndex: (laneCount - 1),
-        intervalSec: 1.08,
+        intervalSec: 0.88,
       ),
     ];
 
@@ -1601,21 +1601,21 @@ class CampaignCatalog {
       [
         WaveSpawnGroup(
           kind: MutantKind.swarmRat,
-          count: 20 + stage,
+          count: 38 + stage * 2,
           laneIndex: (stage + 1) % laneCount,
-          intervalSec: 0.56,
+          intervalSec: 0.28,
         ),
         WaveSpawnGroup(
           kind: MutantKind.sickHound,
-          count: 13 + stage ~/ 2,
+          count: 22 + stage,
           laneIndex: 0,
-          intervalSec: 0.70,
+          intervalSec: 0.38,
         ),
         WaveSpawnGroup(
           kind: MutantKind.shieldYacha,
-          count: 8 + stage ~/ 2,
+          count: 9 + stage ~/ 2,
           laneIndex: laneCount - 1,
-          intervalSec: 0.98,
+          intervalSec: 0.85,
         ),
         if (stage >= 2)
           WaveSpawnGroup(
@@ -1629,21 +1629,21 @@ class CampaignCatalog {
       [
         WaveSpawnGroup(
           kind: MutantKind.swarmRat,
-          count: 22 + stage,
+          count: 42 + stage * 2,
           laneIndex: stage % laneCount,
-          intervalSec: 0.54,
+          intervalSec: 0.26,
         ),
         WaveSpawnGroup(
           kind: MutantKind.bloodCocoon,
-          count: 10 + stage ~/ 2,
+          count: 13 + stage ~/ 2,
           laneIndex: 3 % laneCount,
-          intervalSec: 0.88,
+          intervalSec: 0.72,
         ),
         WaveSpawnGroup(
           kind: MutantKind.ironBoar,
-          count: 7 + stage ~/ 2,
+          count: 8 + stage ~/ 2,
           laneIndex: 1 % laneCount,
-          intervalSec: 1.08,
+          intervalSec: 0.96,
         ),
         WaveSpawnGroup(
           kind: secondMidBoss,
@@ -1656,41 +1656,41 @@ class CampaignCatalog {
       [
         WaveSpawnGroup(
           kind: MutantKind.swarmRat,
-          count: 22 + stage,
+          count: 44 + stage * 2,
           laneIndex: (stage + 3) % laneCount,
-          intervalSec: 0.52,
+          intervalSec: 0.24,
         ),
         WaveSpawnGroup(
           kind: MutantKind.sickHound,
-          count: 12 + stage ~/ 2,
+          count: 22 + stage,
           laneIndex: 2 % laneCount,
-          intervalSec: 0.74,
+          intervalSec: 0.38,
         ),
         WaveSpawnGroup(
           kind: MutantKind.shieldYacha,
-          count: 7 + stage ~/ 2,
+          count: 9 + stage ~/ 2,
           laneIndex: 0,
-          intervalSec: 0.96,
+          intervalSec: 0.82,
         ),
       ],
       [
         WaveSpawnGroup(
           kind: MutantKind.swarmRat,
-          count: 24 + stage,
+          count: 48 + stage * 2,
           laneIndex: (stage + 2) % laneCount,
-          intervalSec: 0.50,
+          intervalSec: 0.22,
         ),
         WaveSpawnGroup(
           kind: MutantKind.ironBoar,
-          count: 8 + stage ~/ 2,
+          count: 9 + stage ~/ 2,
           laneIndex: 1 % laneCount,
-          intervalSec: 1.02,
+          intervalSec: 0.92,
         ),
         WaveSpawnGroup(
           kind: MutantKind.plagueToad,
-          count: 7 + stage ~/ 2,
+          count: 8 + stage ~/ 2,
           laneIndex: 2 % laneCount,
-          intervalSec: 1.08,
+          intervalSec: 0.96,
         ),
         WaveSpawnGroup(
           kind: MutantKind.chapterOverlord,
