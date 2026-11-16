@@ -141,6 +141,22 @@ void main(List<String> args) {
     double chDurationSum = 0;
 
     for (final st in stages) {
+      if (ch.number == 1 && st.stageNumber >= 5) {
+        tunedProgress.companionLevels[CompanionHero.yeonbi] = 2;
+        if (!tunedProgress.activePreset.companions.contains(CompanionHero.yeonbi)) {
+          tunedProgress.activePreset.companions.add(CompanionHero.yeonbi);
+        }
+      }
+      if (ch.number == 1 && st.stageNumber >= 9) {
+        tunedProgress.companionLevels[CompanionHero.cheongmyeong] = 2;
+        if (!tunedProgress.activePreset.companions.contains(CompanionHero.cheongmyeong)) {
+          tunedProgress.activePreset.companions.add(CompanionHero.cheongmyeong);
+        }
+        for (final lt in LauncherType.values) {
+          tunedProgress.launcherPermanentLevels[lt] = 2;
+        }
+      }
+
       int easyWins = 0;
       int normalWins = 0;
       int nightmareWins = 0;
@@ -218,7 +234,33 @@ void main(List<String> args) {
     );
   }
 
-  // 역상성/무배치 대조군 검증 (중반 5장 보스전: 무배치·부실 구성 패배 vs 맞춤 배치 승리 차이 검증)
+  // 1) 무개입 방치(초소 0개 배치 · 수동 조작 0회) 전 구간 100% 패배(마을 함락) 하드게이트 검증!
+  // 가장 쉬운 1-1(쉬움)을 포함해 전 111단계에서 아무것도 안 하고 가만히 두면 단 1판도 깨져서는 안 된다!
+  int idleAccidentalWins = 0;
+  final idleWinStages = <String>[];
+  for (final st in CampaignCatalog.allStages) {
+    final prog = buildExpectedProgressForChapter(st.chapterNumber, tunedLoadout: true);
+    final easyIdle = runSingleHeadlessSim(
+      stage: st,
+      difficulty: DefenseDifficulty.easy,
+      progress: prog,
+      seed: 7000 + st.globalIndex,
+      autoBuildPads: false,
+    );
+    final normalIdle = runSingleHeadlessSim(
+      stage: st,
+      difficulty: DefenseDifficulty.normal,
+      progress: prog,
+      seed: 8000 + st.globalIndex,
+      autoBuildPads: false,
+    );
+    if (easyIdle.summary.victory || normalIdle.summary.victory) {
+      idleAccidentalWins++;
+      idleWinStages.add(st.code);
+    }
+  }
+
+  // 2) 역상성/무배치 대조군 검증 (중반 5장 보스전: 무배치 패배 vs 맞춤 초소 배치·비급 선택 승리 비교)
   final checkStage = CampaignCatalog.stageAt(5, 11);
   final badProg = buildExpectedProgressForChapter(5, tunedLoadout: false);
   final goodProg = buildExpectedProgressForChapter(5, tunedLoadout: true);
@@ -249,11 +291,16 @@ void main(List<String> args) {
 
   buf.writeln('--------------------------------------------------------------------');
   buf.writeln(
+    '무개입 방치 클리어 차단 검증(1-1 쉬움 포함 전 111단계 초소 0개 방치 시): '
+    '방치 승리 $idleAccidentalWins / ${CampaignCatalog.allStages.length}건 '
+    '(${idleAccidentalWins == 0 ? "무개입 시 0.0% 전패 완벽 입증!" : "방치 클리어 발생: ${idleWinStages.join(", ")}"})',
+  );
+  buf.writeln(
     '최단 전투 지속시간(쉬운 1-1 포함 전 구간 30초 이상 보장 검증): '
     '${minWinDurationSec.toStringAsFixed(1)}초 [$minWinDurationCode]',
   );
   buf.writeln(
-    '직접 배치 & 구성 민감도 검증 (5-11 폭주 기관 거신): '
+    '직접 배치 & 돌파 비급 민감도 검증 (5-11 폭주 기관 거신): '
     '무배치·미성장 ${badRate.toStringAsFixed(1)}% → 맞춤 초소 배치 시 ${goodRate.toStringAsFixed(1)}% (승률 상승폭 +${delta.toStringAsFixed(1)}%p)',
   );
   buf.writeln(
@@ -266,7 +313,7 @@ void main(List<String> args) {
   stdout.write(report);
   File('RESULTS_DEFENSE.txt').writeAsStringSync(report);
 
-  if (failedCodes.isNotEmpty || delta < 35.0 || minWinDurationSec < 32.0) {
+  if (failedCodes.isNotEmpty || idleAccidentalWins > 0 || delta < 35.0 || minWinDurationSec < 32.0) {
     exitCode = 1;
   }
 }

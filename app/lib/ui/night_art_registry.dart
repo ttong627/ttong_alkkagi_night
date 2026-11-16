@@ -25,13 +25,14 @@ class NightArtRegistry {
   static const String cardSupplyConvoy = 'assets/images/scenes/card_supply_convoy.webp';
   static const String cardEndlessAbyss = 'assets/images/scenes/card_endless_abyss.webp';
 
-  // 2. 중앙 수호탑 · 마을 생태 3종 (assets/images/launchers/)
+  // 2. 중앙 수호탑 · 마을 생태 3종 · 전장 화약통 기물 (assets/images/launchers/)
   static const String towerGuardian = 'assets/images/launchers/tower_guardian.webp';
   static const String villageGranary = 'assets/images/launchers/village_granary.webp';
   static const String villageCrops = 'assets/images/launchers/village_crops.webp';
   static const String villageLivestock = 'assets/images/launchers/village_livestock.webp';
+  static const String propPowderKeg = 'assets/images/launchers/prop_powder_keg.webp';
 
-  // 3. 전용 코덱스 아이콘 (assets/images/icons/)
+  // 3. 전용 코덱스 아이콘 · 돌파 비급 · 운빨 소환패 (assets/images/icons/)
   static const String appLogo = 'assets/images/icons/app_logo.webp';
   static const String wslogisLogo = 'assets/images/icons/wslogis.webp';
   static const String nightToken = 'assets/images/icons/night_token.webp';
@@ -41,6 +42,8 @@ class NightArtRegistry {
   static const String nightSerendipity = 'assets/images/icons/night_serendipity.webp';
   static const String nightMeridian = 'assets/images/icons/night_meridian.webp';
   static const String nightEndless = 'assets/images/icons/night_endless.webp';
+  static const String iconRogueScroll = 'assets/images/icons/icon_rogue_scroll.webp';
+  static const String iconLuckyDice = 'assets/images/icons/icon_lucky_dice.webp';
 
   // 보조 공용 아이콘
   static const String iconAttendance = 'assets/images/icons/attendance.webp';
@@ -54,7 +57,7 @@ class NightArtRegistry {
   static const String iconSettings = 'assets/images/icons/settings.webp';
   static const String iconTrainingSeal = 'assets/images/icons/tp.webp';
 
-  // 4. 전장 타격 · 출두 · 침공 균열문 이펙트 9종 (assets/images/fx/)
+  // 4. 전장 타격 · 출두 · 침공 균열문 · 복제진 · 피버 이펙트 11종 + 보물 도깨비
   static const String fxChuldu = 'assets/images/fx/fx_chuldu.webp';
   static const String fxBarrier = 'assets/images/fx/fx_barrier.webp';
   static const String fxBreachGate = 'assets/images/fx/fx_breach_gate.webp';
@@ -64,6 +67,9 @@ class NightArtRegistry {
   static const String fxCombo = 'assets/images/fx/fx_combo.webp';
   static const String fxLucky = 'assets/images/fx/fx_lucky.webp';
   static const String fxQi = 'assets/images/fx/fx_qi.webp';
+  static const String fxCloneGate = 'assets/images/fx/fx_clone_gate.webp';
+  static const String fxFeverAura = 'assets/images/fx/fx_fever_aura.webp';
+  static const String mutTreasureGoblin = 'assets/images/mutants/mut_treasure_goblin.webp';
 
   /// 심야 돌연변이·중간보스·대수괴 12종 기본 행군 원화 경로 (`assets/images/mutants/mut_${kind.id}.webp`).
   static String mutantAsset(MutantKind kind) =>
@@ -307,6 +313,10 @@ class NightBattleSprites {
   ui.Image? get fxCombo => _cache[NightArtRegistry.fxCombo];
   ui.Image? get fxLucky => _cache[NightArtRegistry.fxLucky];
   ui.Image? get fxQi => _cache[NightArtRegistry.fxQi];
+  ui.Image? get fxCloneGate => _cache[NightArtRegistry.fxCloneGate];
+  ui.Image? get fxFeverAura => _cache[NightArtRegistry.fxFeverAura];
+  ui.Image? get propPowderKeg => _cache[NightArtRegistry.propPowderKeg];
+  ui.Image? get mutTreasureGoblin => _cache[NightArtRegistry.mutTreasureGoblin];
 
   ui.Image? floorOf(ChapterSpec chapter) => _cache[chapter.floorAsset];
   ui.Image? mutantOf(MutantKind kind) => _cache[NightArtRegistry.mutantAsset(kind)];
@@ -327,6 +337,10 @@ class NightBattleSprites {
       NightArtRegistry.villageGranary,
       NightArtRegistry.villageCrops,
       NightArtRegistry.villageLivestock,
+      NightArtRegistry.propPowderKeg,
+      NightArtRegistry.fxCloneGate,
+      NightArtRegistry.fxFeverAura,
+      NightArtRegistry.mutTreasureGoblin,
       NightArtRegistry.fxChuldu,
       NightArtRegistry.fxBarrier,
       NightArtRegistry.fxBreachGate,

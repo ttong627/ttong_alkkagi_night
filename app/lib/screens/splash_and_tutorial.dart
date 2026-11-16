@@ -24,10 +24,10 @@ class _SplashScreenState extends State<SplashScreen>
   bool _navigated = false;
 
   static const List<String> _tips = [
-    '전투 시작 시 길목은 비어 있으며, 빛나는 빈 초소(2→10곳)를 눌러 발사대를 직접 배치합니다!',
-    '맨 아래 중앙 기명 수호탑은 자동 발사와 수동 조준 탄지(화력 ×1.38·도탄 예측선)를 자유롭게 전환합니다.',
-    '관문을 순서대로 돌파할수록 동료 14인과 영수 5종이 차례로 구출되어 수호 본영에 합류합니다.',
-    '위기 순간 「무림수호단 출두야~~!!」 지원패를 누르면 화면 전체 변이 무리를 단숨에 일소합니다!',
+    '본진 단독 방치로는 마을이 함락됩니다! 군수 기력(⚡)을 모아 빛나는 빈 초소(2→10곳)에 발사대를 배치하세요!',
+    '⚡35 기력으로 「🎲 운빨 대박 소환」을 돌리면 상위 발사대나 2·3형 각성 포탑이 단숨에 강림하며, 같은 포탑 2기는 무료(0⚡)로 합쳐 진화합니다!',
+    '물결 돌파나 보물 도깨비 처치마다 「📜 심야 돌파 비급(3택 1)」이 열려 쌍탄 분열·연쇄 뇌전·화염 폭발을 중첩할 수 있습니다!',
+    '전장 한가운데 「🌀 ×2 복제 마법진」과 「🧨 심야 화약통(+16⚡)」으로 수호알 핀볼 연쇄 폭격을 터뜨리세요!',
   ];
 
   @override
@@ -58,6 +58,8 @@ class _SplashScreenState extends State<SplashScreen>
       NightArtRegistry.cardRescueBeacon,
       NightArtRegistry.cardEndlessAbyss,
       NightArtRegistry.appLogo,
+      NightArtRegistry.iconRogueScroll,
+      NightArtRegistry.iconLuckyDice,
       'assets/images/chars/sabu_idle.webp',
       'assets/images/chars/banDal_idle.webp',
       NightArtRegistry.wslogisLogo,
@@ -289,33 +291,33 @@ Future<void> showTutorialGuideDialog(
       speaker: '사부 현암',
       portrait: 'sabu',
       emblemAsset: NightArtRegistry.towerGuardian,
-      title: '1/4 · 빈 초소 직접 배치 & 초소 점진 확장(2→10곳)',
-      body: '전투가 시작되면 산길 길목은 비어 있고, 맨 아래 마을 어귀의 「중앙 기명 수호탑」만 가동됩니다.\n'
-          '구불구불한 북쪽 산길 옆 빛나는 「빈 초소」를 터치해 직접 발사대를 설치하세요! 관문이 나아갈수록 초소가 2곳에서 최대 10곳까지 늘어납니다.',
+      title: '1/4 · 초소 건설 조건(군수기력 ⚡ · 물결 봉인) 안내',
+      body: '아무것도 배치하지 않고 방치하면 중앙 수호탑만으로는 변이 무리를 막지 못해 마을이 함락됩니다!\n'
+          '상단 「군수기력 ⚡」 바를 확인하세요. 초소마다 [🔨건설 가능!(45⚡) / 🎲운빨가능(35⚡) / ⚡기력 충전중 / 🔒2·3물결 개방] 조건이 원형 호와 배지로 실시간 표시됩니다.',
     ),
     (
       speaker: '의용대장 석두',
       portrait: 'seokdu',
-      emblemAsset: NightArtRegistry.villageGranary,
-      title: '2/4 · 남단 마을 수호 & 중앙 수호탑 자동·수동 전환',
-      body: '식량 창고·논밭·외양간은 전장 맨 아래에 위치하며, 변이 무리가 위쪽 균열문에서 굽이쳐 쳐들어옵니다.\n'
-          '중앙 수호탑은 평소엔 자동으로 쏘지만, 「수동 탄지」로 전환하거나 드래그하면 도탄 예측선과 함께 강화 탄알(화력 ×1.38·관통 +2)을 직접 튕길 수 있습니다!',
+      emblemAsset: NightArtRegistry.iconLuckyDice,
+      title: '2/4 · 🎲 운빨 대박 소환(35⚡) & ☯️ 무료 합치기 진화',
+      body: '• 빈 초소를 눌러 「🎲 운빨 대박 소환(35⚡)」을 선택하면 미해금 상위 포탑까지 무작위로 강림하며 대박 시 2형(34%)·3형 신화(16%)가 즉시 출현합니다!\n'
+          '• 같은 종류·등급 포탑이 2곳에 있으면 「☯️ 무료 합치기(0⚡)」로 상위 형으로 각성시키고 빈 초소를 다시 확보할 수 있습니다.',
     ),
     (
       speaker: '명궁 연비',
       portrait: 'yeonbi',
-      emblemAsset: NightArtRegistry.nightToken,
-      title: '3/4 · 순서대로 정화하며 동료 14인 · 영수 5종 구출',
-      body: '• 본영의 「이번 수호 차례」 황금 성문을 따라 순서대로 관문을 돌파하면 1~9장에 걸쳐 갇혀 있던 동료와 영수를 지속적으로 구출합니다!\n'
-          '• 소형 독쥐 떼엔 「속사 연발기」, 거대 중갑 멧돼지엔 「중포 탄지기」, 뼈방패 야차엔 「곡사 회전기」를 배치해 상성을 제압하세요.',
+      emblemAsset: NightArtRegistry.iconRogueScroll,
+      title: '3/4 · 📜 돌파 비급(3택 1) & 🌀 ×2 복제 · 🧨 화약통 핀볼',
+      body: '• 물결을 돌파하거나 「👹 황금 보물 도깨비(+55⚡)」를 잡으면 12종 무림 비급 중 1권을 골라 탄알 분열·연쇄 번개·홍련 폭발을 끝없이 중첩합니다!\n'
+          '• 전장의 「🌀 ×2 쌍류 복제 마법진」에 수호알을 통과시키면 탄알이 2배로 불어나며, 「🧨 화약통」을 맞히면 대폭발과 함께 +16⚡ 기력이 들어옵니다.',
     ),
     (
       speaker: '기관장 정각',
       portrait: 'jeonggak',
       emblemAsset: NightArtRegistry.nightSupportSeal,
-      title: '4/4 · 증표 · 영약 분업 & 무림수호단 출두!',
-      body: '• 변이 처치 「증표」는 발사대 건설·승급·영구 강화에, 「영약」은 구출한 동료·영수·내공 경지 돌파에 쓰입니다.\n'
-          '• 위기 순간 「무림수호단 출두야~~!!」 지원패를 누르면 전군의 황금 수호알이 온 길목의 변이 무리를 쓸어버립니다!',
+      title: '4/4 · 중앙 수동 저격 · ⚡조기 호출 · 무림수호단 출두!',
+      body: '• 중앙 수호탑을 「수동 탄지」로 전환해 당겨 쏘면 사거리 제한 없이 전장 끝까지 고화력(×1.82·관통+2) 도탄 저격이 나갑니다.\n'
+          '• 여유가 있을 때 「⚡조기호출(+18⚡·비급)」로 기력과 비급을 당겨 받고, 위기 순간 「무림수호단 출두야~~!!」로 전세를 뒤집으세요!',
     ),
   ];
 

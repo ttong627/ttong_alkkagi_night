@@ -5,9 +5,9 @@ enum LauncherType {
     name: '속사 탄지기',
     roleSummary: '떼 지어 몰려오는 초소형·소형 독쥐·들개 대군 연속 관통 소탕',
     tierNames: ['1형 단발 목제기', '2형 쌍발 연노기', '3형 삼연속 회전기', '4형 폭풍 만발 탄지진'],
-    baseCooldownSec: 1.12,
-    baseDamage: 20.0,
-    projectileSpeed: 355.0,
+    baseCooldownSec: 1.02,
+    baseDamage: 26.0,
+    projectileSpeed: 365.0,
     unlockChapter: 1,
     buildCostTokens: 45,
     colorHex: 0xFF4EA8DE,
@@ -17,9 +17,9 @@ enum LauncherType {
     name: '중포 탄지기',
     roleSummary: '대형 중갑 변이체 장갑 파쇄·범위 충격파 및 절벽 추락 유도',
     tierNames: ['1형 외발 투석기', '2형 철심 강타포', '3형 파쇄 관통대포', '4형 천추 파성포'],
-    baseCooldownSec: 2.15,
-    baseDamage: 48.0,
-    projectileSpeed: 295.0,
+    baseCooldownSec: 1.98,
+    baseDamage: 60.0,
+    projectileSpeed: 305.0,
     unlockChapter: 1,
     buildCostTokens: 55,
     colorHex: 0xFFF77F00,
@@ -173,22 +173,23 @@ class CentralGuardianSpec {
     required double coreFortitudeBonus,
     required double coreFirepowerBonus,
   }) {
-    final shieldHp = (280.0 + centralLevel * 48.0) *
+    // 본진은 최후의 근접 방어선 역할만 수행하도록 내구도·자동 사격 주기를 정밀 설계 (무배치 방치 시 반드시 함락!)
+    final shieldHp = (135.0 + centralLevel * 28.0) *
         realmDefenseMult *
         (1.0 + meridianShieldBonus + coreFortitudeBonus);
-    final towerHp = (220.0 + centralLevel * 38.0) *
+    final towerHp = (110.0 + centralLevel * 22.0) *
         realmDefenseMult *
         (1.0 + coreFortitudeBonus);
-    final interval = (0.94 / (1.0 + centralLevel * 0.055 + meridianReloadBonus))
-        .clamp(0.36, 1.05);
-    final dmg = (33.0 + centralLevel * 6.8) * (1.0 + coreFirepowerBonus);
+    final interval = (1.42 / (1.0 + centralLevel * 0.045 + meridianReloadBonus))
+        .clamp(0.58, 1.55);
+    final dmg = (18.5 + centralLevel * 4.2) * (1.0 + coreFirepowerBonus);
     return CentralGuardianSpec(
       coreLevel: centralLevel,
       shieldMaxHp: shieldHp,
       coreMaxHp: towerHp,
       fireIntervalSec: interval,
       baseDamage: dmg,
-      shieldWavePush: 55.0 + centralLevel * 4.5,
+      shieldWavePush: 36.0 + centralLevel * 3.0,
     );
   }
 

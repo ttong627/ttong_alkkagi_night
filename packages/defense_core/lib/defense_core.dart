@@ -6,3 +6,4 @@ export 'src/launchers.dart';
 export 'src/materials.dart';
 export 'src/mutants.dart';
 export 'src/progression.dart';
+export 'src/tactical_fun.dart';

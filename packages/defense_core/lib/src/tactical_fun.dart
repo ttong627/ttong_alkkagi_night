@@ -1,0 +1,262 @@
+import 'campaign.dart';
+
+/// 물결 돌파 비급 카드 희귀도 등급.
+enum RoguePerkRarity {
+  common('일반 비급', 0xFF72EFDD),
+  rare('희귀 비급', 0xFF4EA8DE),
+  legendary('전설 비급', 0xFFFFD166);
+
+  const RoguePerkRarity(this.label, this.colorHex);
+  final String label;
+  final int colorHex;
+}
+
+/// 《탕탕특공대 · 페글린 · 펀볼》 스타일 물결 돌파 3택 1 전술 비급 12종.
+enum RoguePerk {
+  splitShot(
+    id: 'splitShot',
+    title: '쌍탄 분열비급',
+    badge: '🔥 탄환 2분열',
+    description: '초소와 수호탑의 알이 첫 적 적중 시 2갈래 분열탄으로 쪼개져 주변 무리를 추가 타격합니다! (중첩 시 분열 위력 +40%)',
+    rarity: RoguePerkRarity.legendary,
+    colorHex: 0xFFFF6B35,
+  ),
+  chainLightning(
+    id: 'chainLightning',
+    title: '뇌전 연쇄탄',
+    badge: '⚡ 번개 3연쇄',
+    description: '알이 적이나 기둥에 부딪힐 때마다 주변 변이 최대 3체에게 푸른 뇌전 사슬 피해를 입힙니다!',
+    rarity: RoguePerkRarity.rare,
+    colorHex: 0xFF4CC9F0,
+  ),
+  corpseExplosion(
+    id: 'corpseExplosion',
+    title: '홍련 폭렬파',
+    badge: '💥 처치 유폭',
+    description: '변이체를 처치할 때마다 진홍 화염 대폭발(반경 62)이 일어나 뒤따르는 무리를 연쇄 폭사시킵니다!',
+    rarity: RoguePerkRarity.legendary,
+    colorHex: 0xFFE63946,
+  ),
+  luckyAscension(
+    id: 'luckyAscension',
+    title: '운명의 신화 승급',
+    badge: '🎲 초소 무료 각성',
+    description: '설치된 초소 중 1곳이 즉시 +1~2형 무료 각성 승급합니다! (설치 초소가 없으면 군수 기력 +75⚡ 즉시 지급)',
+    rarity: RoguePerkRarity.legendary,
+    colorHex: 0xFFFFD166,
+  ),
+  giantBoulder(
+    id: 'giantBoulder',
+    title: '태산 거대석',
+    badge: '🪨 거대화·밀침↑',
+    description: '발사되는 모든 수호석 크기 +38% 거대화 및 밀침 충격력 +55% 상승! 절벽 뽀록 추락이 대폭 늘어납니다.',
+    rarity: RoguePerkRarity.rare,
+    colorHex: 0xFFF4A261,
+  ),
+  frostNova(
+    id: 'frostNova',
+    title: '만년 빙옥진',
+    badge: '❄️ 냉기·쇄빙폭발',
+    description: '모든 탄환에 한기 감속을 부여하고, 얼거나 느려진 변이 처치 시 얼음 파편 범위 폭발을 일으킵니다!',
+    rarity: RoguePerkRarity.rare,
+    colorHex: 0xFF90E0EF,
+  ),
+  ricochetMaster(
+    id: 'ricochetMaster',
+    title: '신궁 도탄결',
+    badge: '🎱 도탄 +2·증폭',
+    description: '벽면·기둥 반사 도탄 횟수 +2회 증가 및 도탄 적중 시 피해량이 +55% 대폭 증폭됩니다!',
+    rarity: RoguePerkRarity.common,
+    colorHex: 0xFF72EFDD,
+  ),
+  warChest(
+    id: 'warChest',
+    title: '군수 기력 대보급',
+    badge: '⚡ 즉시 +65기력',
+    description: '즉시 초소 건설 기력 +65⚡을 지급받고, 이후 변이 처치 시 기력 구슬 획득량이 +30% 증가합니다!',
+    rarity: RoguePerkRarity.common,
+    colorHex: 0xFFFFD166,
+  ),
+  rapidBarrage(
+    id: 'rapidBarrage',
+    title: '질풍 폭사결',
+    badge: '🏹 전 초소 가속',
+    description: '배치된 모든 길목 초소의 연사 속도가 영구히 +30% 빨라집니다! (중첩 가능)',
+    rarity: RoguePerkRarity.common,
+    colorHex: 0xFF38BDF8,
+  ),
+  ironBastion(
+    id: 'ironBastion',
+    title: '금강 수호결계',
+    badge: '🛡️ 방어막 대수복',
+    description: '외곽 방어막과 마을 피해를 즉시 50% 수복하고 방어막 최대 내구도를 +30% 확장합니다!',
+    rarity: RoguePerkRarity.common,
+    colorHex: 0xFF34D399,
+  ),
+  allyAwakening(
+    id: 'allyAwakening',
+    title: '영수·동료 각성령',
+    badge: '🐉 협공 주기 단축',
+    description: '구출 동료와 신비 영수의 지원 출격 대기시간 -32% 단축 및 스킬 화력 +45% 강화!',
+    rarity: RoguePerkRarity.rare,
+    colorHex: 0xFFC77DFF,
+  ),
+  armorBreaker(
+    id: 'armorBreaker',
+    title: '파갑 멸마송',
+    badge: '☠️ 장갑 완전관통',
+    description: '뼈방패와 중갑 외피를 100% 관통 무시하며 중간보스·대수괴에게 주는 피해가 +40% 증가합니다!',
+    rarity: RoguePerkRarity.rare,
+    colorHex: 0xFFF72585,
+  );
+
+  const RoguePerk({
+    required this.id,
+    required this.title,
+    required this.badge,
+    required this.description,
+    required this.rarity,
+    required this.colorHex,
+  });
+
+  final String id;
+  final String title;
+  final String badge;
+  final String description;
+  final RoguePerkRarity rarity;
+  final int colorHex;
+}
+
+/// 변이 처치·화약통 유폭·조기 호출 시 상단 건설 기력 게이지로 날아가는 황금 기력 구슬 연출 객체.
+class FlyingQiOrb {
+  FlyingQiOrb({
+    required this.startPos,
+    required this.targetPos,
+    required this.amount,
+    this.colorHex = 0xFFFFD166,
+  }) : currentPos = startPos;
+
+  final Vec2 startPos;
+  final Vec2 targetPos;
+  Vec2 currentPos;
+  final int amount;
+  final int colorHex;
+  double progress = 0.0;
+}
+
+/// 전장 한가운데를 유영하며 통과하는 수호석 알을 2개로 복제 증식시키는 《펀볼》식 ×2 쌍류 복제 마법진!
+class CloneGateZone {
+  CloneGateZone({
+    required this.baseCenter,
+    this.radius = 23.0,
+    this.swayAmplitude = 46.0,
+    this.phase = 0.0,
+  }) : center = baseCenter;
+
+  final Vec2 baseCenter;
+  Vec2 center;
+  final double radius;
+  final double swayAmplitude;
+  double phase;
+  double pulseAnim = 0.0;
+}
+
+/// 산길 굽이 옆에 놓여 알로 맞히면 대폭발하며 주변 변이를 쓸어버리고 건설 기력을 주는 화약통 기물!
+class PowderKegProp {
+  PowderKegProp({
+    required this.pos,
+    this.intact = true,
+    this.respawnTimer = 0.0,
+  });
+
+  final Vec2 pos;
+  bool intact;
+  double respawnTimer;
+}
+
+/// 전투 중 긴급 출몰하여 도주 전 저격 시 대량 건설 기력과 돌파 비급을 떨어뜨리는 황금 보물 도깨비!
+class TreasureGoblinEntity {
+  TreasureGoblinEntity({
+    required this.pos,
+    required this.vel,
+    required this.maxHp,
+  }) : hp = maxHp;
+
+  Vec2 pos;
+  final Vec2 vel;
+  final double maxHp;
+  double hp;
+  bool alive = true;
+  double animPhase = 0.0;
+  double hitFlashTimer = 0.0;
+}
+
+/// 길목 빈 초소의 건설 조건 상태 (유저가 왜 지을 수 있는지/없는지 한눈에 인지).
+enum PadConditionState {
+  waveLocked,
+  chargingQi,
+  readyLuckyOnly,
+  readyFullBuild,
+  built,
+}
+
+/// 각 초소의 실시간 건설 조건 안내 데이터.
+class PadConditionInfo {
+  const PadConditionInfo({
+    required this.slotIndex,
+    required this.state,
+    required this.unlockWaveNumber,
+    required this.currentQi,
+    required this.luckySummonCost,
+    required this.directBuildCost,
+    required this.chargeRatio,
+    required this.shortBadge,
+    required this.detailReason,
+  });
+
+  final int slotIndex;
+  final PadConditionState state;
+  final int unlockWaveNumber;
+  final int currentQi;
+  final int luckySummonCost;
+  final int directBuildCost;
+  final double chargeRatio;
+  final String shortBadge;
+  final String detailReason;
+}
+
+/// 배치된 초소들 사이에 발동되는 무림 진법 시너지 광선 연결 정보.
+class ActiveSynergyLink {
+  const ActiveSynergyLink({
+    required this.slotA,
+    required this.slotB,
+    required this.posA,
+    required this.posB,
+    required this.synergyName,
+    required this.bonusSummary,
+    required this.colorHex,
+  });
+
+  final int slotA;
+  final int slotB;
+  final Vec2 posA;
+  final Vec2 posB;
+  final String synergyName;
+  final String bonusSummary;
+  final int colorHex;
+}
+
+/// 두 점 사이 뇌전 사슬 시각 연출 선분.
+class LightningArcFx {
+  LightningArcFx({
+    required this.from,
+    required this.to,
+    this.ttlSec = 0.24,
+    this.colorHex = 0xFF4CC9F0,
+  });
+
+  final Vec2 from;
+  final Vec2 to;
+  double ttlSec;
+  final int colorHex;
+}

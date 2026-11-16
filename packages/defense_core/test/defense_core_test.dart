@@ -1025,6 +1025,8 @@ void main() {
         ..animPhase = 3.25
         ..freezeTimer = 1.5;
       sim.isFinished = false;
+      sim.shieldHp = 100.0;
+      sim.towerHp = 100.0;
       sim.mutants
         ..clear()
         ..add(frozenTestMutant);
@@ -1302,6 +1304,96 @@ void main() {
       expect(sim.isFinished, isTrue);
       expect(sim.isVictory, isTrue);
       expect(sim.elapsedSec, greaterThanOrEqualTo(32.0));
+    });
+
+    test('1-1 쉬움 난이도라도 아무것도 배치하지 않고 방치하면 100% 패배(마을 함락)하며, 초소 배치 시 승리한다', () {
+      final freshPlayer = PlayerProgress();
+      final idleSim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 1),
+        difficulty: DefenseDifficulty.easy,
+        progress: freshPlayer,
+        autoBuildForSimVerify: false,
+      );
+      const dt = 1.0 / 30.0;
+      for (int i = 0; i < 6000 && !idleSim.isFinished; i++) {
+        idleSim.step(dt);
+      }
+      expect(idleSim.isFinished, isTrue);
+      expect(idleSim.isVictory, isFalse, reason: '무배치 방치 상태에서 1-1 쉬움이 자동 클리어되면 안 됨!');
+      expect(idleSim.buildSummary().coachingTip, contains('군수 기력'));
+    });
+
+    test('초소 건설 조건(물결 봉인·기력 충전·운빨 소환 35⚡·합치기 진화·돌파 비급 3택1·핀볼 기물)이 정확히 작동한다', () {
+      final p = PlayerProgress();
+      final stage18 = CampaignCatalog.stageAt(1, 8); // 초소 4곳 개방 스테이지
+      final sim = DefenseBattleSim(
+        stage: stage18,
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        seed: 42,
+      );
+
+      // 초기 기력 48⚡: 0번 초소는 지정 건설 가능, 3번 초소(4번째 칸)는 2물결 잠금 상태!
+      expect(sim.fieldTokens, 48);
+      expect(sim.padConditionOf(0).state, PadConditionState.readyFullBuild);
+      expect(sim.padConditionOf(3).state, PadConditionState.waveLocked);
+
+      // 0번 초소에 35⚡ 운빨 무작위 소환 실행 → 남은 기력 13⚡ → 1번 초소는 기력 충전 중(13/35⚡)!
+      final summoned = sim.summonLuckyLauncherInBattle(0);
+      expect(summoned, isNotNull);
+      expect(sim.fieldTokens, 13);
+      expect(sim.padConditionOf(1).state, PadConditionState.chargingQi);
+
+      // 기력 보충 후 같은 종류·같은 형 초소를 1번 칸에 강제 세팅해 0⚡ 합치기 진화 검증!
+      sim.fieldTokens = 100;
+      expect(sim.placeLauncherInBattle(1, LauncherType.rapid), isTrue);
+      sim.launcherAtSlot(0)!
+        ..type = LauncherType.rapid
+        ..tier = 1;
+      sim.launcherAtSlot(1)!
+        ..type = LauncherType.rapid
+        ..tier = 1;
+      expect(sim.findMergePartnerSlot(0), 1);
+      expect(sim.activeSynergyLinks, isNotEmpty);
+      expect(sim.mergeLauncherAtSlot(0), isTrue);
+      expect(sim.launcherAtSlot(0)!.tier, 2);
+      expect(sim.launcherAtSlot(1), isNull); // 합쳐진 파트너 초소는 다시 빈 초소가 됨!
+
+      // 물결 조기 호출 및 3택 1 돌파 비급 선택 검증!
+      sim.elapsedSec = 5.0;
+      sim.step(30.0); // 스폰 큐 소진 유도
+      while (!sim.canCallNextWaveEarly && sim.elapsedSec < 25.0) {
+        sim.step(0.5);
+      }
+      if (sim.canCallNextWaveEarly) {
+        final beforeQi = sim.fieldTokens;
+        expect(sim.callNextWaveEarly(), isTrue);
+        expect(sim.fieldTokens, greaterThanOrEqualTo(beforeQi + 18));
+        expect(sim.pendingPerkChoices.length, 3);
+        final chosen = sim.pendingPerkChoices.first;
+        expect(sim.chooseRoguePerk(chosen), isTrue);
+        expect(sim.perkStacks(chosen), 1);
+      }
+
+      // ×2 쌍류 복제 마법진 통과 시 투사체가 2개로 복제되는지 검증!
+      sim.projectiles.clear();
+      sim.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'test',
+          sourceLabel: '시험탄',
+          pos: sim.cloneGate.center,
+          vel: const Vec2(0, -300),
+          material: StoneMaterial.cheongok,
+          shape: StoneShape.round,
+          damage: 30,
+          knockback: 40,
+          critChance: 0.1,
+          colorHex: 0xFF72EFDD,
+        ),
+      );
+      sim.step(1 / 60);
+      expect(sim.projectiles.length, 2);
+      expect(sim.cloneSplitCount, greaterThanOrEqualTo(1));
     });
   });
 }

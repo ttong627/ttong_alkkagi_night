@@ -229,6 +229,10 @@ def cutout_square(im: Image.Image, target_size: tuple[int, int], chroma: str) ->
     return sq.resize(target_size, Image.LANCZOS)
 
 
+def base_kind_of(kind: str) -> str:
+    return kind[:-8] if kind.endswith("_magenta") else kind
+
+
 def apply_one(item: dict) -> Path | None:
     kind = item["kind"]
     if kind.startswith("appicon"):
@@ -236,13 +240,13 @@ def apply_one(item: dict) -> Path | None:
     src = find_raw(item["id"])
     if not src:
         return None
-    base_kind = "icon" if kind == "icon_magenta" else ("stone" if kind == "stone_magenta" else ("launcher" if kind == "launcher_magenta" else kind))
+    base_kind = base_kind_of(kind)
     chroma = "magenta" if kind.endswith("_magenta") else "green"
     out_dir = ASSETS / DEST_FOLDER[base_kind]
     out_dir.mkdir(parents=True, exist_ok=True)
     dest = out_dir / f"{item['id']}.webp"
     im = Image.open(src)
-    target_sz = SIZE_MAP[base_kind]
+    target_sz = tuple(item["size"]) if "size" in item else SIZE_MAP[base_kind]
     if base_kind in ("bg", "floor"):
         cover_crop(im.convert("RGB"), target_sz).save(dest, "WEBP", quality=84, method=6)
     elif base_kind in ("scene_wide", "card_wide", "card_sq"):
@@ -362,7 +366,7 @@ def cmd_sheet(args) -> int:
             if kind.startswith("appicon"):
                 f = find_raw(it["id"])
             else:
-                base_kind = "icon" if kind == "icon_magenta" else ("stone" if kind == "stone_magenta" else ("launcher" if kind == "launcher_magenta" else kind))
+                base_kind = base_kind_of(kind)
                 f = ASSETS / DEST_FOLDER[base_kind] / f"{it['id']}.webp"
             if not f or not f.exists():
                 continue

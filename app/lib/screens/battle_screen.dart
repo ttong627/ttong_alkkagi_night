@@ -40,10 +40,11 @@ class _BattleScreenState extends State<BattleScreen>
   bool _paused = false;
   bool _summaryShown = false;
 
-  /// 수동 조준 드래그 상태 및 실시간 반사 예측선 각도.
+  /// 수동 조준 드래그 상태 및 실시간 반사 예측선 각도 · 선택된 초소 사거리 미리보기.
   bool _draggingManualAim = false;
   bool _draggedFromTower = false;
   double? _manualAimPreviewAngleRad;
+  int? _selectedSlotIndex;
 
   @override
   void initState() {
@@ -81,12 +82,17 @@ class _BattleScreenState extends State<BattleScreen>
     _summaryShown = false;
     _draggingManualAim = false;
     _manualAimPreviewAngleRad = null;
+    _selectedSlotIndex = null;
     _lastTick = null;
   }
 
   void _onTick(Duration elapsed) {
-    if (_paused) {
+    // 일시정지 중이거나 3택 1 돌파 비급 카드 선택 중에는 물리를 멈추고 선택을 대기!
+    if (_paused || _sim.pendingPerkChoices.isNotEmpty) {
       _lastTick = elapsed;
+      if (_sim.pendingPerkChoices.isNotEmpty) {
+        _frameNotifier.value++;
+      }
       return;
     }
     final prev = _lastTick;
@@ -172,7 +178,11 @@ class _BattleScreenState extends State<BattleScreen>
   Future<void> _openMountBuildOrManageSheet(LauncherMountSlot slot) async {
     if (_sim.isFinished) return;
     final wasPaused = _paused;
-    setState(() => _paused = true);
+    setState(() {
+      _paused = true;
+      _selectedSlotIndex = slot.slotIndex;
+    });
+    _frameNotifier.value++;
     NightAudioController.instance.playAsset('ui_tap.ogg');
 
     await showModalBottomSheet<void>(
@@ -186,6 +196,8 @@ class _BattleScreenState extends State<BattleScreen>
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             final existing = _sim.launcherAtSlot(slot.slotIndex);
+            final cond = _sim.padConditionOf(slot.slotIndex);
+            final mergePartner = _sim.findMergePartnerSlot(slot.slotIndex);
             final recType = slot.recommendedType;
             final orderedTypes = <LauncherType>[
               recType,
@@ -227,7 +239,7 @@ class _BattleScreenState extends State<BattleScreen>
                                   ),
                                 ),
                                 Text(
-                                  '현장 보유 증표: ${_sim.fieldTokens}개 · 개방 초소 ${_sim.launchers.length}/${_sim.activeMounts.length}곳 가동중',
+                                  '⚡ 현재 군수 기력: ${_sim.fieldTokens}⚡ · 가동 초소 ${_sim.launchers.length}/${_sim.activeMounts.length}곳',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: NightPalette.jadeGreen,
@@ -242,7 +254,147 @@ class _BattleScreenState extends State<BattleScreen>
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+
+                      // 초소 건설 조건 명확 안내 카드
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: NightPalette.bgDeep,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: NightPalette.jadeShield.withValues(alpha: 0.55),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cond.detailReason,
+                              style: const TextStyle(
+                                fontSize: 12.2,
+                                fontWeight: FontWeight.bold,
+                                color: NightPalette.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            const Text(
+                              '💡 기력(⚡) 획득법: 변이 처치 구슬 흡수 · 🧨화약통 저격(+16⚡) · 물결 돌파(+22⚡) · ⚡조기 호출(+18⚡)',
+                              style: TextStyle(
+                                fontSize: 11.2,
+                                color: NightPalette.jadeGreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 10),
+
+                      // 빈 초소 & 봉인 해제 상태일 때: 🎲 35⚡ 운빨 무작위 대박 소환 카드!
+                      if (existing == null && cond.state != PadConditionState.waveLocked) ...[
+                        InkWell(
+                          key: const Key('lucky_summon_btn'),
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: _sim.fieldTokens >= DefenseBattleSim.luckySummonCostTokens
+                              ? () {
+                                  final created = _sim.summonLuckyLauncherInBattle(
+                                    slot.slotIndex,
+                                  );
+                                  if (created != null) {
+                                    NightHaptics.instance.lightTap();
+                                    _frameNotifier.value++;
+                                    Navigator.of(ctx).pop();
+                                  }
+                                }
+                              : null,
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: _sim.fieldTokens >=
+                                        DefenseBattleSim.luckySummonCostTokens
+                                    ? const [Color(0xFF281B48), Color(0xFF132D3E)]
+                                    : const [Color(0xFF141A29), Color(0xFF141A29)],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: _sim.fieldTokens >=
+                                        DefenseBattleSim.luckySummonCostTokens
+                                    ? NightPalette.accentGold
+                                    : Colors.white24,
+                                width: 1.6,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                NightSpriteIcon(
+                                  assetPath: NightArtRegistry.iconLuckyDice,
+                                  fallbackIcon: Icons.casino_rounded,
+                                  size: 46,
+                                  dimmed: _sim.fieldTokens <
+                                      DefenseBattleSim.luckySummonCostTokens,
+                                  showFrame: true,
+                                  frameColor: NightPalette.accentGold,
+                                ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '🎲 운빨 대박 무작위 소환 (할인!)',
+                                        style: TextStyle(
+                                          fontFamily: 'BlackHanSans',
+                                          fontSize: 15.2,
+                                          color: NightPalette.accentGold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        '5종 발사대(미해금 상위 포함!) 무작위 강림 · 대박 시 처음부터 2형(34%) · 3형 신화(16%) 즉시 출현!',
+                                        style: TextStyle(
+                                          fontSize: 11.4,
+                                          color: NightPalette.textPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _sim.fieldTokens >=
+                                            DefenseBattleSim.luckySummonCostTokens
+                                        ? NightPalette.accentGold
+                                        : Colors.white12,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '⚡${DefenseBattleSim.luckySummonCostTokens}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13.5,
+                                      color: _sim.fieldTokens >=
+                                              DefenseBattleSim.luckySummonCostTokens
+                                          ? Colors.black
+                                          : NightPalette.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+
                       if (existing != null) ...[
                         MurimCard(
                           borderColor: NightPalette.jadeGreen,
@@ -263,6 +415,30 @@ class _BattleScreenState extends State<BattleScreen>
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: [
+                                  if (mergePartner != null)
+                                    FilledButton.icon(
+                                      key: const Key('merge_slot_btn'),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: NightPalette.accentGold,
+                                        foregroundColor: Colors.black,
+                                      ),
+                                      onPressed: () {
+                                        if (_sim.mergeLauncherAtSlot(
+                                          slot.slotIndex,
+                                        )) {
+                                          NightHaptics.instance.lightTap();
+                                          _frameNotifier.value++;
+                                          Navigator.of(ctx).pop();
+                                        }
+                                      },
+                                      icon: const Icon(
+                                        Icons.auto_awesome_rounded,
+                                        size: 18,
+                                      ),
+                                      label: Text(
+                                        '☯️ ${mergePartner + 1}번 초소와 무료 합치기! (${existing.tier + 1}형 각성)',
+                                      ),
+                                    ),
                                   FilledButton.icon(
                                     key: const Key('upgrade_slot_btn'),
                                     style: FilledButton.styleFrom(
@@ -291,7 +467,7 @@ class _BattleScreenState extends State<BattleScreen>
                                     label: Text(
                                       existing.tier >= 4
                                           ? '최고 4형 달성 완료'
-                                          : '${existing.tier + 1}형 승급 (증표 ${existing.type.inBattleUpgradeCost(existing.tier)})',
+                                          : '${existing.tier + 1}형 승급 (⚡${existing.type.inBattleUpgradeCost(existing.tier)})',
                                     ),
                                   ),
                                   OutlinedButton.icon(
@@ -311,7 +487,7 @@ class _BattleScreenState extends State<BattleScreen>
                                       size: 18,
                                     ),
                                     label: Text(
-                                      '철거 (+${(existing.investedTokens * 0.80).round()} 환급)',
+                                      '철거 (+⚡${(existing.investedTokens * 0.80).round()} 환급)',
                                     ),
                                   ),
                                 ],
@@ -321,7 +497,7 @@ class _BattleScreenState extends State<BattleScreen>
                         ),
                         const SizedBox(height: 10),
                         const Text(
-                          '다른 종류의 수호 발사대로 교체 배치 (기존 증표 80% 자동 차감 반영)',
+                          '다른 종류의 수호 발사대로 지정 교체 (기존 기력 80% 자동 차감 반영)',
                           style: TextStyle(
                             fontSize: 12.5,
                             color: NightPalette.textMuted,
@@ -329,10 +505,11 @@ class _BattleScreenState extends State<BattleScreen>
                         ),
                         const SizedBox(height: 6),
                       ],
-                      ...orderedTypes.map((lt) {
-                        if (existing != null && existing.type == lt) {
-                          return const SizedBox.shrink();
-                        }
+                      if (cond.state != PadConditionState.waveLocked)
+                        ...orderedTypes.map((lt) {
+                          if (existing != null && existing.type == lt) {
+                            return const SizedBox.shrink();
+                          }
                         final unlocked = _sim.isLauncherTypeUnlocked(lt);
                         final isRec = lt == recType;
                         final refund = existing != null
@@ -499,7 +676,12 @@ class _BattleScreenState extends State<BattleScreen>
     );
 
     if (mounted && !_sim.isFinished) {
-      setState(() => _paused = wasPaused);
+      setState(() {
+        _paused = wasPaused;
+        _selectedSlotIndex = null;
+      });
+    } else if (mounted) {
+      setState(() => _selectedSlotIndex = null);
     }
   }
 
@@ -992,17 +1174,30 @@ class _BattleScreenState extends State<BattleScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // 상단 전장 상태 막대
+            // 상단 전장 상태 막대 + 실시간 초소 건설 기력(⚡) 충전 게이지 바
             ValueListenableBuilder<int>(
               valueListenable: _frameNotifier,
               builder: (_, _, _) {
-                final shieldPct = _sim.centralSpec.shieldMaxHp > 0
-                    ? (_sim.shieldHp / _sim.centralSpec.shieldMaxHp * 100)
-                        .round()
+                final shieldPct = _sim.shieldMaxHpDynamic > 0
+                    ? (_sim.shieldHp / _sim.shieldMaxHpDynamic * 100).round()
                     : 0;
                 final towerPct = _sim.centralSpec.coreMaxHp > 0
                     ? (_sim.towerHp / _sim.centralSpec.coreMaxHp * 100).round()
                     : 0;
+                final nextSlot = _sim.nextRecommendedSlotIndex();
+                final nextDirectCost = nextSlot != null
+                    ? (_sim
+                            .mountSlotByIndex(nextSlot)
+                            ?.recommendedType
+                            .buildCostTokens ??
+                        45)
+                    : 45;
+                final qiFill =
+                    (_sim.fieldTokens / nextDirectCost).clamp(0.0, 1.0);
+                final canBuildAny =
+                    _sim.fieldTokens >= DefenseBattleSim.luckySummonCostTokens &&
+                        nextSlot != null;
+
                 return Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -1062,6 +1257,77 @@ class _BattleScreenState extends State<BattleScreen>
                         ],
                       ),
                       const SizedBox(height: 3),
+
+                      // ★ 한눈에 보이는 「초소 건설 기력(⚡) 충전 바 & 조건 표시」
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: NightPalette.bgDeep,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: canBuildAny
+                                ? const Color(0xFF80ED99)
+                                : NightPalette.jadeShield.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const NightSpriteIcon(
+                              assetPath: NightArtRegistry.iconLuckyDice,
+                              fallbackIcon: Icons.bolt_rounded,
+                              size: 18,
+                              borderRadius: 4,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '군수기력 ⚡${_sim.fieldTokens}',
+                              style: TextStyle(
+                                fontSize: 11.8,
+                                fontWeight: FontWeight.bold,
+                                color: canBuildAny
+                                    ? const Color(0xFF80ED99)
+                                    : NightPalette.accentGold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(5),
+                                child: LinearProgressIndicator(
+                                  value: qiFill,
+                                  minHeight: 7,
+                                  backgroundColor: Colors.white12,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    canBuildAny
+                                        ? const Color(0xFF80ED99)
+                                        : NightPalette.accentGold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              nextSlot == null
+                                  ? '전 초소 가동/대기'
+                                  : (canBuildAny
+                                      ? '🔨초소 건설 가능!'
+                                      : '운빨35⚡/지정$nextDirectCost⚡'),
+                              style: TextStyle(
+                                fontSize: 11.0,
+                                fontWeight: FontWeight.bold,
+                                color: canBuildAny
+                                    ? const Color(0xFF80ED99)
+                                    : NightPalette.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+
                       Wrap(
                         spacing: 8,
                         runSpacing: 4,
@@ -1078,12 +1344,6 @@ class _BattleScreenState extends State<BattleScreen>
                             color: _sim.launchers.isEmpty
                                 ? NightPalette.accentGold
                                 : NightPalette.jadeGreen,
-                          ),
-                          _HudStatBadge(
-                            assetPath: NightArtRegistry.nightToken,
-                            fallbackIcon: Icons.toll_rounded,
-                            text: '현장증표 ${_sim.fieldTokens}',
-                            color: Colors.amberAccent,
                           ),
                           _HudStatBadge(
                             assetPath: NightArtRegistry.fxBarrier,
@@ -1103,6 +1363,14 @@ class _BattleScreenState extends State<BattleScreen>
                             text: '내공 ${_sim.qiBars.toStringAsFixed(1)}/3칸',
                             color: NightPalette.jadeGreen,
                           ),
+                          if (_sim.activePerks.isNotEmpty)
+                            _HudStatBadge(
+                              assetPath: NightArtRegistry.iconRogueScroll,
+                              fallbackIcon: Icons.menu_book_rounded,
+                              text:
+                                  '비급 ${_sim.activePerks.values.fold<int>(0, (a, b) => a + b)}권',
+                              color: NightPalette.accentGold,
+                            ),
                           if (_sim.auroraCritTimer > 0)
                             _HudStatBadge(
                               assetPath: NightArtRegistry.fxCritical,
@@ -1265,6 +1533,7 @@ class _BattleScreenState extends State<BattleScreen>
                                         repaintTick: _frameNotifier,
                                         manualAimPreviewAngleRad:
                                             _manualAimPreviewAngleRad,
+                                        selectedSlotIndex: _selectedSlotIndex,
                                       ),
                                     );
                                   },
@@ -1388,6 +1657,317 @@ class _BattleScreenState extends State<BattleScreen>
                                         ),
                                       ),
                                     ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // 우측 상단 연타 콤보 · 🔥 피버 타임 게이지 & ⚡ 다음 물결 조기 호출 버튼!
+                  ValueListenableBuilder<int>(
+                    valueListenable: _frameNotifier,
+                    builder: (_, _, _) {
+                      final showCombo =
+                          _sim.comboCount >= 3 || _sim.feverTimer > 0;
+                      final canEarly = _sim.canCallNextWaveEarly;
+                      if (!showCombo && !canEarly && _sim.feverGauge < 15) {
+                        return const SizedBox.shrink();
+                      }
+                      return Positioned(
+                        top: 42,
+                        right: 10,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            if (showCombo || _sim.feverGauge >= 15)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _sim.feverTimer > 0
+                                      ? const Color(0xEE5E1908)
+                                      : const Color(0xCC0D1628),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: _sim.feverTimer > 0
+                                        ? NightPalette.accentGold
+                                        : NightPalette.jadeShield,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    NightSpriteIcon(
+                                      assetPath: _sim.feverTimer > 0
+                                          ? NightArtRegistry.fxFeverAura
+                                          : NightArtRegistry.fxCombo,
+                                      fallbackIcon:
+                                          Icons.local_fire_department_rounded,
+                                      size: 18,
+                                      borderRadius: 9,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _sim.feverTimer > 0
+                                          ? '🔥피버 무쌍 ${_sim.feverTimer.toStringAsFixed(1)}초!'
+                                          : '${_sim.comboCount}연타 · 열기 ${_sim.feverGauge.round()}%',
+                                      style: TextStyle(
+                                        fontSize: 11.4,
+                                        fontWeight: FontWeight.bold,
+                                        color: _sim.feverTimer > 0
+                                            ? NightPalette.accentGold
+                                            : NightPalette.jadeGreen,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (canEarly) ...[
+                              const SizedBox(height: 6),
+                              FilledButton.icon(
+                                key: const Key('call_early_wave_btn'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xEE183A37),
+                                  foregroundColor: NightPalette.accentGold,
+                                  side: const BorderSide(
+                                    color: NightPalette.accentGold,
+                                    width: 1.3,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                onPressed: () {
+                                  if (_sim.callNextWaveEarly()) {
+                                    NightHaptics.instance.lightTap();
+                                    _frameNotifier.value++;
+                                    setState(() {});
+                                  }
+                                },
+                                icon: const Icon(
+                                  Icons.fast_forward_rounded,
+                                  size: 16,
+                                ),
+                                label: const Text(
+                                  '⚡조기호출(+18⚡·비급)',
+                                  style: TextStyle(
+                                    fontSize: 11.2,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
+                  // 📜 《탕탕특공대 · 페글린》 스타일 물결 돌파 3택 1 비급 카드 선택 오버레이!
+                  ValueListenableBuilder<int>(
+                    valueListenable: _frameNotifier,
+                    builder: (_, _, _) {
+                      if (_sim.pendingPerkChoices.isEmpty || _sim.isFinished) {
+                        return const SizedBox.shrink();
+                      }
+                      final choices =
+                          List<RoguePerk>.from(_sim.pendingPerkChoices);
+                      return Positioned.fill(
+                        child: Container(
+                          color: const Color(0xCC060A14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 520),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const NightSpriteIcon(
+                                          assetPath:
+                                              NightArtRegistry.iconRogueScroll,
+                                          fallbackIcon:
+                                              Icons.auto_stories_rounded,
+                                          size: 32,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Flexible(
+                                          child: Text(
+                                            '📜 심야 돌파 비급 선택 (3택 1)',
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontFamily: 'BlackHanSans',
+                                              fontSize: 19,
+                                              color: NightPalette.accentGold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      '이번 밤 전투 내내 중첩되는 무림 비급 1권을 고르세요!',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12.2,
+                                        color: NightPalette.jadeGreen,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ...choices.map((perk) {
+                                      final rarityCol =
+                                          Color(perk.rarity.colorHex);
+                                      final curStack = _sim.perkStacks(perk);
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 8),
+                                        child: InkWell(
+                                          key: Key('rogue_perk_${perk.id}'),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          onTap: () {
+                                            if (_sim.chooseRoguePerk(perk)) {
+                                              NightHaptics.instance.lightTap();
+                                              _frameNotifier.value++;
+                                              setState(() {});
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  const Color(0xFF151F35),
+                                                  Color(perk.colorHex)
+                                                      .withValues(alpha: 0.18),
+                                                ],
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: rarityCol,
+                                                width: perk.rarity ==
+                                                        RoguePerkRarity
+                                                            .legendary
+                                                    ? 2.0
+                                                    : 1.4,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                NightSpriteIcon(
+                                                  assetPath: NightArtRegistry
+                                                      .iconRogueScroll,
+                                                  fallbackIcon: Icons
+                                                      .auto_fix_high_rounded,
+                                                  size: 42,
+                                                  showFrame: true,
+                                                  frameColor: rarityCol,
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Wrap(
+                                                        spacing: 6,
+                                                        crossAxisAlignment:
+                                                            WrapCrossAlignment
+                                                                .center,
+                                                        children: [
+                                                          Container(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                              horizontal: 6,
+                                                              vertical: 2,
+                                                            ),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color: rarityCol
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.22),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          6),
+                                                            ),
+                                                            child: Text(
+                                                              perk.rarity.label,
+                                                              style: TextStyle(
+                                                                fontSize: 10.5,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color:
+                                                                    rarityCol,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            perk.title,
+                                                            style: TextStyle(
+                                                              fontFamily:
+                                                                  'BlackHanSans',
+                                                              fontSize: 15.5,
+                                                              color: Color(
+                                                                perk.colorHex,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          if (curStack > 0)
+                                                            Text(
+                                                              '($curStack중첩중)',
+                                                              style:
+                                                                  const TextStyle(
+                                                                fontSize: 11,
+                                                                color: NightPalette
+                                                                    .accentGold,
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 3),
+                                                      Text(
+                                                        '${perk.badge} · ${perk.description}',
+                                                        style: const TextStyle(
+                                                          fontSize: 11.8,
+                                                          color: NightPalette
+                                                              .textPrimary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const Icon(
+                                                  Icons.chevron_right_rounded,
+                                                  color:
+                                                      NightPalette.accentGold,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
                                   ],
                                 ),
                               ),

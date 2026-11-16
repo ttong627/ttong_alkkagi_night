@@ -37,6 +37,7 @@ void main() {
     expect(NightArtRegistry.villageGranary, 'assets/images/launchers/village_granary.webp');
     expect(NightArtRegistry.villageCrops, 'assets/images/launchers/village_crops.webp');
     expect(NightArtRegistry.villageLivestock, 'assets/images/launchers/village_livestock.webp');
+    expect(NightArtRegistry.propPowderKeg, 'assets/images/launchers/prop_powder_keg.webp');
 
     expect(NightArtRegistry.appLogo, 'assets/images/icons/app_logo.webp');
     expect(NightArtRegistry.nightToken, 'assets/images/icons/night_token.webp');
@@ -46,6 +47,8 @@ void main() {
     expect(NightArtRegistry.nightSerendipity, 'assets/images/icons/night_serendipity.webp');
     expect(NightArtRegistry.nightMeridian, 'assets/images/icons/night_meridian.webp');
     expect(NightArtRegistry.nightEndless, 'assets/images/icons/night_endless.webp');
+    expect(NightArtRegistry.iconRogueScroll, 'assets/images/icons/icon_rogue_scroll.webp');
+    expect(NightArtRegistry.iconLuckyDice, 'assets/images/icons/icon_lucky_dice.webp');
 
     expect(NightArtRegistry.fxChuldu, 'assets/images/fx/fx_chuldu.webp');
     expect(NightArtRegistry.fxBarrier, 'assets/images/fx/fx_barrier.webp');
@@ -56,6 +59,9 @@ void main() {
     expect(NightArtRegistry.fxCombo, 'assets/images/fx/fx_combo.webp');
     expect(NightArtRegistry.fxLucky, 'assets/images/fx/fx_lucky.webp');
     expect(NightArtRegistry.fxQi, 'assets/images/fx/fx_qi.webp');
+    expect(NightArtRegistry.fxCloneGate, 'assets/images/fx/fx_clone_gate.webp');
+    expect(NightArtRegistry.fxFeverAura, 'assets/images/fx/fx_fever_aura.webp');
+    expect(NightArtRegistry.mutTreasureGoblin, 'assets/images/mutants/mut_treasure_goblin.webp');
 
     expect(
       MutantKind.values.map(NightArtRegistry.mutantAsset).toList(),
@@ -337,6 +343,7 @@ void main() {
     expect(find.text('초소 0/2곳'), findsOneWidget);
 
     // 1-2 전장의 1번 빈 초소 좌표(arena: 200, 392)를 터치해 직접 발사대 설치 시트 오픈!
+    expect(find.textContaining('군수기력 ⚡'), findsOneWidget);
     final arenaBox = tester.getRect(find.byKey(const Key('battle_arena_gesture')));
     final slotTapOffset = Offset(
       arenaBox.left + arenaBox.width * (200.0 / CampaignCatalog.arenaWidth),
@@ -346,11 +353,40 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
     expect(find.textContaining('빈 초소 · 발사대 직접 배치'), findsOneWidget);
+    expect(find.byKey(const Key('lucky_summon_btn')), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(const Key('place_launcher_rapid')));
     await tester.tap(find.byKey(const Key('place_launcher_rapid')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('초소 1/2곳'), findsOneWidget);
+
+    // 3배속으로 전환해 제1물결 후반부까지 진행하면 ⚡조기호출(+18⚡·비급) 버튼이 활성화된다!
+    await tester.tap(find.text('3배'));
+    await tester.pump();
+    for (int f = 0; f < 80; f++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byKey(const Key('call_early_wave_btn')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+
+    // ⚡ 다음 물결 조기 호출 버튼 클릭 시 +18⚡ 보급과 함께 📜 심야 돌파 비급(3택 1) 오버레이가 즉시 열리는지 검증!
+    expect(find.byKey(const Key('call_early_wave_btn')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('call_early_wave_btn')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.textContaining('심야 돌파 비급 선택 (3택 1)'), findsOneWidget);
+
+    // 첫 번째 비급 카드를 선택하면 오버레이가 닫히고 전투가 이어진다!
+    final firstPerkCard = find.byWidgetPredicate(
+      (w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('rogue_perk_'),
+    );
+    expect(firstPerkCard, findsNWidgets(3));
+    await tester.tap(firstPerkCard.first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.textContaining('심야 돌파 비급 선택 (3택 1)'), findsNothing);
   });
 
   testWidgets('상용 확장 화면(출석·임무·비약 제조·수호 도감·확률 공개·무한 혈전·설정·만든 이·제작노트) 전수 검증',

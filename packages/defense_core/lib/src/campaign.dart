@@ -1124,7 +1124,7 @@ class CampaignCatalog {
                 LauncherType.curveSpin,
                 LauncherType.rapid,
               ],
-              startingFieldTokens: 210 + st * 14,
+              startingFieldTokens: 105 + st * 5,
               clearElixirBonus: isFinalGod ? 10 : 4,
               isBossStage: true,
               maxMountCount: mountCap,
@@ -1224,7 +1224,7 @@ class CampaignCatalog {
             tacticalHint: _hintForStage(ch.number, st, isChapterBoss, isHeukpungStage),
             recommendedStone: recStone,
             recommendedLaunchers: ch.mounts.take(mountCap).map((m) => m.recommendedType).toList(),
-            startingFieldTokens: 96 + ch.number * 14 + st * 4,
+            startingFieldTokens: 48 + (ch.number - 1) * 5,
             clearElixirBonus: isChapterBoss
                 ? 5
                 : ((isHeukpungStage || isMukhyeonStage || rescueHero != null || rescuePet != null) ? 3 : 1),
@@ -1725,7 +1725,7 @@ class CampaignCatalog {
         StoryLine(
           speaker: '석두',
           portraitPrefix: 'seokdu',
-          text: '걱정 마십시오 촌장님! 마을 맨 아래 어귀에 자동·수동 겸용 기명 수호탑과 결계를 세웠으니, 굽이길 초소마다 직접 발사대를 배치해 모두 막아내겠습니다!',
+          text: '본진 수호탑만으로는 밀려오는 대군을 절대 막을 수 없습니다! 초기 군수 기력(⚡)으로 먼저 첫 초소를 세우고, 변이를 잡아 모은 기력 구슬과 돌파 비급으로 방어선을 확장합시다!',
         ),
       ];
     }
