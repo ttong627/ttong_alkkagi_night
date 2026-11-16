@@ -364,7 +364,7 @@ void main() {
     // 3배속으로 전환해 제1물결 후반부까지 진행하면 ⚡조기호출(+18⚡·비급) 버튼이 활성화된다!
     await tester.tap(find.text('3배'));
     await tester.pump();
-    for (int f = 0; f < 80; f++) {
+    for (int f = 0; f < 180; f++) {
       await tester.pump(const Duration(milliseconds: 50));
       if (find.byKey(const Key('call_early_wave_btn')).evaluate().isNotEmpty) {
         break;
@@ -626,5 +626,86 @@ void main() {
         expect(tester.takeException(), isNull);
       }
     }
+  });
+
+  testWidgets('무정지 실시간 전장: 초소 빠른 띠(4.8초)·돌파 비급(6.5초) 미클릭 자동 패스 및 원터치 소환·실시간 강화 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final controller = GameController(
+      initialProgress: PlayerProgress(
+        tokens: 500,
+        highestClearedGlobalStage: 2,
+        tutorialSeen: true,
+        bgmVolume: 0.0,
+        sfxVolume: 0.0,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BattleScreen(
+          controller: controller,
+          stage: CampaignCatalog.stageAt(1, 2),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // 1) 빈 초소 터치 시 전체 모달이 아니라 하단 4.8초 실시간 빠른 띠가 열리며, 안 누르고 5.2초가 지나면 게임이 멈추지 않고 자동 통과!
+    final arenaBox = tester.getRect(find.byKey(const Key('battle_arena_gesture')));
+    final slotTapOffset = Offset(
+      arenaBox.left + arenaBox.width * (200.0 / CampaignCatalog.arenaWidth),
+      arenaBox.top + arenaBox.height * (392.0 / CampaignCatalog.arenaHeight),
+    );
+    await tester.tapAt(slotTapOffset);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('빈 초소 · 발사대 직접 배치'), findsOneWidget);
+
+    for (int i = 0; i < 105; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.textContaining('빈 초소 · 발사대 직접 배치'), findsNothing);
+
+    // 2) 하단 실시간 원터치 「🎲즉시운빨(35⚡)」 버튼으로 화면 가림 없이 즉시 소환 검증!
+    expect(find.text('초소 0/2곳'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('quick_lucky_summon_btn')));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('초소 1/2곳'), findsOneWidget);
+
+    // 3) 3배속 진행 중 조기 호출로 뜬 「📜 심야 돌파 비급 선택 (3택 1)」도 미클릭 시 멈춤 없이 자동 통과!
+    await tester.tap(find.text('3배'));
+    await tester.pump();
+    for (int f = 0; f < 180; f++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byKey(const Key('call_early_wave_btn')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    expect(find.byKey(const Key('call_early_wave_btn')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('call_early_wave_btn')));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.textContaining('심야 돌파 비급 선택 (3택 1)'), findsOneWidget);
+
+    // 3배속에서도 실제 벽시계 기준 6.5초 카운트다운이므로 7.0초(50ms×140) 경과 시 자동 패스 검증!
+    for (int i = 0; i < 140; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.textContaining('심야 돌파 비급 선택 (3택 1)'), findsNothing);
+
+    // 4) 기력이 모인 상태에서 실시간 「⚔️화력업+0」 클릭 시 즉시 +1단으로 강화되는지 검증!
+    final fireBtn = find.byKey(const Key('live_upg_firepower_btn'));
+    expect(fireBtn, findsOneWidget);
+    if (find.textContaining('⚔️화력업+0').evaluate().isNotEmpty) {
+      await tester.ensureVisible(fireBtn);
+      await tester.tap(fireBtn);
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(tester.takeException(), isNull);
   });
 }

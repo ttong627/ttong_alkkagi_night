@@ -764,39 +764,84 @@ class NightBattlePainter extends CustomPainter {
     );
   }
 
-  /// 전장 핀볼 기물 3종(×2 쌍류 복제 마법진 · 심야 화약통 · 황금 보물 도깨비) 렌더링!
+  /// 전장 핀볼·배율 기물 4종(×2→×3 진화 복제진 · 🎯화력 과녁패 · 심야 화약통 · 황금 보물 도깨비) 렌더링!
   void _drawFieldPinballGimmicks(Canvas canvas) {
     final gate = sim.cloneGate;
     final gateCenter = Offset(gate.center.x, gate.center.y);
-    final gatePulse = 1.0 + gate.pulseAnim * 0.25 + sin(sim.elapsedSec * 4.5) * 0.05;
+    final isTriple = gate.multiplier >= 3;
+    final gatePulse = 1.0 + gate.pulseAnim * 0.28 + sin(sim.elapsedSec * (isTriple ? 8.5 : 4.5)) * 0.06;
+    final gateCol = isTriple ? const Color(0xFFFF6B35) : const Color(0xFF72EFDD);
     final gateImg = sprites.fxCloneGate;
     if (gateImg != null) {
       _drawSpriteCentered(
         canvas,
         gateImg,
         gateCenter,
-        width: gate.radius * 2.35 * gatePulse,
-        height: gate.radius * 2.35 * gatePulse,
-        rotationRad: sim.elapsedSec * 1.4,
-        opacity: 0.92,
+        width: gate.radius * (isTriple ? 2.65 : 2.35) * gatePulse,
+        height: gate.radius * (isTriple ? 2.65 : 2.35) * gatePulse,
+        rotationRad: sim.elapsedSec * (isTriple ? 3.2 : 1.4),
+        opacity: 0.95,
+        tintColor: isTriple ? const Color(0x66FF6B35) : null,
       );
     } else {
       canvas.drawCircle(
         gateCenter,
         gate.radius * gatePulse,
         Paint()
-          ..color = const Color(0xAA72EFDD)
+          ..color = gateCol.withValues(alpha: 0.78)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 3.2,
+          ..strokeWidth = 3.4,
       );
     }
+    canvas.drawArc(
+      Rect.fromCircle(center: gateCenter, radius: gate.radius + 4.5),
+      -pi / 2,
+      2 * pi * gate.chargeRatio,
+      false,
+      Paint()
+        ..color = isTriple ? NightPalette.accentGold : gateCol
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 2.8,
+    );
     _paintMiniText(
       canvas,
-      '×2 복제',
+      isTriple ? '🔥×3 폭주!' : '×2복제(${gate.passCharge}/10)',
       gateCenter,
-      NightPalette.accentGold,
-      10.6,
+      isTriple ? const Color(0xFFFFD166) : NightPalette.accentGold,
+      isTriple ? 11.2 : 9.6,
       withBg: true,
+    );
+
+    // 🎯 라스트워·핀볼 광고식 이동형 화력 증폭 숫자 과녁패 (+10% ~ +60%)!
+    final pt = sim.powerTarget;
+    final ptc = Offset(pt.center.x, pt.center.y);
+    final ptPulse = 1.0 + pt.pulseAnim * 0.30 + sin(sim.elapsedSec * 5.2) * 0.05;
+    final ptActive = pt.powerStacks > 0;
+    final ptCol = pt.powerStacks >= 4
+        ? const Color(0xFFFF6B35)
+        : (ptActive ? NightPalette.accentGold : const Color(0xFF4EA8DE));
+    final bannerRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: ptc, width: 78 * ptPulse, height: 26 * ptPulse),
+      const Radius.circular(13),
+    );
+    canvas.drawRRect(
+      bannerRect,
+      Paint()..color = const Color(0xDD101B32),
+    );
+    canvas.drawRRect(
+      bannerRect,
+      Paint()
+        ..color = ptCol
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = ptActive ? 2.2 : 1.5,
+    );
+    _paintMiniText(
+      canvas,
+      ptActive ? '🎯화력 +${pt.bonusPercent}%!' : '🎯과녁 +화력%',
+      ptc,
+      ptCol,
+      10.2,
     );
 
     for (final keg in sim.powderKegs) {
@@ -1080,7 +1125,17 @@ class NightBattlePainter extends CustomPainter {
           l.tier < 4 && sim.fieldTokens >= l.type.inBattleUpgradeCost(l.tier);
       final canMerge = sim.findMergePartnerSlot(l.slotIndex) != null;
 
-      if (l.type == LauncherType.qiAmplifier && sprites.fxQi != null) {
+      if (l.tier >= 5 && sprites.fxFeverAura != null) {
+        _drawSpriteCentered(
+          canvas,
+          sprites.fxFeverAura!,
+          c,
+          width: 58,
+          height: 58,
+          rotationRad: -sim.elapsedSec * 1.6,
+          opacity: 0.65,
+        );
+      } else if (l.type == LauncherType.qiAmplifier && sprites.fxQi != null) {
         _drawSpriteCentered(
           canvas,
           sprites.fxQi!,
@@ -1160,10 +1215,13 @@ class NightBattlePainter extends CustomPainter {
 
       _paintMiniText(
         canvas,
-        canUpgrade ? '${l.tier}형▲' : '${l.tier}형',
+        l.tier >= 5 ? '★5신기' : (canUpgrade ? '${l.tier}형▲' : '${l.tier}형'),
         c + const Offset(0, 24),
-        canUpgrade ? NightPalette.jadeGreen : NightPalette.accentGold,
-        10.0,
+        l.tier >= 5
+            ? const Color(0xFFFF6B35)
+            : (canUpgrade ? NightPalette.jadeGreen : NightPalette.accentGold),
+        l.tier >= 5 ? 10.6 : 10.0,
+        withBg: l.tier >= 5,
       );
     }
   }
@@ -1314,6 +1372,54 @@ class NightBattlePainter extends CustomPainter {
         ),
         Paint()..color = Colors.black.withValues(alpha: motion.shadowAlpha),
       );
+
+      // 1-B) 길 밖 비정규 침투 괴물(월담·땅굴) 전용 붉은 침투 경보 점선 & 땅굴 분출 파문!
+      if (m.isInfiltrator) {
+        if (m.emergeAnimTimer > 0) {
+          final ep = (1.0 - m.emergeAnimTimer / 0.85).clamp(0.0, 1.0);
+          canvas.drawOval(
+            Rect.fromCenter(
+              center: groundCenter,
+              width: (18.0 + ep * 26.0),
+              height: (9.0 + ep * 13.0),
+            ),
+            Paint()
+              ..color = const Color(0xFFFF6B35).withValues(alpha: (1.0 - ep) * 0.85)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.4,
+          );
+        }
+        final targetVillage = Offset(
+          CampaignCatalog.centralTowerPos.x,
+          CampaignCatalog.centralTowerPos.y,
+        );
+        final vec = targetVillage - c;
+        final distV = vec.distance;
+        if (distV > 28.0) {
+          final dirV = vec / distV;
+          final maxDash = min(75.0, distV - 18.0);
+          for (double d = 10.0; d < maxDash; d += 12.0) {
+            final p1 = c + dirV * d;
+            final p2 = c + dirV * min(d + 6.0, maxDash);
+            canvas.drawLine(
+              p1,
+              p2,
+              Paint()
+                ..color = const Color(0xCCFF4D6D)
+                ..strokeWidth = 1.6
+                ..strokeCap = StrokeCap.round,
+            );
+          }
+        }
+        _paintMiniText(
+          canvas,
+          m.infiltratorStyle == 'tunnel' ? '🕳️땅굴기습' : '🌲월담기습',
+          bodyCenter + Offset(0, -halfVisualH * 0.92 - 12),
+          const Color(0xFFFF4D6D),
+          8.6,
+          withBg: true,
+        );
+      }
 
       // 2) 발구름 흙먼지 · 중장갑/우두머리 지면 충격파 파동
       if (motion.footImpact > 0.18 && m.freezeTimer <= 0) {

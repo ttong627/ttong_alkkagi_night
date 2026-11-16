@@ -19,6 +19,8 @@ class GameController extends ChangeNotifier {
   PlayerProgress _progress;
   DefenseDifficulty selectedDifficulty = DefenseDifficulty.normal;
   int selectedChapter = 1;
+  int battleSpeedMultiplier = 1;
+  bool autoChooseBattlePerks = false;
   final Random _rng = Random();
 
   PlayerProgress get progress => _progress;

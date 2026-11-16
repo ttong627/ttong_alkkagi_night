@@ -145,12 +145,12 @@ class FlyingQiOrb {
   double progress = 0.0;
 }
 
-/// 전장 한가운데를 유영하며 통과하는 수호석 알을 2개로 복제 증식시키는 《펀볼》식 ×2 쌍류 복제 마법진!
+/// 전장 한가운데를 유영하며 통과하는 수호석 알을 2배(폭주 시 ×3배!)로 복제 증식시키는 배율 마법진!
 class CloneGateZone {
   CloneGateZone({
     required this.baseCenter,
-    this.radius = 23.0,
-    this.swayAmplitude = 46.0,
+    this.radius = 24.0,
+    this.swayAmplitude = 48.0,
     this.phase = 0.0,
   }) : center = baseCenter;
 
@@ -160,6 +160,98 @@ class CloneGateZone {
   final double swayAmplitude;
   double phase;
   double pulseAnim = 0.0;
+
+  /// 탄알이 통과할 때마다 충전(0~10)되며, 10회 달성 시 8초간 🔥×3 삼류 폭주진으로 진화!
+  int passCharge = 0;
+  double tripleOverdriveTimer = 0.0;
+
+  int get multiplier => tripleOverdriveTimer > 0 ? 3 : 2;
+  double get chargeRatio =>
+      tripleOverdriveTimer > 0 ? (tripleOverdriveTimer / 8.0).clamp(0.0, 1.0) : (passCharge / 10.0).clamp(0.0, 1.0);
+}
+
+/// 《라스트워 · 바운스 디펜스》 광고처럼 맞힐수록 전군 화력 배율(+10% → +60%)이 치솟는 이동식 숫자 과녁패!
+class PowerTargetProp {
+  PowerTargetProp({
+    required this.baseCenter,
+    this.radius = 19.0,
+    this.swayAmplitude = 58.0,
+    this.phase = 1.6,
+  }) : center = baseCenter;
+
+  final Vec2 baseCenter;
+  Vec2 center;
+  final double radius;
+  final double swayAmplitude;
+  double phase;
+  int powerStacks = 0; // 0 ~ 6단 (+0% ~ +60% 전군 공격력 가산!)
+  double decayTimer = 0.0;
+  double pulseAnim = 0.0;
+
+  int get bonusPercent => powerStacks * 10;
+  double get damageMultiplier => 1.0 + powerStacks * 0.10;
+}
+
+/// 전투 중 실시간 단기 목표와 즉각적인 기력 대박을 주는 긴급 현상수배 미션!
+class BattleBountyQuest {
+  const BattleBountyQuest({
+    required this.stepIndex,
+    required this.title,
+    required this.current,
+    required this.goal,
+    required this.rewardQi,
+    required this.bonusLabel,
+    required this.allCleared,
+  });
+
+  final int stepIndex;
+  final String title;
+  final int current;
+  final int goal;
+  final int rewardQi;
+  final String bonusLabel;
+  final bool allCleared;
+
+  double get ratio => goal <= 0 ? 1.0 : (current / goal).clamp(0.0, 1.0);
+}
+
+/// 보스 강림·현상수배 달성 시 돌리는 꽝 없는 5칸 「운명의 태극 기연 돌림판」 보상!
+enum DestinyRoulettePrize {
+  hyperBarrage(
+    title: '🌟 천뢰 무한 폭사',
+    subtitle: '9초간 전 초소 연사 ×2.2배 & 확정 치명타 발동!',
+    colorHex: 0xFFFFD166,
+  ),
+  qiJackpot(
+    title: '💎 군수 기력 대박',
+    subtitle: '즉시 초소 건설 기력 +85⚡ 황금 구슬 폭포수 지급!',
+    colorHex: 0xFF72EFDD,
+  ),
+  mythicAwakening(
+    title: '☯️ 태초 신기 각성',
+    subtitle: '초소 1곳 즉시 +1형 무료 초월 진화(최대 ★5형 태초 신기)!',
+    colorHex: 0xFFC77DFF,
+  ),
+  tripleGateFrenzy(
+    title: '🔥 ×3 배율 & 화력 +60%',
+    subtitle: '10초간 복제진이 ×3 삼류진으로 진화 + 화력 과녁 최대치 점화!',
+    colorHex: 0xFFFF6B35,
+  ),
+  freeChulduSweep(
+    title: '🎺 무림수호단 무료 출두',
+    subtitle: '지원패 소모 없이 전장 변이 일소 & 방어막 50% 즉시 수복!',
+    colorHex: 0xFF80ED99,
+  );
+
+  const DestinyRoulettePrize({
+    required this.title,
+    required this.subtitle,
+    required this.colorHex,
+  });
+
+  final String title;
+  final String subtitle;
+  final int colorHex;
 }
 
 /// 산길 굽이 옆에 놓여 알로 맞히면 대폭발하며 주변 변이를 쓸어버리고 건설 기력을 주는 화약통 기물!

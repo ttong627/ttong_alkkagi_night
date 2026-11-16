@@ -85,9 +85,12 @@ enum LauncherType {
   final int buildCostTokens;
   final int colorHex;
 
-  String tierLabel(int tier) => tierNames[(tier - 1).clamp(0, 3)];
+  String tierLabel(int tier) {
+    if (tier >= 5) return '★5형 태초 신기($name)';
+    return tierNames[(tier - 1).clamp(0, 3)];
+  }
 
-  /// 전투 중 현장 증표로 버전을 올리는 비용 (1→2형, 2→3형, 3→4형).
+  /// 전투 중 현장 증표로 버전을 올리는 비용 (1→2형, 2→3형, 3→4형 · 5형은 합치기/기연 초월 전용!).
   int inBattleUpgradeCost(int currentTier) {
     switch (currentTier) {
       case 1:
@@ -101,9 +104,9 @@ enum LauncherType {
     }
   }
 
-  /// 버전(1~4형)에 따른 연사 속도 배수.
+  /// 버전(1~5형)에 따른 연사 속도 배수.
   double tierFireRateMultiplier(int tier) {
-    switch (tier.clamp(1, 4)) {
+    switch (tier.clamp(1, 5)) {
       case 1:
         return 1.0;
       case 2:
@@ -112,14 +115,16 @@ enum LauncherType {
         return 1.48;
       case 4:
         return 1.78;
+      case 5:
+        return 2.28;
       default:
         return 1.0;
     }
   }
 
-  /// 버전(1~4형)에 따른 단발 피해 배수.
+  /// 버전(1~5형)에 따른 단발 피해 배수.
   double tierDamageMultiplier(int tier) {
-    switch (tier.clamp(1, 4)) {
+    switch (tier.clamp(1, 5)) {
       case 1:
         return 1.0;
       case 2:
@@ -128,27 +133,34 @@ enum LauncherType {
         return 1.72;
       case 4:
         return 2.25;
+      case 5:
+        return 3.15;
       default:
         return 1.0;
     }
   }
 
-  /// 발사대 종류 및 버전(1~4형)별 1회 사격당 동시 발사 탄알 수 (시원한 탄막 일제사격!).
+  /// 발사대 종류 및 버전(1~5형)별 1회 사격당 동시 발사 탄알 수 (시원한 탄막 일제사격!).
   int projectilesPerShot(int tier) {
-    final t = tier.clamp(1, 4);
+    final t = tier.clamp(1, 5);
     switch (this) {
       case LauncherType.rapid:
+        if (t >= 5) return 7;
         if (t >= 4) return 5;
         if (t >= 3) return 4;
         if (t >= 2) return 3;
         return 2;
       case LauncherType.frostField:
+        if (t >= 5) return 4;
         return t >= 3 ? 3 : 2;
       case LauncherType.curveSpin:
+        if (t >= 5) return 3;
         return t >= 2 ? 2 : 1;
       case LauncherType.heavy:
+        if (t >= 5) return 3;
         return t >= 4 ? 2 : 1;
       case LauncherType.qiAmplifier:
+        if (t >= 5) return 3;
         return t >= 3 ? 2 : 1;
     }
   }
@@ -184,11 +196,12 @@ class CentralGuardianSpec {
     required double coreFortitudeBonus,
     required double coreFirepowerBonus,
   }) {
-    // 본진은 최후의 근접 방어선 역할만 수행하도록 내구도·자동 사격 주기를 정밀 설계 (무배치 방치 시 반드시 함락!)
-    final shieldHp = (135.0 + centralLevel * 28.0) *
+    // 초보자가 첫 18~20초간 화면을 둘러보다가 배치해도 여유 있게 살아남되,
+    // 끝까지 아무것도 안 하고 방치하면 약 26~32초경(1~2물결)에 반드시 함락되도록 내구도 정밀 설계!
+    final shieldHp = (275.0 + centralLevel * 32.0) *
         realmDefenseMult *
         (1.0 + meridianShieldBonus + coreFortitudeBonus);
-    final towerHp = (110.0 + centralLevel * 22.0) *
+    final towerHp = (225.0 + centralLevel * 26.0) *
         realmDefenseMult *
         (1.0 + coreFortitudeBonus);
     final interval = (1.42 / (1.0 + centralLevel * 0.045 + meridianReloadBonus))

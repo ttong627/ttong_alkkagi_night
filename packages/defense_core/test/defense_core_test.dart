@@ -1429,5 +1429,113 @@ void main() {
       expect(sim.deathRagdolls, isNotEmpty);
       expect(sim.damagePopups, isNotEmpty);
     });
+
+    test('무정지 실시간 돌파 비급 자동패스·전장 실시간 강화 3종·길 밖 침투 괴물·×3 각성문·화력 과녁·5형 신기·운명 돌림판이 작동한다', () {
+      final p = PlayerProgress();
+      final sim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 8),
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        seed: 2026,
+      );
+
+      // 1) 실시간 돌파 비급 3택 1: 6.5초 동안 클릭하지 않아도 멈추지 않고 자동 스킵됨!
+      sim.pendingPerkChoices
+        ..clear()
+        ..addAll([
+          RoguePerk.rapidBarrage,
+          RoguePerk.frostNova,
+          RoguePerk.giantBoulder,
+        ]);
+      sim.perkChoiceTimer = DefenseBattleSim.perkWindowDurationSec;
+      for (int i = 0; i < 220; i++) {
+        sim.step(1 / 30); // 약 7.3초 실시간 경과
+      }
+      expect(sim.pendingPerkChoices, isEmpty, reason: '시간 내 미클릭 시 게임이 멈추지 않고 자동으로 넘어가야 함');
+
+      // 2) 전장 실시간 군수 업그레이드 3종(화력·연사·결계) 작동 검증
+      sim.fieldTokens = 300;
+      sim.shieldHp = sim.shieldMaxHpDynamic * 0.4;
+      expect(sim.upgradeLiveFirepower(), isTrue);
+      expect(sim.liveFirepowerLv, 1);
+      expect(sim.upgradeLiveReload(), isTrue);
+      expect(sim.liveReloadLv, 1);
+      final beforeMaxShield = sim.shieldMaxHpDynamic;
+      expect(sim.upgradeLiveBarrier(), isTrue);
+      expect(sim.liveBarrierLv, 1);
+      expect(sim.shieldMaxHpDynamic, greaterThan(beforeMaxShield));
+
+      // 3) 길이 아닌 숲·땅굴에서 침투하는 돌연변이(월담·땅굴 기습) 작동 검증
+      final beforeCount = sim.mutants.length;
+      final flanker = sim.spawnOffPathInfiltrator(isTunnel: false);
+      final tunneler = sim.spawnOffPathInfiltrator(isTunnel: true);
+      expect(sim.mutants.length, beforeCount + 2);
+      expect(flanker.isInfiltrator, isTrue);
+      expect(flanker.infiltratorStyle, 'flank');
+      expect(tunneler.isInfiltrator, isTrue);
+      expect(tunneler.infiltratorStyle, 'tunnel');
+      final prevY = tunneler.pos.y;
+      sim.step(0.5);
+      expect(tunneler.pos.y, greaterThan(prevY));
+
+      // 4) ×2 복제문 10회 통과 → 🔥×3 삼류 폭주 각성 & 이동형 화력 과녁(+10%~+60%) 검증
+      sim.cloneGate.passCharge = 9;
+      sim.projectiles
+        ..clear()
+        ..add(
+          ActiveStoneProjectile(
+            sourceKey: 'test_gate',
+            sourceLabel: '각성시험탄',
+            pos: sim.cloneGate.center,
+            vel: const Vec2(0, -300),
+            material: StoneMaterial.cheongok,
+            shape: StoneShape.round,
+            damage: 20,
+            knockback: 30,
+            critChance: 0.1,
+            colorHex: 0xFF72EFDD,
+          ),
+        );
+      sim.step(1 / 60);
+      expect(sim.cloneGate.tripleOverdriveTimer, greaterThan(0.0));
+      expect(sim.cloneGate.multiplier, 3);
+
+      sim.powerTarget.powerStacks = 0;
+      sim.projectiles
+        ..clear()
+        ..add(
+          ActiveStoneProjectile(
+            sourceKey: 'test_target',
+            sourceLabel: '과녁시험탄',
+            pos: sim.powerTarget.center,
+            vel: const Vec2(0, -300),
+            material: StoneMaterial.cheongok,
+            shape: StoneShape.round,
+            damage: 20,
+            knockback: 30,
+            critChance: 0.1,
+            colorHex: 0xFF72EFDD,
+          ),
+        );
+      sim.step(1 / 60);
+      expect(sim.powerTarget.bonusPercent, 10);
+      expect(sim.powerTarget.damageMultiplier, closeTo(1.10, 0.001));
+
+      // 5) 4형 + 4형 합체 → ★5형 태초 신기 진화 & 🎰 운명의 돌림판 무꽝 당첨 검증
+      sim.fieldTokens = 200;
+      sim.launchers.clear();
+      expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
+      expect(sim.placeLauncherInBattle(1, LauncherType.rapid), isTrue);
+      sim.launcherAtSlot(0)!.tier = 4;
+      sim.launcherAtSlot(1)!.tier = 4;
+      expect(sim.quickMergeAnyPair(), isTrue);
+      expect(sim.launcherAtSlot(0)!.tier, 5);
+      expect(LauncherType.rapid.projectilesPerShot(5), 7);
+
+      sim.rouletteSpinsAvailable = 1;
+      final prize = sim.spinDestinyRoulette();
+      expect(prize, isNotNull);
+      expect(sim.rouletteSpinsAvailable, 0);
+    });
   });
 }
