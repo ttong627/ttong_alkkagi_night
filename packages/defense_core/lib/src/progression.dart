@@ -252,13 +252,16 @@ class LoadoutPreset {
         LauncherType.rapid,
         LauncherType.heavy,
         LauncherType.qiAmplifier,
+        LauncherType.frostField,
+        LauncherType.curveSpin,
+        LauncherType.heavy,
+        LauncherType.frostField,
+        LauncherType.rapid,
       ],
       equippedBeast: SpiritBeast.nalssaendol,
       beastCondition: SpiritBeast.nalssaendol.defaultCondition,
       companions: [
         CompanionHero.seokdu,
-        CompanionHero.yeonbi,
-        CompanionHero.cheongmyeong,
       ],
       companionConditions: {
         for (final h in CompanionHero.values) h: h.defaultCondition,
@@ -323,10 +326,10 @@ class LoadoutPreset {
               ))
           .toList();
       if (parsed.isNotEmpty) {
-        while (parsed.length < 5) {
-          parsed.add(LauncherType.rapid);
+        while (parsed.length < 10) {
+          parsed.add(LauncherType.values[parsed.length % LauncherType.values.length]);
         }
-        base.mountTypes = parsed.take(5).toList();
+        base.mountTypes = parsed.take(10).toList();
       }
     }
     base.equippedBeast = SpiritBeast.values.firstWhere(
@@ -437,11 +440,7 @@ class PlayerProgress {
         companionLevels = companionLevels ??
             {
               for (final c in CompanionHero.values)
-                c: (c == CompanionHero.seokdu ||
-                        c == CompanionHero.yeonbi ||
-                        c == CompanionHero.cheongmyeong)
-                    ? 1
-                    : 0,
+                c: c == CompanionHero.seokdu ? 1 : 0,
             },
         coreStatLevels = coreStatLevels ??
             {for (final s in CoreStatType.values) s: 0},
@@ -557,8 +556,17 @@ class PlayerProgress {
   final Set<String> claimedAchievements;
   final Set<MutantKind> seenMutants;
 
+  /// 가장 최근 관문 첫 정화 시 구출 합류한 동료·영수 축하 알림 (일시 표시용).
+  String? lastRescueBanner;
+  CompanionHero? lastRescuedCompanion;
+  SpiritBeast? lastRescuedBeast;
+
   NaegongRealm get realm => NaegongRealm.values[realmIndex.clamp(0, 7)];
   LoadoutPreset get activePreset => presets[activePresetIndex.clamp(0, presets.length - 1)];
+
+  /// 앞으로 구출을 기다리는 가장 가까운 관문 (모두 구출 시 null).
+  StageSpec? get nextRescueStage =>
+      CampaignCatalog.nextRescueStageAfter(highestClearedGlobalStage);
 
   int get highestUnlockedChapter {
     if (highestClearedGlobalStage <= 0) return 1;
@@ -1138,6 +1146,10 @@ class PlayerProgress {
     int endlessWavesCleared = 0,
     String? todayKey,
   }) {
+    lastRescueBanner = null;
+    lastRescuedCompanion = null;
+    lastRescuedBeast = null;
+
     final safeUsedSupport = max(0, usedSupportCount);
     final safeEarnedTokens = max(0, earnedTokens);
     final safeEarnedElixirs = max(0, earnedElixirs);
@@ -1199,22 +1211,48 @@ class PlayerProgress {
 
         if (stage.globalIndex > highestClearedGlobalStage) {
           highestClearedGlobalStage = stage.globalIndex;
-          // 스토리 동료 자동 합류 처리!
-          if (stage.chapterNumber == 2 && stage.stageNumber == 11) {
-            companionLevels[CompanionHero.bandal] =
-                max(1, companionLevels[CompanionHero.bandal] ?? 0);
-          } else if (stage.chapterNumber == 4 && stage.stageNumber == 12) {
-            companionLevels[CompanionHero.gurumi] =
-                max(1, companionLevels[CompanionHero.gurumi] ?? 0);
-          } else if (stage.chapterNumber == 5 && stage.stageNumber == 11) {
-            companionLevels[CompanionHero.jeonggak] =
-                max(1, companionLevels[CompanionHero.jeonggak] ?? 0);
-          } else if (stage.chapterNumber == 6 && stage.stageNumber == 12) {
-            companionLevels[CompanionHero.yonga] =
-                max(1, companionLevels[CompanionHero.yonga] ?? 0);
+
+          // 관문 진행에 따른 동료(13인) · 영수(4종) 지속 구출 합류!
+          final rescueNotices = <String>[];
+          if (stage.rescueCompanion != null) {
+            final hero = stage.rescueCompanion!;
+            final prevLv = companionLevels[hero] ?? 0;
+            companionLevels[hero] = prevLv <= 0 ? 1 : (prevLv + 1).clamp(1, 10);
+            for (final preset in presets) {
+              if (preset.companions.length < 3 && !preset.companions.contains(hero)) {
+                preset.companions.add(hero);
+              }
+            }
+            lastRescuedCompanion = hero;
+            rescueNotices.add(
+              prevLv <= 0
+                  ? '🎉 동료 「${hero.name}(${hero.title})」 구출 합류!'
+                  : '🎉 동료 「${hero.name}」 구출 감응 (+1단계 승급)!',
+            );
+          }
+
+          if (stage.alsoRescuesMukhyeon) {
+            final prevMuk = companionLevels[CompanionHero.mukhyeon] ?? 0;
             companionLevels[CompanionHero.mukhyeon] =
-                max(1, companionLevels[CompanionHero.mukhyeon] ?? 0);
-            supportTokens += 2;
+                prevMuk <= 0 ? 1 : (prevMuk + 1).clamp(1, 10);
+            supportTokens = (supportTokens + 2).clamp(0, 9999);
+            rescueNotices.add('⚔️ 숙적 「묵현」 귀순 합류 & 지원패 +2!');
+          }
+
+          if (stage.rescueBeast != null) {
+            final beast = stage.rescueBeast!;
+            final prevBeastLv = beastLevels[beast] ?? 0;
+            beastLevels[beast] = prevBeastLv <= 0 ? 1 : (prevBeastLv + 1).clamp(1, 10);
+            lastRescuedBeast = beast;
+            rescueNotices.add(
+              prevBeastLv <= 0
+                  ? '🐾 영수 「${beast.name}」 구출 계약 완료!'
+                  : '🐾 영수 「${beast.name}」 영기 각성 (+1단계 승급)!',
+            );
+          }
+
+          if (rescueNotices.isNotEmpty) {
+            lastRescueBanner = rescueNotices.join(' · ');
           }
         }
       }

@@ -463,24 +463,30 @@ class EndlessWaveBuilder {
     for (int w = 1; w <= totalWaves; w++) {
       final groups = <WaveSpawnGroup>[
         WaveSpawnGroup(
-          kind: w % 2 == 0 ? MutantKind.sickHound : MutantKind.swarmRat,
-          count: 4 + w * 2,
-          intervalSec: (0.78 - w * 0.015).clamp(0.32, 0.78),
+          kind: MutantKind.swarmRat,
+          count: 10 + w * 3,
+          intervalSec: (0.48 - w * 0.008).clamp(0.22, 0.48),
           laneIndex: w % 3,
         ),
         WaveSpawnGroup(
+          kind: MutantKind.sickHound,
+          count: 6 + w * 2,
+          intervalSec: (0.58 - w * 0.008).clamp(0.28, 0.58),
+          laneIndex: (w + 2) % 3,
+        ),
+        WaveSpawnGroup(
           kind: w % 2 == 0 ? MutantKind.plagueToad : MutantKind.shieldYacha,
-          count: 2 + (w ~/ 2),
-          intervalSec: 1.05,
+          count: 4 + (w ~/ 2),
+          intervalSec: 0.82,
           laneIndex: (w + 1) % 3,
         ),
       ];
-      if (w >= 3) {
+      if (w >= 2) {
         groups.add(
           WaveSpawnGroup(
             kind: w % 3 == 0 ? MutantKind.bloodCocoon : MutantKind.ironBoar,
-            count: 1 + (w ~/ 3),
-            intervalSec: 1.35,
+            count: 3 + (w ~/ 2),
+            intervalSec: 0.95,
             laneIndex: (w + 2) % 3,
           ),
         );
@@ -539,8 +545,9 @@ class EndlessWaveBuilder {
         LauncherType.curveSpin,
       ],
       isBossStage: true,
+      maxMountCount: CampaignCatalog.chapterOf(safeTheme).mounts.length,
       waves: waves,
-      startingFieldTokens: 90 + totalWaves * 5,
+      startingFieldTokens: 155 + totalWaves * 6,
       clearElixirBonus: 3 + (totalWaves ~/ 5),
     );
   }

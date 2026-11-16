@@ -25,6 +25,14 @@ void main() {
   test('코덱스 원화 레지스트리(NightArtRegistry) 전 경로 규격 100% 일치 검증', () {
     expect(NightArtRegistry.bgNightSplash, 'assets/images/scenes/bg_night_splash.webp');
     expect(NightArtRegistry.bgNightLobby, 'assets/images/scenes/bg_night_lobby.webp');
+    expect(NightArtRegistry.lobbyStageFortress, 'assets/images/scenes/lobby_stage_fortress.webp');
+    expect(NightArtRegistry.cardGateBattle, 'assets/images/scenes/card_gate_battle.webp');
+    expect(NightArtRegistry.cardTrainingHall, 'assets/images/scenes/card_training_hall.webp');
+    expect(NightArtRegistry.cardForgeSanctum, 'assets/images/scenes/card_forge_sanctum.webp');
+    expect(NightArtRegistry.cardAllyPavilion, 'assets/images/scenes/card_ally_pavilion.webp');
+    expect(NightArtRegistry.cardRescueBeacon, 'assets/images/scenes/card_rescue_beacon.webp');
+    expect(NightArtRegistry.cardSupplyConvoy, 'assets/images/scenes/card_supply_convoy.webp');
+    expect(NightArtRegistry.cardEndlessAbyss, 'assets/images/scenes/card_endless_abyss.webp');
     expect(NightArtRegistry.towerGuardian, 'assets/images/launchers/tower_guardian.webp');
     expect(NightArtRegistry.villageGranary, 'assets/images/launchers/village_granary.webp');
     expect(NightArtRegistry.villageCrops, 'assets/images/launchers/village_crops.webp');
@@ -320,6 +328,29 @@ void main() {
     await tester.tap(find.byKey(const Key('use_consumable_qiSurgePill')));
     await tester.pump();
     expect(controller.progress.consumables[TacticalConsumable.qiSurgePill], beforePill - 1);
+
+    // 5. 중앙 기명 수호탑 자동발사 ↔ 수동탄지 전환 및 길목 빈 초소 터치 직접 배치 검증
+    expect(find.text('중앙탑: 자동발사'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('battle_toggle_central_mode_btn')));
+    await tester.pump();
+    expect(find.text('중앙탑: 수동탄지'), findsOneWidget);
+    expect(find.text('초소 0/2곳'), findsOneWidget);
+
+    // 1-2 전장의 1번 빈 초소 좌표(arena: 200, 392)를 터치해 직접 발사대 설치 시트 오픈!
+    final arenaBox = tester.getRect(find.byKey(const Key('battle_arena_gesture')));
+    final slotTapOffset = Offset(
+      arenaBox.left + arenaBox.width * (200.0 / CampaignCatalog.arenaWidth),
+      arenaBox.top + arenaBox.height * (392.0 / CampaignCatalog.arenaHeight),
+    );
+    await tester.tapAt(slotTapOffset);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(find.textContaining('빈 초소 · 발사대 직접 배치'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('place_launcher_rapid')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(find.text('초소 1/2곳'), findsOneWidget);
   });
 
   testWidgets('상용 확장 화면(출석·임무·비약 제조·수호 도감·확률 공개·무한 혈전·설정·만든 이·제작노트) 전수 검증',
@@ -350,6 +381,7 @@ void main() {
 
     // 1. 출석 · 임무 · 비약 제조 화면 검증
     await tester.ensureVisible(find.byKey(const Key('menu_daily_btn')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('menu_daily_btn')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));

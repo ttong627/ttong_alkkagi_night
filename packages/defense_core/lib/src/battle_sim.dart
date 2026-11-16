@@ -74,14 +74,16 @@ class ActiveLauncher {
     required this.pos,
     required this.type,
     required this.permanentLevel,
-  });
+    int? investedTokens,
+  }) : investedTokens = investedTokens ?? type.buildCostTokens;
 
   final int slotIndex;
   final Vec2 pos;
   LauncherType type;
   final int permanentLevel;
+  int investedTokens;
   int tier = 1;
-  double cooldown = 0.25;
+  double cooldown = 0.22;
   double aimAngleRad = -pi / 2;
   double recoilAnim = 0.0;
 }
@@ -99,6 +101,7 @@ class ActiveMutant {
     this.customName,
     this.customPortrait,
     this.lateralSeed = 0.0,
+    this.laneLateralOffset = 0.0,
   }) : hp = maxHp;
 
   final int uid;
@@ -120,10 +123,12 @@ class ActiveMutant {
   bool cliffChecked = false;
   double sweatAnim = 0.0;
 
-  /// 사실적인 침공 보행·질주·타격·피격·균열 소환 묘사용 실시간 상태값.
+  /// 사실적인 침공 보행·질주·타격·피격·균열 소환·관성 곡선 선회 묘사용 실시간 상태값.
+  Vec2 smoothVel = const Vec2(0, 0);
   double animPhase = 0.0;
   double headingRad = 1.5707963;
   double lateralSeed;
+  final double laneLateralOffset;
   double attackAnimTimer = 0.0;
   double hitFlashTimer = 0.0;
   double dashBurstTimer = 0.0;
@@ -268,6 +273,7 @@ class DefenseBattleSim {
     int seed = 20261115,
     this.allowSupportTokens = true,
     this.allowSerendipity = true,
+    this.autoBuildForSimVerify = false,
   })  : chapter = CampaignCatalog.chapterOf(stage.chapterNumber),
         preset = overridePreset ?? progress.activePreset,
         rng = Random(seed) {
@@ -283,11 +289,22 @@ class DefenseBattleSim {
   final bool allowSupportTokens;
   final bool allowSerendipity;
 
+  /// 자동 검증 시뮬레이터(`defense_verify_sim`)에서만 true로 두어 빈 초소를 순차 건설·승급한다.
+  /// 실제 플레이에서는 false이며, 전투 시작 시 길목 발사대는 0개(모두 빈 초소)이고 플레이어가 직접 배치한다!
+  final bool autoBuildForSimVerify;
+
   late final CentralGuardianSpec centralSpec;
   late double shieldHp;
   late double towerHp;
-  double centralFireTimer = 0.35;
+  double centralFireTimer = 0.25;
   double centralGearAngle = 0.0;
+
+  /// 맨 아래 중앙 기명 수호탑 `자동 발사` ↔ `수동 탄지` 전환 상태.
+  bool centralManualMode = false;
+  double centralAimAngleRad = -pi / 2;
+  double centralRecoilAnim = 0.0;
+
+  bool get isCentralReadyToFire => !isFinished && towerHp > 0 && centralFireTimer <= 0.04;
 
   /// 마을 생태계 3대 지표 (1.0 = 평온/풍요, 0.0 = 황폐/폐사).
   double granaryHealth = 1.0;
@@ -355,6 +372,10 @@ class DefenseBattleSim {
   final Map<CompanionHero, double> companionCooldowns = {};
   final Map<String, ContributionEntry> _contribMap = {};
 
+  /// 이번 관문에서 개방된 길목 초소 목록 (`1-1` 2곳 → 후반 최대 10곳 점진 확장!).
+  List<LauncherMountSlot> get activeMounts =>
+      chapter.mounts.take(stage.maxMountCount.clamp(1, chapter.mounts.length)).toList();
+
   void _initBattle() {
     centralSpec = CentralGuardianSpec.fromLevels(
       centralLevel: progress.centralGuardianLevel,
@@ -375,22 +396,9 @@ class DefenseBattleSim {
       supportChargesLeft = min(preset.supportSlotCount, progress.supportTokens);
     }
 
-    for (int i = 0; i < chapter.mounts.length; i++) {
-      final slot = chapter.mounts[i];
-      final chosenType = i < preset.mountTypes.length ? preset.mountTypes[i] : slot.recommendedType;
-      final unlockedType = chosenType.unlockChapter <= progress.highestUnlockedChapter + 1
-          ? chosenType
-          : slot.recommendedType;
-      final permLv = progress.launcherPermanentLevels[unlockedType] ?? 1;
-      launchers.add(
-        ActiveLauncher(
-          slotIndex: slot.slotIndex,
-          pos: slot.pos,
-          type: unlockedType,
-          permanentLevel: permLv,
-        ),
-      );
-    }
+    // 실제 플레이 시작 시 길목 발사대는 0개(모두 빈 초소)이며 플레이어가 직접 배치한다!
+    // 맨 아래 중앙 기명 수호탑(자동·수동 전환 가능)만 기본 가동된다.
+    launchers.clear();
 
     for (final _ in chapter.pillars) {
       pillarAngles.add(0.0);
@@ -406,7 +414,411 @@ class DefenseBattleSim {
       }
     }
 
+    if (!autoBuildForSimVerify) {
+      if (stage.hasRescueReward) {
+        callouts.add(
+          FloatingCallout(
+            pos: const Vec2(200, 178),
+            text: '🆘 ${stage.rescueBadgeText} 작전! 초소(${activeMounts.length}곳)에 발사대를 배치하세요!',
+            colorHex: 0xFF72EFDD,
+            ttlSec: 2.8,
+            isBigBanner: true,
+          ),
+        );
+      } else {
+        callouts.add(
+          FloatingCallout(
+            pos: const Vec2(200, 178),
+            text: '👆 빈 초소(${activeMounts.length}곳)를 눌러 발사대를 직접 배치하세요!',
+            colorHex: 0xFFFFD166,
+            ttlSec: 2.5,
+            isBigBanner: true,
+          ),
+        );
+      }
+    }
+
     _enqueueWave(0);
+  }
+
+  /// 해당 초소 번호에 배치된 발사대 조회 (비어 있으면 null).
+  ActiveLauncher? launcherAtSlot(int slotIndex) {
+    for (final l in launchers) {
+      if (l.slotIndex == slotIndex) return l;
+    }
+    return null;
+  }
+
+  /// 이번 관문에 개방된 초소 정보 조회.
+  LauncherMountSlot? mountSlotByIndex(int slotIndex) {
+    for (final m in activeMounts) {
+      if (m.slotIndex == slotIndex) return m;
+    }
+    return null;
+  }
+
+  /// 순서대로 정해진 듯 배치를 유도하는 다음 추천 빈 초소 번호 (모두 배치 시 null).
+  int? nextRecommendedSlotIndex() {
+    for (final m in activeMounts) {
+      if (launcherAtSlot(m.slotIndex) == null) {
+        return m.slotIndex;
+      }
+    }
+    return null;
+  }
+
+  /// 발사대 종류 해금 여부 확인.
+  bool isLauncherTypeUnlocked(LauncherType type) =>
+      type.unlockChapter <= max(stage.chapterNumber, progress.highestUnlockedChapter) + 1;
+
+  /// 빈 길목 초소에 플레이어가 직접 수호 발사대 신규 배치!
+  bool placeLauncherInBattle(int slotIndex, LauncherType type) {
+    if (isFinished) return false;
+    final slot = mountSlotByIndex(slotIndex);
+    if (slot == null) return false;
+    if (launcherAtSlot(slotIndex) != null) return false;
+    if (!isLauncherTypeUnlocked(type)) return false;
+
+    final cost = type.buildCostTokens;
+    if (fieldTokens < cost) return false;
+    fieldTokens -= cost;
+
+    final permLv = progress.launcherPermanentLevels[type] ?? 1;
+    final created = ActiveLauncher(
+      slotIndex: slot.slotIndex,
+      pos: slot.pos,
+      type: type,
+      permanentLevel: permLv,
+      investedTokens: cost,
+    );
+    launchers.add(created);
+    launchers.sort((a, b) => a.slotIndex.compareTo(b.slotIndex));
+
+    pendingSounds.add(SoundCue.gearMotion);
+    bursts.add(FxBurst(pos: slot.pos, colorHex: 0xFF72EFDD, maxRadius: 34));
+    callouts.add(
+      FloatingCallout(
+        pos: slot.pos + const Vec2(0, -18),
+        text: '🛠️ ${type.name} 배치 완료!',
+        colorHex: 0xFF72EFDD,
+      ),
+    );
+    return true;
+  }
+
+  /// 초소 번호 기준 발사대 승급 (1형 → 4형).
+  bool upgradeLauncherAtSlot(int slotIndex) {
+    final l = launcherAtSlot(slotIndex);
+    if (l == null) return false;
+    return upgradeLauncherInBattle(launchers.indexOf(l));
+  }
+
+  /// 이미 배치된 초소의 발사대를 다른 종류로 교체 (기존 투입 증표 80% 환급 반영).
+  bool replaceLauncherInBattle(int slotIndex, LauncherType newType) {
+    if (isFinished) return false;
+    final existing = launcherAtSlot(slotIndex);
+    if (existing == null || existing.type == newType) return false;
+    if (!isLauncherTypeUnlocked(newType)) return false;
+
+    final refund = (existing.investedTokens * 0.80).round();
+    final buildCost = newType.buildCostTokens;
+    if (fieldTokens + refund < buildCost) return false;
+
+    fieldTokens = fieldTokens + refund - buildCost;
+    final idx = launchers.indexOf(existing);
+    final permLv = progress.launcherPermanentLevels[newType] ?? 1;
+    launchers[idx] = ActiveLauncher(
+      slotIndex: slotIndex,
+      pos: existing.pos,
+      type: newType,
+      permanentLevel: permLv,
+      investedTokens: buildCost,
+    );
+
+    pendingSounds.add(SoundCue.gearMotion);
+    bursts.add(FxBurst(pos: existing.pos, colorHex: 0xFFFFD166, maxRadius: 32));
+    callouts.add(
+      FloatingCallout(
+        pos: existing.pos + const Vec2(0, -18),
+        text: '🔄 ${newType.name} 교체 배치!',
+        colorHex: 0xFFFFD166,
+      ),
+    );
+    return true;
+  }
+
+  /// 배치된 발사대 철거 및 투입 증표 80% 현장 환급!
+  int dismantleLauncherInBattle(int slotIndex) {
+    if (isFinished) return 0;
+    final existing = launcherAtSlot(slotIndex);
+    if (existing == null) return 0;
+    final refund = (existing.investedTokens * 0.80).round();
+    launchers.remove(existing);
+    fieldTokens += refund;
+    pendingSounds.add(SoundCue.gearMotion);
+    bursts.add(FxBurst(pos: existing.pos, colorHex: 0xFFE9C46A, maxRadius: 26));
+    callouts.add(
+      FloatingCallout(
+        pos: existing.pos + const Vec2(0, -18),
+        text: '♻️ 초소 철거 (+$refund 증표 환급)',
+        colorHex: 0xFFE9C46A,
+      ),
+    );
+    return refund;
+  }
+
+  /// 맨 아래 중앙 기명 수호탑 `자동 발사` ↔ `수동 탄지` 전환.
+  void setCentralManualMode(bool manual) {
+    if (centralManualMode == manual) return;
+    centralManualMode = manual;
+    pendingSounds.add(SoundCue.gearMotion);
+    callouts.add(
+      FloatingCallout(
+        pos: CampaignCatalog.centralTowerPos + const Vec2(0, -34),
+        text: manual ? '🎯 중앙 탑: 수동 조준 탄지(화력 ×1.38·관통 +2)!' : '⚙️ 중앙 탑: 자동 조준 사격 가동!',
+        colorHex: manual ? 0xFFFFD166 : 0xFF72EFDD,
+      ),
+    );
+  }
+
+  void toggleCentralManualMode() => setCentralManualMode(!centralManualMode);
+
+  /// 수동 탄지 조준 각도 보정 (아래쪽 마을 뒤로 잘못 쏘지 않도록 상방 반구 유도).
+  static double sanitizeManualAimAngle(double rawAngleRad) {
+    if (!rawAngleRad.isFinite) return -pi / 2;
+    double vx = cos(rawAngleRad);
+    double vy = sin(rawAngleRad);
+    if (vy > 0.18) {
+      vy = -vy.abs().clamp(0.25, 1.0);
+    }
+    return atan2(vy, vx);
+  }
+
+  /// 수동 탄지 도탄 궤적 예측선 계산 (벽면 및 회전 기둥 1회 반사 포함).
+  List<Vec2> previewCentralManualRay(double rawAngleRad, {double maxDist = 610.0}) {
+    final angle = sanitizeManualAimAngle(rawAngleRad);
+    final origin = CampaignCatalog.centralTowerPos;
+    Vec2 cur = origin;
+    Vec2 dir = Vec2(cos(angle), sin(angle)).normalized;
+    final pts = <Vec2>[origin];
+    double rem = maxDist;
+    int bounces = 0;
+
+    const stepLen = 8.0;
+    while (rem > 0) {
+      final next = cur + dir * stepLen;
+      rem -= stepLen;
+
+      if (next.y <= 14 || next.y >= CampaignCatalog.arenaHeight - 12) {
+        pts.add(Vec2(next.x.clamp(16.0, CampaignCatalog.arenaWidth - 16.0), next.y.clamp(14.0, 668.0)));
+        break;
+      }
+
+      if (next.x <= 16.0 || next.x >= CampaignCatalog.arenaWidth - 16.0) {
+        final hit = Vec2(next.x.clamp(16.0, CampaignCatalog.arenaWidth - 16.0), next.y);
+        pts.add(hit);
+        if (bounces >= 1) break;
+        bounces++;
+        dir = Vec2(-dir.x, dir.y).normalized;
+        cur = hit;
+        continue;
+      }
+
+      bool hitPillar = false;
+      for (final pillar in chapter.pillars) {
+        final toP = next - pillar.center;
+        if (toP.length <= pillar.radius + 7.5) {
+          final n = toP.normalized;
+          final hit = pillar.center + n * (pillar.radius + 8.0);
+          pts.add(hit);
+          if (bounces < 1) {
+            final dot = dir.x * n.x + dir.y * n.y;
+            dir = (dir - n * (2 * dot)).normalized;
+            cur = hit;
+            bounces++;
+            hitPillar = true;
+          } else {
+            rem = 0;
+            hitPillar = true;
+          }
+          break;
+        }
+      }
+      if (hitPillar) {
+        if (rem <= 0) break;
+        continue;
+      }
+      cur = next;
+    }
+    if (pts.last.distanceTo(cur) > 3.0) {
+      pts.add(cur);
+    }
+    return pts;
+  }
+
+  /// 플레이어가 전장 좌표를 찍거나 당겨 쏜 수동 탄지 발사!
+  bool fireCentralManualAt(Vec2 targetArenaPos) {
+    final delta = targetArenaPos - CampaignCatalog.centralTowerPos;
+    final rawAngle = delta.length > 4.0 ? atan2(delta.y, delta.x) : -pi / 2;
+    return fireCentralManualAngle(rawAngle);
+  }
+
+  /// 플레이어가 조준한 각도로 중앙 기명 수호탑 수동 강화 탄지 발사!
+  bool fireCentralManualAngle(double rawAngleRad) {
+    if (!isCentralReadyToFire) return false;
+    final angle = sanitizeManualAimAngle(rawAngleRad);
+    centralAimAngleRad = angle;
+    centralRecoilAnim = 1.0;
+    centralFireTimer = auroraCritTimer > 0
+        ? (centralSpec.fireIntervalSec * 0.86) / 1.55
+        : centralSpec.fireIntervalSec * 0.86;
+    pendingSounds.add(SoundCue.gearMotion);
+
+    final origin = CampaignCatalog.centralTowerPos;
+
+    if (qiBars >= 2.95) {
+      qiBars = 0.0;
+      final count = progress.realm.eogieoseokCount + 2;
+      callouts.add(
+        FloatingCallout(
+          pos: origin + const Vec2(0, -48),
+          text: '⚡ 수동 어기어석 일제 탄지! ($count기 관통 파쇄!)',
+          colorHex: 0xFFFFD166,
+          isBigBanner: true,
+        ),
+      );
+      for (int i = 0; i < count; i++) {
+        final spread = (i - (count - 1) / 2.0) * 0.11;
+        _spawnManualDirectionalShot(
+          origin: origin + Vec2((i - (count - 1) / 2.0) * 8.0, -6),
+          angleRad: angle + spread,
+          baseDamage: centralSpec.baseDamage * 2.15,
+          speed: 410,
+          pierceBonus: 4,
+          aoeRadius: 52,
+          ignoresShield: true,
+          knockbackScale: 1.45,
+        );
+      }
+      return true;
+    }
+
+    SectTechnique? sectTech;
+    double dmgMult = 1.38; // 수동 직접 탄지 정밀 화력 가산!
+    if (qiBars >= 1.0) {
+      qiBars -= 1.0;
+      sectTech = preset.sectTechnique;
+      dmgMult *= 1.32;
+    }
+
+    _spawnManualDirectionalShot(
+      origin: origin + const Vec2(0, -6),
+      angleRad: angle,
+      baseDamage: centralSpec.baseDamage * dmgMult,
+      speed: 390,
+      pierceBonus: 2,
+      aoeRadius: 28,
+      knockbackScale: 1.28,
+      sectTech: sectTech,
+    );
+    return true;
+  }
+
+  void _spawnManualDirectionalShot({
+    required Vec2 origin,
+    required double angleRad,
+    required double baseDamage,
+    required double speed,
+    int pierceBonus = 0,
+    double aoeRadius = 0.0,
+    bool ignoresShield = false,
+    double knockbackScale = 1.0,
+    SectTechnique? sectTech,
+  }) {
+    if (projectiles.length >= 56) {
+      projectiles.removeAt(0);
+    }
+    final stone = preset.primaryStone;
+    final shape = preset.primaryShape;
+    final finalSpeed = speed *
+        shape.speedFactor *
+        (cheonghakBuffTimer > 0 ? 1.20 : 1.0) *
+        (stone == StoneMaterial.manyeonGiju ? 1.18 : 1.0);
+    final vel = Vec2(cos(angleRad) * finalSpeed, sin(angleRad) * finalSpeed);
+
+    final isCritSerendipity =
+        allowSerendipity && rng.nextDouble() < (0.12 + progress.meridianSerendipityBonus * 0.6);
+    if (isCritSerendipity) {
+      serendipityCount++;
+    }
+
+    int pierce = pierceBonus + (stone == StoneMaterial.geumgang ? 1 : 0);
+    double splash = aoeRadius + (stone == StoneMaterial.obsidian ? 32.0 : 0.0);
+    double curve = 0.0;
+    bool bypassShield = ignoresShield || stone == StoneMaterial.jageum;
+
+    if (sectTech == SectTechnique.swordQi) pierce += 3;
+    if (sectTech == SectTechnique.ironFist) splash = max(splash, 60.0);
+    if (sectTech == SectTechnique.taiji) {
+      curve = 1.25 * shape.spinCurveFactor;
+      bypassShield = true;
+      qiBars = (qiBars + 0.25).clamp(0.0, 3.0);
+    }
+
+    final finalDamage = baseDamage * stone.damageMultiplier * (isCritSerendipity ? 2.1 : 1.0);
+    final finalKnock = 48.0 *
+        stone.knockbackMultiplier *
+        shape.knockbackFactor *
+        knockbackScale *
+        (1.0 + progress.meridianKnockbackBonus) *
+        (stone == StoneMaterial.yongrin ? 1.35 : 1.0);
+    final critChance = (0.16 +
+            shape.critBonus +
+            progress.meridianCritBonus +
+            (cheonghakBuffTimer > 0 ? 0.10 : 0.0) +
+            (stone == StoneMaterial.geumgang ? 0.08 : 0.0))
+        .clamp(0.05, 0.82);
+
+    projectiles.add(
+      ActiveStoneProjectile(
+        sourceKey: 'central_tower',
+        sourceLabel: '중앙 기명 수호탑 (수동 탄지)',
+        pos: origin,
+        vel: vel,
+        material: stone,
+        shape: shape,
+        damage: finalDamage,
+        knockback: finalKnock,
+        critChance: critChance,
+        colorHex: isCritSerendipity ? 0xFFFFD166 : stone.colorHex,
+        radius: isCritSerendipity ? 13.5 : 9.2,
+        spinCurve: curve,
+        pierceLeft: pierce,
+        aoeSplashRadius: splash,
+        freezesOnHit: stone == StoneMaterial.hancheol,
+        ignoresShield: bypassShield,
+        isGiantCritSerendipity: isCritSerendipity,
+      ),
+    );
+
+    if (sectTech == SectTechnique.shadowClone) {
+      final cloneAngle = angleRad + 0.16;
+      projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'central_tower',
+          sourceLabel: '중앙 기명 수호탑 (수동 분신탄)',
+          pos: origin,
+          vel: Vec2(cos(cloneAngle) * finalSpeed, sin(cloneAngle) * finalSpeed),
+          material: stone,
+          shape: shape,
+          damage: finalDamage * 0.80,
+          knockback: finalKnock * 0.85,
+          critChance: critChance,
+          colorHex: 0xFFC77DFF,
+          pierceLeft: max(0, pierce - 1),
+        ),
+      );
+    }
   }
 
   void _enqueueWave(int waveIdx) {
@@ -438,12 +850,10 @@ class DefenseBattleSim {
     if (launcherIndex < 0 || launcherIndex >= launchers.length) return false;
     final l = launchers[launcherIndex];
     if (l.tier >= 4) return false;
-    if (l.tier == 3 && progress.highestUnlockedChapter < 4) {
-      // 4형 극의는 중반 이후에도 여유 시 개방 허용하되 기본 비용 지불
-    }
     final cost = l.type.inBattleUpgradeCost(l.tier);
     if (fieldTokens < cost) return false;
     fieldTokens -= cost;
+    l.investedTokens += cost;
     l.tier++;
     pendingSounds.add(SoundCue.gearMotion);
     bursts.add(FxBurst(pos: l.pos, colorHex: 0xFFFFD166, maxRadius: 34));
@@ -629,8 +1039,33 @@ class DefenseBattleSim {
       );
     }
 
-    // 자동 버전 업그레이드 켜짐 시 현장 증표가 충분하면 가장 낮은 버전 거점부터 자동 승급!
-    if (preset.autoUpgradeInBattle) {
+    if (centralRecoilAnim > 0) {
+      centralRecoilAnim = max(0, centralRecoilAnim - dt * 4.2);
+    }
+
+    // 헤드리스 밸런스 검증(`autoBuildForSimVerify == true`) 시 빈 초소 순차 배치 시뮬레이션
+    // 실제 플레이(`autoBuildForSimVerify == false`)에서는 빈 초소에 절대 자동 설치하지 않고 플레이어가 직접 배치!
+    if (autoBuildForSimVerify) {
+      final nextSlotIdx = nextRecommendedSlotIndex();
+      if (nextSlotIdx != null) {
+        final slot = mountSlotByIndex(nextSlotIdx)!;
+        final desired = nextSlotIdx < preset.mountTypes.length
+            ? preset.mountTypes[nextSlotIdx]
+            : slot.recommendedType;
+        final buildType = isLauncherTypeUnlocked(desired) ? desired : slot.recommendedType;
+        if (fieldTokens >= buildType.buildCostTokens) {
+          placeLauncherInBattle(nextSlotIdx, buildType);
+        }
+      }
+    }
+
+    // 이미 배치된 발사대의 자동 버전 업그레이드 (헤드리스 검증에서는 기본 초소 배치 우선 후 승급)
+    final allowAutoUpgNow = preset.autoUpgradeInBattle &&
+        launchers.isNotEmpty &&
+        (!autoBuildForSimVerify ||
+            nextRecommendedSlotIndex() == null ||
+            launchers.length >= min(4, activeMounts.length) && fieldTokens >= 95);
+    if (allowAutoUpgNow) {
       ActiveLauncher? bestCandidate;
       int bestCost = 999999;
       for (final l in launchers) {
@@ -694,7 +1129,7 @@ class DefenseBattleSim {
       if (wavePauseTimer <= 0) {
         wavesClearedCount = max(wavesClearedCount, currentWaveIndex + 1);
         currentWaveIndex++;
-        wavePauseTimer = 1.0;
+        wavePauseTimer = 1.45;
         _enqueueWave(currentWaveIndex);
         // 한 번 더 출두 기연 예약이 있으면 새 웨이브 돌입 직후 자동 공짜 출두!
         if (pendingFreeEncoreChuldu && _spawnQueue.isNotEmpty) {
@@ -743,19 +1178,21 @@ class DefenseBattleSim {
   void _spawnMutant(_PendingSpawn item) {
     encounteredMutants.add(item.kind);
     final laneIdx = item.laneIndex % chapter.lanes.length;
-    final lane = chapter.lanes[laneIdx];
+    final lane = chapter.smoothedLane(laneIdx);
     if (laneIdx < lanePortalEnergy.length) {
       lanePortalEnergy[laneIdx] = 1.0;
     }
 
     final chScale = stage.globalIndex >= 900
         ? (1.0 + (stage.chapterNumber - 1) * 0.14 + currentWaveIndex * 0.16)
-        : (1.0 + (stage.chapterNumber - 1) * 0.24 + (stage.stageNumber - 1) * 0.045);
-    final maxHp = item.kind.baseHp * chScale * difficulty.hpMult;
+        : (1.0 + (stage.chapterNumber - 1) * 0.23 + (stage.stageNumber - 1) * 0.042);
+    final maxHp =
+        item.kind.baseHp * item.kind.swarmHpFactor * chScale * difficulty.hpMult;
     final spd = item.kind.speed * (1.0 + (stage.chapterNumber - 1) * 0.02) * difficulty.speedMult;
-    final spawnPos = lane.first + Vec2((rng.nextDouble() - 0.5) * 14, 0);
+    final latOffset = item.kind.isBoss ? 0.0 : (rng.nextDouble() - 0.5) * 14.0;
+    final spawnPos = lane.first + Vec2(latOffset * 0.65, 0);
 
-    final nextWp = lane.length > 1 ? lane[1] : CampaignCatalog.villageCenter;
+    final nextWp = lane.length > 2 ? lane[2] : CampaignCatalog.villageCenter;
     final initDelta = nextWp - spawnPos;
     final initHeading = initDelta.length > 1e-4 ? atan2(initDelta.y, initDelta.x) : 1.5707963;
 
@@ -770,8 +1207,10 @@ class DefenseBattleSim {
       customName: item.customTitle,
       customPortrait: item.customPortrait,
       lateralSeed: rng.nextDouble() * pi * 2,
+      laneLateralOffset: latOffset,
     )
       ..headingRad = initHeading
+      ..smoothVel = Vec2(cos(initHeading) * spd, sin(initHeading) * spd)
       ..dashCooldown = item.kind == MutantKind.swiftShadowBoss ? 2.2 : 2.6;
 
     mutants.add(spawned);
@@ -868,7 +1307,7 @@ class DefenseBattleSim {
           if (m.dashCooldown <= 0) {
             m.dashCooldown = 3.4;
             m.dashBurstTimer = 0.65;
-            m.attackAnimTimer = max(m.attackAnimTimer, 0.55);
+            m.attackAnimTimer = max(m.attackAnimTimer, 1.30);
             bursts.add(
               FxBurst(
                 pos: m.pos,
@@ -884,7 +1323,7 @@ class DefenseBattleSim {
           if (m.dashCooldown <= 0) {
             m.dashCooldown = 3.6;
             m.dashBurstTimer = 0.45;
-            m.attackAnimTimer = max(m.attackAnimTimer, 0.40);
+            m.attackAnimTimer = max(m.attackAnimTimer, 0.90);
           }
         }
 
@@ -892,41 +1331,94 @@ class DefenseBattleSim {
         if (m.dashBurstTimer > 0) {
           gaitMult = m.kind == MutantKind.swiftShadowBoss ? 1.55 : 1.32;
         } else if (m.kind == MutantKind.plagueToad) {
-          gaitMult = 0.55 + 0.75 * sin(m.animPhase).abs();
+          gaitMult = 0.62 + 0.66 * sin(m.animPhase * 0.85).abs();
+        } else if (m.kind == MutantKind.ironBoar || m.kind == MutantKind.ironColossusBoss) {
+          gaitMult = 0.94 + 0.12 * sin(m.animPhase * 0.9).abs();
         }
 
         final slowFactor = m.slowTimer > 0 ? 0.58 : 1.0;
-        final targetWp = m.waypoints[m.waypointIndex.clamp(0, m.waypoints.length - 1)];
-        final toWp = targetWp - m.pos;
-        if (toWp.length < 12 && m.waypointIndex + 1 < m.waypoints.length) {
-          m.waypointIndex++;
-        }
-        final activeWp = m.waypoints[m.waypointIndex.clamp(0, m.waypoints.length - 1)];
-        final rawDelta = activeWp - m.pos;
-        final dir = rawDelta.normalized;
         final effectiveSpeed = m.speed * slowFactor * gaitMult;
 
-        Vec2 moveDir = dir;
-        if (!m.kind.isBoss && rawDelta.length > 24.0) {
-          final perp = Vec2(-dir.y, dir.x);
-          final weaveAmp = m.kind.speedRating >= 4 ? 0.20 : 0.11;
-          final weave = sin(m.animPhase * 0.7 + m.lateralSeed) * weaveAmp;
-          final candidateDir = (dir + perp * weave).normalized;
-          final candidatePos = m.pos + candidateDir * (effectiveSpeed * dt);
-          final safeEdge = candidatePos.x >= 28.0 && candidatePos.x <= CampaignCatalog.arenaWidth - 28.0;
-          final safeCliff = chapter.cliffs.every((c) => candidatePos.distanceTo(c.center) > c.radius + 4.0);
-          if (safeEdge && safeCliff) {
-            moveDir = candidateDir;
+        // Catmull-Rom 곡선 경로 전방 주시(Look-Ahead Pure Pursuit) + 관성 속도 보간(smoothVel)!
+        if (m.waypoints.isNotEmpty) {
+          int wpIdx = m.waypointIndex.clamp(0, m.waypoints.length - 1);
+          while (wpIdx + 1 < m.waypoints.length &&
+              m.pos.distanceTo(m.waypoints[wpIdx]) < 15.0) {
+            wpIdx++;
           }
-        }
+          m.waypointIndex = wpIdx;
 
-        m.pos = m.pos + moveDir * (effectiveSpeed * dt);
-        m.animPhase += effectiveSpeed * dt * (0.14 + m.kind.speedRating * 0.024) + dt * 2.1;
+          final lookIdx = min(wpIdx + 2, m.waypoints.length - 1);
+          Vec2 targetPt = m.waypoints[lookIdx];
+          final rawForward = (targetPt - m.pos);
+          final baseDir = rawForward.length > 1e-4 ? rawForward.normalized : const Vec2(0, 1);
 
-        if (rawDelta.length > 1e-4) {
-          final desiredHeading = atan2(moveDir.y, moveDir.x);
-          final angleDiff = atan2(sin(desiredHeading - m.headingRad), cos(desiredHeading - m.headingRad));
-          m.headingRad = m.headingRad + angleDiff * min(1.0, dt * 10.0);
+          if (!m.kind.isBoss && rawForward.length > 26.0) {
+            final perp = Vec2(-baseDir.y, baseDir.x);
+            final swayAmp = m.kind.speedRating >= 4 ? 3.8 : 2.2;
+            final lateralShift =
+                m.laneLateralOffset * 0.55 + sin(m.animPhase * 0.55 + m.lateralSeed) * swayAmp;
+            final candidatePt = targetPt + perp * lateralShift;
+            final safeEdge =
+                candidatePt.x >= 26.0 && candidatePt.x <= CampaignCatalog.arenaWidth - 26.0;
+            final safeCliff =
+                chapter.cliffs.every((c) => candidatePt.distanceTo(c.center) > c.radius + 5.0);
+            if (safeEdge && safeCliff) {
+              targetPt = candidatePt;
+            }
+          }
+
+          Vec2 steerDir = (targetPt - m.pos).normalized;
+
+          // 대규모 무리 겹침 방지 소프트 분리력 (물결처럼 자연스럽게 퍼지며 전진)
+          if (!m.kind.isBoss && mutants.length > 1) {
+            Vec2 sep = const Vec2(0, 0);
+            int checks = 0;
+            for (final other in mutants) {
+              if (other.uid == m.uid || other.kind.isBoss) continue;
+              final diff = m.pos - other.pos;
+              final d = diff.length;
+              final minGap = (m.kind.radius + other.kind.radius) * 0.82;
+              if (d > 0.01 && d < minGap) {
+                sep = sep + diff.normalized * ((minGap - d) / minGap);
+              }
+              checks++;
+              if (checks >= 10) break;
+            }
+            if (sep.length > 0.01) {
+              final candDir = (steerDir + sep * 0.34).normalized;
+              final candPos = m.pos + candDir * (effectiveSpeed * dt);
+              final safeEdge =
+                  candPos.x >= 26.0 && candPos.x <= CampaignCatalog.arenaWidth - 26.0;
+              final safeCliff =
+                  chapter.cliffs.every((c) => candPos.distanceTo(c.center) > c.radius + 5.0);
+              if (safeEdge && safeCliff) {
+                steerDir = candDir;
+              }
+            }
+          }
+
+          final desiredVel = steerDir * effectiveSpeed;
+          final velBlend = min(1.0, dt * 8.6);
+          if (m.smoothVel.length < 1.0) {
+            m.smoothVel = desiredVel;
+          } else {
+            m.smoothVel = Vec2(
+              m.smoothVel.x + (desiredVel.x - m.smoothVel.x) * velBlend,
+              m.smoothVel.y + (desiredVel.y - m.smoothVel.y) * velBlend,
+            );
+          }
+
+          m.pos = m.pos + m.smoothVel * dt;
+          final actualSpeed = m.smoothVel.length;
+          m.animPhase += actualSpeed * dt * (0.125 + m.kind.speedRating * 0.022) + dt * 1.95;
+
+          if (actualSpeed > 0.5) {
+            final desiredHeading = atan2(m.smoothVel.y, m.smoothVel.x);
+            final angleDiff =
+                atan2(sin(desiredHeading - m.headingRad), cos(desiredHeading - m.headingRad));
+            m.headingRad = m.headingRad + angleDiff * min(1.0, dt * 9.2);
+          }
         }
       }
 
@@ -984,7 +1476,9 @@ class DefenseBattleSim {
           );
         }
       } else if (shieldHp <= 0 &&
-          distToCenter <= CampaignCatalog.centralTowerRadius + m.kind.radius * 0.6) {
+          (distToCenter <= CampaignCatalog.centralTowerRadius + m.kind.radius * 0.6 ||
+              m.pos.distanceTo(CampaignCatalog.centralTowerPos) <=
+                  CampaignCatalog.centralTowerRadius + m.kind.radius * 0.6)) {
         // 방어막이 깨진 상태에서 중앙 자동 보호 장치 직접 타격 → attackPower 비례 피해!
         towerHp = max(0, towerHp - m.kind.attackPower * 0.95);
         m.attackAnimTimer = 1.0;
@@ -1017,15 +1511,30 @@ class DefenseBattleSim {
 
   void _stepCentralGuardian(double dt) {
     if (towerHp <= 0) return;
-    centralFireTimer -= dt;
-    if (centralFireTimer > 0 || mutants.isEmpty) return;
+    if (centralFireTimer > 0) {
+      centralFireTimer = max(0.0, centralFireTimer - dt);
+    }
+    if (mutants.isEmpty) return;
 
-    final target = _pickMostThreateningMutant(CampaignCatalog.villageCenter, maxRange: 460);
+    final origin = CampaignCatalog.centralTowerPos;
+    final target = _pickMostThreateningMutant(origin, maxRange: 540);
     if (target == null) return;
+
+    if (!centralManualMode) {
+      final aimDir = (target.pos - origin).normalized;
+      final desiredAngle = atan2(aimDir.y, aimDir.x);
+      final diff = atan2(sin(desiredAngle - centralAimAngleRad), cos(desiredAngle - centralAimAngleRad));
+      centralAimAngleRad = centralAimAngleRad + diff * min(1.0, dt * 10.0);
+    }
+
+    // 수동 탄지 모드일 때는 플레이어의 직접 조준 발사를 대기한다!
+    if (centralManualMode) return;
+    if (centralFireTimer > 0) return;
 
     centralFireTimer = auroraCritTimer > 0
         ? centralSpec.fireIntervalSec / 1.5
         : centralSpec.fireIntervalSec;
+    centralRecoilAnim = 1.0;
     pendingSounds.add(SoundCue.gearMotion);
 
     // 3칸 완충 시 자동 어기어석 궁극 편대 발동!
@@ -1036,17 +1545,17 @@ class DefenseBattleSim {
     }
 
     // 2칸 이상이고 밀집 시 흡성탄지 발동!
-    if (qiBars >= 2.0 && _countMutantsNear(target.pos, 75) >= 4) {
+    if (qiBars >= 2.0 && _countMutantsNear(target.pos, 80) >= 4) {
       qiBars -= 1.5;
       _spawnStoneShot(
         sourceKey: 'central_tower',
         sourceLabel: '중앙 기명 수호탑 (흡성탄지)',
-        origin: CampaignCatalog.villageCenter,
+        origin: origin,
         target: target,
-        baseDamage: centralSpec.baseDamage * 1.45,
-        speed: 330,
+        baseDamage: centralSpec.baseDamage * 1.48,
+        speed: 350,
         pullsEnemies: true,
-        aoeRadius: 68,
+        aoeRadius: 72,
       );
       return;
     }
@@ -1061,19 +1570,21 @@ class DefenseBattleSim {
     _spawnStoneShot(
       sourceKey: 'central_tower',
       sourceLabel: '중앙 기명 수호탑',
-      origin: CampaignCatalog.villageCenter,
+      origin: origin,
       target: target,
-      baseDamage: centralSpec.baseDamage * (useSectTech ? 1.38 : 1.0),
-      speed: 345,
+      baseDamage: centralSpec.baseDamage * (useSectTech ? 1.40 : 1.0),
+      speed: 360,
+      pierceBonus: 1,
       sectTech: useSectTech ? preset.sectTechnique : null,
     );
   }
 
   void _fireAutoEogieoseok(ActiveMutant primaryTarget) {
+    final origin = CampaignCatalog.centralTowerPos;
     final count = progress.realm.eogieoseokCount + 1;
     callouts.add(
       FloatingCallout(
-        pos: CampaignCatalog.villageCenter + const Vec2(0, -68),
+        pos: origin + const Vec2(0, -52),
         text: '✨ 자동 어기어석 발동! 수호 알 $count기 편대 소탕!',
         colorHex: 0xFF72EFDD,
         isBigBanner: true,
@@ -1090,12 +1601,12 @@ class DefenseBattleSim {
       _spawnStoneShot(
         sourceKey: 'central_tower',
         sourceLabel: '중앙 기명 수호탑 (어기어석)',
-        origin: CampaignCatalog.villageCenter + Vec2((i - count / 2) * 14, -8),
+        origin: origin + Vec2((i - count / 2) * 14, -8),
         target: tgt,
         baseDamage: centralSpec.baseDamage * 1.95,
-        speed: 380,
+        speed: 390,
         pierceBonus: 3,
-        aoeRadius: 48,
+        aoeRadius: 52,
         ignoresShield: true,
       );
     }
@@ -1172,6 +1683,16 @@ class DefenseBattleSim {
               progress.codexPowerBonus);
 
       final shotCount = l.type.projectilesPerShot(l.tier);
+      final launcherPierce = switch (l.type) {
+        LauncherType.rapid => l.tier >= 2 ? 1 : 0,
+        LauncherType.curveSpin => 1 + (l.tier >= 3 ? 1 : 0),
+        _ => 0,
+      };
+      final launcherSplash = switch (l.type) {
+        LauncherType.heavy => 26.0 + l.tier * 7.5,
+        LauncherType.frostField => 34.0 + l.tier * 6.0,
+        _ => 0.0,
+      };
       for (int s = 0; s < shotCount; s++) {
         final spreadRad = shotCount == 1 ? 0.0 : (s - (shotCount - 1) / 2) * 0.14;
         _spawnStoneShot(
@@ -1179,13 +1700,14 @@ class DefenseBattleSim {
           sourceLabel: '${l.type.name}(${l.slotIndex + 1}거점)',
           origin: l.pos,
           target: target,
-          baseDamage: dmg / (shotCount > 1 ? 1.25 : 1.0),
+          baseDamage: dmg / (shotCount > 1 ? 1.22 : 1.0),
           speed: l.type.projectileSpeed,
           spreadAngleRad: spreadRad,
           extraCrit: ampCrit,
           spinCurve: l.type == LauncherType.curveSpin ? (1.1 + l.tier * 0.25) : 0.0,
+          pierceBonus: launcherPierce,
           ignoresShield: l.type == LauncherType.curveSpin || (l.type == LauncherType.heavy && l.tier >= 3),
-          aoeRadius: l.type == LauncherType.heavy && l.tier >= 4 ? 52.0 : 0.0,
+          aoeRadius: launcherSplash,
           freezesOnHit: l.type == LauncherType.frostField,
           knockbackScale: l.type == LauncherType.heavy ? (1.45 + l.tier * 0.18) : 1.0,
         );
@@ -1551,11 +2073,13 @@ class DefenseBattleSim {
     final stone = preset.primaryStone;
     final shape = preset.primaryShape;
 
-    // 이동 예측 조준 보정 (영안 정밀 수련치 반영)
+    // 이동 예측 조준 보정 (곡선 경로 관성 속도 smoothVel 및 영안 정밀 수련치 반영)
     final leadFactor = (0.18 + progress.corePrecisionBonus * 0.8).clamp(0.18, 0.55);
     final nextWp = target.waypoints[target.waypointIndex.clamp(0, target.waypoints.length - 1)];
-    final moveDir = (nextWp - target.pos).normalized;
-    final predictedPos = target.pos + moveDir * (target.speed * leadFactor);
+    final moveVel = target.smoothVel.length > 4.0
+        ? target.smoothVel
+        : (nextWp - target.pos).normalized * target.speed;
+    final predictedPos = target.pos + moveVel * leadFactor;
 
     final rawDir = (predictedPos - origin).normalized;
     final baseAngle = atan2(rawDir.y, rawDir.x) + spreadAngleRad;
@@ -1914,8 +2438,9 @@ class DefenseBattleSim {
           }
         }
       } else if (m.kind.splitsOnDeath) {
-        // 회심 박살이 아니면 작은 독쥐 2마리로 분열
+        // 회심 박살이 아니면 작은 독쥐 2마리로 분열 (매끄러운 곡선 관성 유지)
         for (final dx in [-10.0, 10.0]) {
+          final childSpd = MutantKind.swarmRat.speed * difficulty.speedMult;
           mutants.add(
             ActiveMutant(
               uid: _nextMutantUid++,
@@ -1924,9 +2449,15 @@ class DefenseBattleSim {
               waypoints: m.waypoints,
               pos: m.pos + Vec2(dx, 0),
               maxHp: m.maxHp * 0.28,
-              speed: MutantKind.swarmRat.speed * difficulty.speedMult,
+              speed: childSpd,
               lateralSeed: rng.nextDouble() * pi * 2,
-            )..waypointIndex = m.waypointIndex,
+              laneLateralOffset: dx * 0.7,
+            )
+              ..waypointIndex = m.waypointIndex
+              ..headingRad = m.headingRad
+              ..smoothVel = m.smoothVel.length > 2.0
+                  ? m.smoothVel.normalized * childSpd
+                  : Vec2(0, childSpd),
           );
         }
       }

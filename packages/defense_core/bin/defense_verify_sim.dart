@@ -47,16 +47,20 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
     preset.primaryShape = ch >= 4 ? StoneShape.sphere : StoneShape.round;
     preset.sectTechnique = ch % 2 == 0 ? SectTechnique.ironFist : SectTechnique.swordQi;
     preset.mountTypes = chapterSpec.mounts.map((m) => m.recommendedType).toList();
-    while (preset.mountTypes.length < 5) {
+    while (preset.mountTypes.length < 10) {
       preset.mountTypes.add(LauncherType.rapid);
     }
     preset.equippedBeast = beast;
     preset.beastCondition = beast.defaultCondition;
-    preset.companions = ch >= 6
-        ? [CompanionHero.yonga, CompanionHero.jeonggak, CompanionHero.seolhwa]
-        : ch >= 4
-            ? [CompanionHero.gurumi, CompanionHero.bandal, CompanionHero.seokdu]
-            : [CompanionHero.seokdu, CompanionHero.yeonbi, CompanionHero.cheongmyeong];
+    preset.companions = ch >= 8
+        ? [CompanionHero.geomhwang, CompanionHero.yonga, CompanionHero.jeonggak]
+        : ch >= 6
+            ? [CompanionHero.yonga, CompanionHero.jeonggak, CompanionHero.seolhwa]
+            : ch >= 3
+                ? [CompanionHero.chwiseon, CompanionHero.bandal, CompanionHero.seokdu]
+                : ch >= 2
+                    ? [CompanionHero.seokdu, CompanionHero.yeonbi, CompanionHero.cheongmyeong]
+                    : [CompanionHero.seokdu];
     for (final h in preset.companions) {
       p.companionLevels[h] = (1 + (ch * 0.85).round()).clamp(1, 10);
     }
@@ -76,7 +80,7 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
       p.coreStatLevels[cs] = 0;
     }
     preset.primaryStone = StoneMaterial.cheongok;
-    preset.mountTypes = List.filled(5, LauncherType.frostField);
+    preset.mountTypes = List.filled(10, LauncherType.frostField);
     preset.companions = [CompanionHero.seokdu];
     p.companionLevels[CompanionHero.seokdu] = 1;
     preset.autoUpgradeInBattle = false;
@@ -85,11 +89,12 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
   return p;
 }
 
-BattleSummary runSingleHeadlessSim({
+({BattleSummary summary, double elapsedSec, int builtCount}) runSingleHeadlessSim({
   required StageSpec stage,
   required DefenseDifficulty difficulty,
   required PlayerProgress progress,
   required int seed,
+  bool autoBuildPads = true,
 }) {
   final sim = DefenseBattleSim(
     stage: stage,
@@ -99,26 +104,33 @@ BattleSummary runSingleHeadlessSim({
     // 검증 절대 원칙: 지원패 0회 · 행운 기연 0% 순수 구성만으로 클리어 검증!
     allowSupportTokens: false,
     allowSerendipity: false,
+    autoBuildForSimVerify: autoBuildPads,
   );
 
-  const dt = 1.0 / 30.0; // 헤드리스 고속 물리 스텝 (최대 180초 전장)
-  int maxSteps = (180.0 / dt).round();
+  const dt = 1.0 / 30.0; // 헤드리스 고속 물리 스텝 (최대 240초 전장)
+  final maxSteps = (240.0 / dt).round();
   for (int i = 0; i < maxSteps && !sim.isFinished; i++) {
     sim.step(dt);
   }
-  return sim.buildSummary();
+  return (
+    summary: sim.buildSummary(),
+    elapsedSec: sim.elapsedSec,
+    builtCount: sim.launchers.length,
+  );
 }
 
 void main(List<String> args) {
   final trialsPerStage = args.contains('--full200') ? 200 : 30;
   final buf = StringBuffer();
   buf.writeln('====================================================================');
-  buf.writeln('《수호알까기 · 탄지무림 심야기습》 전 10장(111단계) 순수 자동 구성 검증 성적표');
-  buf.writeln('조건: 손 조작 0회 · 지원패 0회 · 행운 기연 0% · 단계당 모의실험 $trialsPerStage판');
+  buf.writeln('《수호알까기 · 탄지무림 심야기습》 전 10장(111단계) 순차 배치·지속시간·밸런스 검증 성적표');
+  buf.writeln('조건: 초기 길목 무배치(0기) → 빈 초소(2~10곳) 순차 건설 · 지원패 0회 · 기연 0% · 단계당 $trialsPerStage판');
   buf.writeln('====================================================================');
 
   int passedStages = 0;
   final failedCodes = <String>[];
+  double minWinDurationSec = 999999.0;
+  String minWinDurationCode = '';
 
   for (final ch in CampaignCatalog.chapters) {
     final tunedProgress = buildExpectedProgressForChapter(ch.number, tunedLoadout: true);
@@ -126,36 +138,53 @@ void main(List<String> args) {
     double chEasySum = 0;
     double chNormalSum = 0;
     double chNightmareSum = 0;
+    double chDurationSum = 0;
 
     for (final st in stages) {
       int easyWins = 0;
       int normalWins = 0;
       int nightmareWins = 0;
+      double stMinElapsed = 999999.0;
+      double stAvgElapsed = 0.0;
 
       for (int t = 0; t < trialsPerStage; t++) {
         final seedBase = st.globalIndex * 1000 + t * 17 + 7;
-        if (runSingleHeadlessSim(
+        final easyRun = runSingleHeadlessSim(
           stage: st,
           difficulty: DefenseDifficulty.easy,
           progress: tunedProgress,
           seed: seedBase,
-        ).victory) {
+        );
+        if (easyRun.summary.victory) {
           easyWins++;
+          if (easyRun.elapsedSec < stMinElapsed) stMinElapsed = easyRun.elapsedSec;
+          if (easyRun.elapsedSec < minWinDurationSec) {
+            minWinDurationSec = easyRun.elapsedSec;
+            minWinDurationCode = '${st.code}(쉬움)';
+          }
         }
-        if (runSingleHeadlessSim(
+        final normalRun = runSingleHeadlessSim(
           stage: st,
           difficulty: DefenseDifficulty.normal,
           progress: tunedProgress,
           seed: seedBase + 3,
-        ).victory) {
+        );
+        stAvgElapsed += normalRun.elapsedSec;
+        if (normalRun.summary.victory) {
           normalWins++;
+          if (normalRun.elapsedSec < stMinElapsed) stMinElapsed = normalRun.elapsedSec;
+          if (normalRun.elapsedSec < minWinDurationSec) {
+            minWinDurationSec = normalRun.elapsedSec;
+            minWinDurationCode = '${st.code}(보통)';
+          }
         }
-        if (runSingleHeadlessSim(
+        final nightmareRun = runSingleHeadlessSim(
           stage: st,
           difficulty: DefenseDifficulty.nightmare,
           progress: tunedProgress,
           seed: seedBase + 9,
-        ).victory) {
+        );
+        if (nightmareRun.summary.victory) {
           nightmareWins++;
         }
       }
@@ -166,27 +195,30 @@ void main(List<String> args) {
       chEasySum += easyRate;
       chNormalSum += normalRate;
       chNightmareSum += nightmareRate;
+      chDurationSum += stAvgElapsed / trialsPerStage;
 
-      final ok = easyRate >= 85.0 && normalRate >= 65.0;
+      final durationOk = stMinElapsed >= 32.0;
+      final ok = easyRate >= 85.0 && normalRate >= 65.0 && durationOk;
       if (ok) {
         passedStages++;
       } else {
         failedCodes.add(
-          '${st.code}(쉬움:${easyRate.toStringAsFixed(0)}%, 보통:${normalRate.toStringAsFixed(0)}%, 악몽:${nightmareRate.toStringAsFixed(0)}%)',
+          '${st.code}(쉬움:${easyRate.toStringAsFixed(0)}%, 보통:${normalRate.toStringAsFixed(0)}%, 최단:${stMinElapsed.toStringAsFixed(1)}초)',
         );
       }
     }
 
     final n = stages.length;
+    final padSpan = '${stages.first.maxMountCount}~${stages.last.maxMountCount}초소';
     buf.writeln(
-      '제${ch.number.toString().padLeft(2)}장 [${ch.villageName}] ($n단계) '
-      '→ 평균 승률 | 쉬움 ${(chEasySum / n).toStringAsFixed(1)}% · '
+      '제${ch.number.toString().padLeft(2)}장 [${ch.villageName}] ($n단계 · $padSpan · 평균 ${(chDurationSum / n).toStringAsFixed(1)}초) '
+      '→ 승률 | 쉬움 ${(chEasySum / n).toStringAsFixed(1)}% · '
       '보통 ${(chNormalSum / n).toStringAsFixed(1)}% · '
       '악몽 ${(chNightmareSum / n).toStringAsFixed(1)}%',
     );
   }
 
-  // 역상성/무성장 대조군 검증 (중반 5장 보스전: 부실 구성 패배 vs 추천 구성 승리 차이 검증)
+  // 역상성/무배치 대조군 검증 (중반 5장 보스전: 무배치·부실 구성 패배 vs 맞춤 배치 승리 차이 검증)
   final checkStage = CampaignCatalog.stageAt(5, 11);
   final badProg = buildExpectedProgressForChapter(5, tunedLoadout: false);
   final goodProg = buildExpectedProgressForChapter(5, tunedLoadout: true);
@@ -198,7 +230,8 @@ void main(List<String> args) {
       difficulty: DefenseDifficulty.normal,
       progress: badProg,
       seed: 9000 + t,
-    ).victory) {
+      autoBuildPads: false,
+    ).summary.victory) {
       badWins++;
     }
     if (runSingleHeadlessSim(
@@ -206,7 +239,7 @@ void main(List<String> args) {
       difficulty: DefenseDifficulty.normal,
       progress: goodProg,
       seed: 9000 + t,
-    ).victory) {
+    ).summary.victory) {
       goodWins++;
     }
   }
@@ -216,8 +249,12 @@ void main(List<String> args) {
 
   buf.writeln('--------------------------------------------------------------------');
   buf.writeln(
-    '구성 조정 민감도 검증 (5-11 폭주 기관 거신): '
-    '부실 역상성 구성 ${badRate.toStringAsFixed(1)}% → 맞춤 구성 조정 시 ${goodRate.toStringAsFixed(1)}% (승률 상승폭 +${delta.toStringAsFixed(1)}%p)',
+    '최단 전투 지속시간(쉬운 1-1 포함 전 구간 30초 이상 보장 검증): '
+    '${minWinDurationSec.toStringAsFixed(1)}초 [$minWinDurationCode]',
+  );
+  buf.writeln(
+    '직접 배치 & 구성 민감도 검증 (5-11 폭주 기관 거신): '
+    '무배치·미성장 ${badRate.toStringAsFixed(1)}% → 맞춤 초소 배치 시 ${goodRate.toStringAsFixed(1)}% (승률 상승폭 +${delta.toStringAsFixed(1)}%p)',
   );
   buf.writeln(
     '전체 통과 스테이지: $passedStages / ${CampaignCatalog.allStages.length} '
@@ -229,7 +266,7 @@ void main(List<String> args) {
   stdout.write(report);
   File('RESULTS_DEFENSE.txt').writeAsStringSync(report);
 
-  if (failedCodes.isNotEmpty || delta < 35.0) {
+  if (failedCodes.isNotEmpty || delta < 35.0 || minWinDurationSec < 32.0) {
     exitCode = 1;
   }
 }

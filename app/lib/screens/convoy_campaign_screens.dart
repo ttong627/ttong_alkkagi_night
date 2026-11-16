@@ -464,7 +464,7 @@ class ConvoyAndSerendipityScreen extends StatelessWidget {
   }
 }
 
-/// 1~10장(총 111단계) 강호 수호 캠페인 지도 화면.
+/// 1~10장(총 111단계) 순차 행군 수호 캠페인 지도 화면.
 class CampaignScreen extends StatelessWidget {
   const CampaignScreen({super.key, required this.controller});
   final GameController controller;
@@ -475,7 +475,13 @@ class CampaignScreen extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final p = controller.progress;
-        final chSpec = CampaignCatalog.chapterOf(controller.selectedChapter);
+        final nextGlobal = (p.highestClearedGlobalStage + 1)
+            .clamp(1, CampaignCatalog.allStages.length);
+        final currentOrderStage = CampaignCatalog.allStages[nextGlobal - 1];
+        final nextRescue = p.nextRescueStage;
+        final safeChapter = controller.selectedChapter
+            .clamp(1, p.highestUnlockedChapter.clamp(1, 10));
+        final chSpec = CampaignCatalog.chapterOf(safeChapter);
         final stages = CampaignCatalog.stagesOfChapter(chSpec.number);
 
         return Scaffold(
@@ -486,9 +492,9 @@ class CampaignScreen extends StatelessWidget {
             overlayOpacity: 0.84,
             child: Column(
               children: [
-                // 상단 장 선택 가로 스크롤 & 난이도 선택
+                // 상단 순차 행군 장 선택 & 난이도 선택 & 이번 차례 바로 출정 바
                 Container(
-                  color: NightPalette.bgPanel.withValues(alpha: 0.92),
+                  color: NightPalette.bgPanel.withValues(alpha: 0.94),
                   padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                   child: Column(
                     children: [
@@ -497,51 +503,83 @@ class CampaignScreen extends StatelessWidget {
                         child: Row(
                           children: CampaignCatalog.chapters.map((c) {
                             final unlocked = c.number <= p.highestUnlockedChapter;
-                            final selected = c.number == controller.selectedChapter;
+                            final selected = c.number == chSpec.number;
                             return Padding(
                               padding: const EdgeInsets.only(right: 6),
                               child: ChoiceChip(
                                 selected: selected,
-                                label: Text('${unlocked ? "🌙" : "🔒"}${c.number}장 ${c.villageName}'),
-                                onSelected: (_) => controller.setSelectedChapter(c.number),
+                                label: Text(
+                                  '${unlocked ? (c.number < p.highestUnlockedChapter ? "✓" : "▶") : "🔒"}${c.number}장 ${c.villageName}',
+                                ),
+                                onSelected: unlocked
+                                    ? (_) => controller.setSelectedChapter(c.number)
+                                    : null,
                               ),
                             );
                           }).toList(),
                         ),
                       ),
                       const SizedBox(height: 6),
-                      SegmentedButton<DefenseDifficulty>(
-                        segments: DefenseDifficulty.values
-                            .map((d) => ButtonSegment(
-                                  value: d,
-                                  label: Text(d.name.split(' · ').first),
-                                ))
-                            .toList(),
-                        selected: {controller.selectedDifficulty},
-                        onSelectionChanged: (s) => controller.setDifficulty(s.first),
-                        style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          SegmentedButton<DefenseDifficulty>(
+                            segments: DefenseDifficulty.values
+                                .map((d) => ButtonSegment(
+                                      value: d,
+                                      label: Text(d.name.split(' · ').first),
+                                    ))
+                                .toList(),
+                            selected: {controller.selectedDifficulty},
+                            onSelectionChanged: (s) => controller.setDifficulty(s.first),
+                            style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                          ),
+                          if (nextRescue != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xDD11353B),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: NightPalette.jadeGreen),
+                              ),
+                              child: Text(
+                                '🆘 다음 구출: ${nextRescue.code} ${nextRescue.rescueBadgeText}',
+                                style: const TextStyle(
+                                  fontSize: 11.2,
+                                  color: NightPalette.jadeGreen,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
                 ),
 
-                // 선택된 장 줄거리 및 보상 요약 배너
+                // 선택된 장 줄거리 및 이번 수호 차례 안내 배너
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                   child: MurimCard(
-                    borderColor: NightPalette.jadeShield,
+                    borderColor: NightPalette.accentGold,
+                    padding: const EdgeInsets.all(12),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         NightSpriteIcon(
                           assetPath: NightArtRegistry.charFace(chSpec.bossPortraitPrefix),
                           fallbackAssetPath: NightArtRegistry.mutantAsset(MutantKind.chapterOverlord),
                           fallbackIcon: Icons.shield_moon_rounded,
-                          size: 52,
+                          size: 48,
                           borderRadius: 12,
                           fit: BoxFit.cover,
                           showFrame: true,
-                          frameColor: NightPalette.jadeShield,
+                          frameColor: NightPalette.accentGold,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -550,31 +588,51 @@ class CampaignScreen extends StatelessWidget {
                             children: [
                               Text(
                                 '${chSpec.actLabel} ${chSpec.title} — ${chSpec.villageName}',
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontFamily: 'BlackHanSans',
-                                  fontSize: 16.5,
+                                  fontSize: 15.5,
                                   color: NightPalette.accentGold,
                                 ),
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: 2),
                               Text(
-                                chSpec.storySummary,
-                                style: const TextStyle(fontSize: 12.5, color: NightPalette.textPrimary),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '✨ 장 완료 해금: ${chSpec.unlockNotice}',
-                                style: const TextStyle(fontSize: 12, color: NightPalette.jadeGreen),
+                                '▶ 현재 수호 차례: ${currentOrderStage.title} (초소 ${currentOrderStage.maxMountCount}곳 개방)',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: NightPalette.jadeGreen,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
+                        ),
+                        const SizedBox(width: 6),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            backgroundColor: NightPalette.accentGold,
+                            foregroundColor: Colors.black,
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => BattleScreen(
+                                  controller: controller,
+                                  stage: currentOrderStage,
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text('이번 차례 출정'),
                         ),
                       ],
                     ),
                   ),
                 ),
 
-                // 단계 목록
+                // 순차 행군 관문 목록 (정화 완료 → ▶이번 수호 차례 강조 → 🔒순서 대기 간결 표시)
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.all(12),
@@ -582,7 +640,62 @@ class CampaignScreen extends StatelessWidget {
                     itemBuilder: (ctx, idx) {
                       final st = stages[idx];
                       final unlocked = p.isStageUnlocked(st);
+                      final isCleared =
+                          st.globalIndex <= p.highestClearedGlobalStage;
+                      final isCurrentOrder =
+                          st.globalIndex == currentOrderStage.globalIndex;
                       final stars = p.stageStars[st.code] ?? 0;
+
+                      // 아직 순서가 오지 않은 미래 관문은 혼란스럽지 않도록 한 줄 행군 노드로 간결하게 표시!
+                      if (!unlocked) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: NightPalette.bgPanel.withValues(alpha: 0.62),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: NightPalette.borderGold.withValues(alpha: 0.22),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.lock_outline_rounded,
+                                  size: 18,
+                                  color: NightPalette.textMuted,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '순서 대기 · ${st.title}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13.2,
+                                      color: NightPalette.textMuted,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '초소 ${st.maxMountCount}곳${st.hasRescueReward ? " · 🆘구출" : ""}',
+                                  style: TextStyle(
+                                    fontSize: 11.2,
+                                    color: st.hasRescueReward
+                                        ? NightPalette.jadeGreen
+                                        : NightPalette.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
                       final invadingBosses = <MutantKind>{
                         for (final wave in st.waves)
                           for (final grp in wave)
@@ -592,26 +705,106 @@ class CampaignScreen extends StatelessWidget {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: MurimCard(
-                          borderColor: st.isBossStage
-                              ? NightPalette.crimsonMoon
-                              : NightPalette.borderGold.withValues(alpha: 0.35),
+                          borderColor: isCurrentOrder
+                              ? NightPalette.accentGold
+                              : (st.isBossStage
+                                  ? NightPalette.crimsonMoon
+                                  : NightPalette.jadeGreen.withValues(alpha: 0.45)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isCurrentOrder
+                                          ? NightPalette.accentGold
+                                          : const Color(0xCC16382E),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      isCurrentOrder
+                                          ? '▶ 이번 수호 차례!'
+                                          : (isCleared ? '✓ 정화 완료' : '출정 가능'),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isCurrentOrder
+                                            ? Colors.black
+                                            : NightPalette.jadeGreen,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xCC122238),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: NightPalette.jadeShield
+                                            .withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '초소 ${st.maxMountCount}곳 개방',
+                                      style: const TextStyle(
+                                        fontSize: 10.8,
+                                        color: NightPalette.jadeShield,
+                                      ),
+                                    ),
+                                  ),
+                                  if (st.hasRescueReward)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xDD143D38),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: NightPalette.jadeGreen,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '🆘 ${st.rescueBadgeText}',
+                                        style: const TextStyle(
+                                          fontSize: 10.8,
+                                          color: NightPalette.jadeGreen,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
                               Row(
                                 children: [
                                   NightSpriteIcon(
                                     assetPath: st.isBossStage
-                                        ? NightArtRegistry.mutantAsset(MutantKind.chapterOverlord)
-                                        : NightArtRegistry.stoneAsset(st.recommendedStone),
+                                        ? NightArtRegistry.mutantAsset(
+                                            MutantKind.chapterOverlord,
+                                          )
+                                        : NightArtRegistry.stoneAsset(
+                                            st.recommendedStone,
+                                          ),
                                     fallbackIcon: st.isBossStage
                                         ? Icons.whatshot_rounded
                                         : Icons.circle_rounded,
                                     size: 38,
-                                    dimmed: !unlocked,
                                     showFrame: true,
-                                    frameColor: st.isBossStage
-                                        ? NightPalette.crimsonMoon
+                                    frameColor: isCurrentOrder
+                                        ? NightPalette.accentGold
                                         : Color(st.recommendedStone.colorHex),
                                   ),
                                   const SizedBox(width: 10),
@@ -621,11 +814,9 @@ class CampaignScreen extends StatelessWidget {
                                       style: TextStyle(
                                         fontSize: 15.5,
                                         fontWeight: FontWeight.bold,
-                                        color: unlocked
-                                            ? (st.isBossStage
-                                                ? NightPalette.accentGold
-                                                : NightPalette.textPrimary)
-                                            : NightPalette.textMuted,
+                                        color: isCurrentOrder
+                                            ? NightPalette.accentGold
+                                            : NightPalette.textPrimary,
                                       ),
                                     ),
                                   ),
@@ -634,7 +825,9 @@ class CampaignScreen extends StatelessWidget {
                                     children: List.generate(
                                       3,
                                       (i) => Icon(
-                                        i < stars ? Icons.star_rounded : Icons.star_border_rounded,
+                                        i < stars
+                                            ? Icons.star_rounded
+                                            : Icons.star_border_rounded,
                                         size: 18,
                                         color: NightPalette.accentGold,
                                       ),
@@ -645,7 +838,10 @@ class CampaignScreen extends StatelessWidget {
                               const SizedBox(height: 4),
                               Text(
                                 st.subtitle,
-                                style: const TextStyle(fontSize: 12.5, color: NightPalette.textMuted),
+                                style: const TextStyle(
+                                  fontSize: 12.2,
+                                  color: NightPalette.textMuted,
+                                ),
                               ),
                               if (invadingBosses.isNotEmpty) ...[
                                 const SizedBox(height: 6),
@@ -659,18 +855,24 @@ class CampaignScreen extends StatelessWidget {
                                         vertical: 3,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: NightPalette.bgDeep.withValues(alpha: 0.85),
+                                        color: NightPalette.bgDeep
+                                            .withValues(alpha: 0.85),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
-                                          color: Color(bk.colorHex).withValues(alpha: 0.72),
+                                          color: Color(bk.colorHex)
+                                              .withValues(alpha: 0.72),
                                         ),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           NightSpriteIcon(
-                                            assetPath: NightArtRegistry.mutantAttackAsset(bk),
-                                            fallbackAssetPath: NightArtRegistry.mutantAsset(bk),
+                                            assetPath:
+                                                NightArtRegistry.mutantAttackAsset(
+                                              bk,
+                                            ),
+                                            fallbackAssetPath:
+                                                NightArtRegistry.mutantAsset(bk),
                                             fallbackIcon: Icons.whatshot_rounded,
                                             size: 18,
                                             borderRadius: 4,
@@ -678,7 +880,7 @@ class CampaignScreen extends StatelessWidget {
                                           const SizedBox(width: 5),
                                           Flexible(
                                             child: Text(
-                                              '${bk.name} (${bk.roleTag} · 전투력 ${bk.combatPower})',
+                                              '${bk.name} (${bk.roleTag})',
                                               overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(
                                                 fontSize: 11,
@@ -692,11 +894,6 @@ class CampaignScreen extends StatelessWidget {
                                   }).toList(),
                                 ),
                               ],
-                              const SizedBox(height: 4),
-                              Text(
-                                '💡 추천 구성: ${st.tacticalHint}',
-                                style: const TextStyle(fontSize: 12, color: NightPalette.jadeShield),
-                              ),
                               const SizedBox(height: 8),
                               Wrap(
                                 spacing: 8,
@@ -704,34 +901,49 @@ class CampaignScreen extends StatelessWidget {
                                 alignment: WrapAlignment.end,
                                 children: [
                                   OutlinedButton.icon(
-                                    onPressed: unlocked
-                                        ? () {
-                                            controller.applyRecommendedLoadoutForStage(st);
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('${st.code} 맞춤 추천 진법을 자동 장착했습니다!'),
-                                              ),
-                                            );
-                                          }
-                                        : null,
-                                    icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
-                                    label: const Text('맞춤 진법 자동 적용'),
+                                    onPressed: () {
+                                      controller.applyRecommendedLoadoutForStage(
+                                        st,
+                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '${st.code} 맞춤 추천 진법을 자동 장착했습니다!',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(
+                                      Icons.auto_fix_high_rounded,
+                                      size: 16,
+                                    ),
+                                    label: const Text('맞춤 진법 적용'),
                                   ),
                                   FilledButton.icon(
-                                    onPressed: unlocked
-                                        ? () {
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (_) => BattleScreen(
-                                                  controller: controller,
-                                                  stage: st,
-                                                ),
-                                              ),
-                                            );
-                                          }
+                                    style: isCurrentOrder
+                                        ? FilledButton.styleFrom(
+                                            backgroundColor:
+                                                NightPalette.accentGold,
+                                            foregroundColor: Colors.black,
+                                          )
                                         : null,
-                                    icon: const Icon(Icons.shield_moon_rounded, size: 18),
-                                    label: Text(unlocked ? '수호 출정' : '이전 밤 수호 필요'),
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => BattleScreen(
+                                            controller: controller,
+                                            stage: st,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(
+                                      Icons.shield_moon_rounded,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      isCurrentOrder ? '이번 차례 출정!' : '재수련 출정',
+                                    ),
                                   ),
                                 ],
                               ),

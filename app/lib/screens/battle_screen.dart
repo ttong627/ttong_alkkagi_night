@@ -1,14 +1,20 @@
+import 'dart:math';
+
 import 'package:defense_core/defense_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../audio/night_audio.dart';
+import '../audio/night_haptics.dart';
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'battle_painter.dart';
 
-/// 실시간 자동 수호 전장 화면 (1·2·3배속 · 거점 버전 승급 · 전술 비약 3종 · 암행어사 출두 · 기여도 분석표).
+/// 실시간 수호 전장 화면:
+/// - 초기 길목 무배치(0기) → 개방된 빈 초소(`2~10곳`) 터치 직접 배치·승급·교체·철거
+/// - 맨 아래 중앙 마을 본진 + 중앙 기명 수호탑 `자동 발사 ↔ 수동 탄지(도탄 예측선)` 겸용
+/// - 동료·영수 구출 축하 연출 및 1·2·3배속 · 전술 비약 · 무림수호단 출두 지원.
 class BattleScreen extends StatefulWidget {
   const BattleScreen({
     super.key,
@@ -34,6 +40,11 @@ class _BattleScreenState extends State<BattleScreen>
   bool _paused = false;
   bool _summaryShown = false;
 
+  /// 수동 조준 드래그 상태 및 실시간 반사 예측선 각도.
+  bool _draggingManualAim = false;
+  bool _draggedFromTower = false;
+  double? _manualAimPreviewAngleRad;
+
   @override
   void initState() {
     super.initState();
@@ -42,7 +53,6 @@ class _BattleScreenState extends State<BattleScreen>
     final bgm = widget.stage.isBossStage ? 'bgm_boss.ogg' : chapter.bgmAsset;
     NightAudioController.instance.playBgm(bgm);
 
-    // 전장 코덱스 스프라이트 비동기 예열 (미존재/테스트 환경에서도 예외 없이 안전 동작)
     NightBattleSprites.instance.warmUpForChapter(
       chapter,
       onSpritesUpdated: () {
@@ -69,6 +79,8 @@ class _BattleScreenState extends State<BattleScreen>
       seed: DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF,
     );
     _summaryShown = false;
+    _draggingManualAim = false;
+    _manualAimPreviewAngleRad = null;
     _lastTick = null;
   }
 
@@ -97,16 +109,397 @@ class _BattleScreenState extends State<BattleScreen>
       _summaryShown = true;
       final summary = _sim.buildSummary();
       widget.controller.recordBattleSummary(widget.stage, summary);
+      final rescueBanner = widget.controller.progress.lastRescueBanner;
+      final rescuedHero = widget.controller.progress.lastRescuedCompanion;
+      final rescuedBeast = widget.controller.progress.lastRescuedBeast;
       setState(() {});
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
         if (summary.victory && widget.stage.outroDialogue.isNotEmpty) {
-          await _showStoryDialogueModal(widget.stage.outroDialogue, isOutro: true);
+          await _showStoryDialogueModal(
+            widget.stage.outroDialogue,
+            isOutro: true,
+          );
         }
         if (mounted) {
-          _showResultModal(summary);
+          _showResultModal(
+            summary,
+            rescueBanner: rescueBanner,
+            rescuedHero: rescuedHero,
+            rescuedBeast: rescuedBeast,
+          );
         }
       });
+    }
+  }
+
+  Vec2 _toArenaCoords(Offset localPos, BoxConstraints constraints) {
+    final lx = (localPos.dx / constraints.maxWidth) * CampaignCatalog.arenaWidth;
+    final ly = (localPos.dy / constraints.maxHeight) * CampaignCatalog.arenaHeight;
+    return Vec2(
+      lx.clamp(0.0, CampaignCatalog.arenaWidth),
+      ly.clamp(0.0, CampaignCatalog.arenaHeight),
+    );
+  }
+
+  LauncherMountSlot? _hitMountSlot(Vec2 arenaPos) {
+    LauncherMountSlot? closest;
+    double bestDist = 30.0;
+    for (final slot in _sim.activeMounts) {
+      final d = slot.pos.distanceTo(arenaPos);
+      if (d < bestDist) {
+        bestDist = d;
+        closest = slot;
+      }
+    }
+    return closest;
+  }
+
+  double _computeAimAngleFromArenaPoint(Vec2 arenaPos, {required bool fromTower}) {
+    final tower = CampaignCatalog.centralTowerPos;
+    final dx = arenaPos.x - tower.x;
+    final dy = arenaPos.y - tower.y;
+    if (dx.abs() < 3.0 && dy.abs() < 3.0) {
+      return -pi / 2;
+    }
+    // 탑 아래쪽으로 당기면 새총 탄지처럼 반대 방향(위쪽)으로 조준, 위쪽 전장을 가리키면 가리킨 지점으로 조준!
+    if (fromTower && dy > 14.0) {
+      return DefenseBattleSim.sanitizeManualAimAngle(atan2(-dy, -dx));
+    }
+    return DefenseBattleSim.sanitizeManualAimAngle(atan2(dy, dx));
+  }
+
+  Future<void> _openMountBuildOrManageSheet(LauncherMountSlot slot) async {
+    if (_sim.isFinished) return;
+    final wasPaused = _paused;
+    setState(() => _paused = true);
+    NightAudioController.instance.playAsset('ui_tap.ogg');
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: NightPalette.bgPanel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final existing = _sim.launcherAtSlot(slot.slotIndex);
+            final recType = slot.recommendedType;
+            final orderedTypes = <LauncherType>[
+              recType,
+              ...LauncherType.values.where((t) => t != recType),
+            ];
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          NightSpriteIcon(
+                            assetPath: existing != null
+                                ? NightArtRegistry.launcherAsset(existing.type)
+                                : NightArtRegistry.launcherAsset(recType),
+                            fallbackIcon: Icons.fort_rounded,
+                            size: 38,
+                            showFrame: true,
+                            frameColor: NightPalette.accentGold,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  existing == null
+                                      ? '길목 ${slot.slotIndex + 1}번 빈 초소 · 발사대 직접 배치'
+                                      : '길목 ${slot.slotIndex + 1}번 초소 · ${existing.type.name} (${existing.tier}형)',
+                                  style: const TextStyle(
+                                    fontFamily: 'BlackHanSans',
+                                    fontSize: 17,
+                                    color: NightPalette.accentGold,
+                                  ),
+                                ),
+                                Text(
+                                  '현장 보유 증표: ${_sim.fieldTokens}개 · 개방 초소 ${_sim.launchers.length}/${_sim.activeMounts.length}곳 가동중',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: NightPalette.jadeGreen,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (existing != null) ...[
+                        MurimCard(
+                          borderColor: NightPalette.jadeGreen,
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${existing.type.name} (${existing.tier}형 / 최대 4형) — ${existing.type.roleSummary}',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: NightPalette.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  FilledButton.icon(
+                                    key: const Key('upgrade_slot_btn'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: NightPalette.jadeGreen,
+                                      foregroundColor: Colors.black,
+                                    ),
+                                    onPressed: existing.tier < 4 &&
+                                            _sim.fieldTokens >=
+                                                existing.type.inBattleUpgradeCost(
+                                                  existing.tier,
+                                                )
+                                        ? () {
+                                            if (_sim.upgradeLauncherAtSlot(
+                                              slot.slotIndex,
+                                            )) {
+                                              NightHaptics.instance.lightTap();
+                                              setSheetState(() {});
+                                              _frameNotifier.value++;
+                                            }
+                                          }
+                                        : null,
+                                    icon: const Icon(
+                                      Icons.upgrade_rounded,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      existing.tier >= 4
+                                          ? '최고 4형 달성 완료'
+                                          : '${existing.tier + 1}형 승급 (증표 ${existing.type.inBattleUpgradeCost(existing.tier)})',
+                                    ),
+                                  ),
+                                  OutlinedButton.icon(
+                                    key: const Key('dismantle_slot_btn'),
+                                    onPressed: () {
+                                      final refund = _sim.dismantleLauncherInBattle(
+                                        slot.slotIndex,
+                                      );
+                                      if (refund > 0) {
+                                        NightHaptics.instance.lightTap();
+                                        _frameNotifier.value++;
+                                        Navigator.of(ctx).pop();
+                                      }
+                                    },
+                                    icon: const Icon(
+                                      Icons.recycling_rounded,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      '철거 (+${(existing.investedTokens * 0.80).round()} 환급)',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          '다른 종류의 수호 발사대로 교체 배치 (기존 증표 80% 자동 차감 반영)',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: NightPalette.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      ...orderedTypes.map((lt) {
+                        if (existing != null && existing.type == lt) {
+                          return const SizedBox.shrink();
+                        }
+                        final unlocked = _sim.isLauncherTypeUnlocked(lt);
+                        final isRec = lt == recType;
+                        final refund = existing != null
+                            ? (existing.investedTokens * 0.80).round()
+                            : 0;
+                        final netCost = max(0, lt.buildCostTokens - refund);
+                        final canAfford = unlocked &&
+                            (_sim.fieldTokens + refund) >= lt.buildCostTokens;
+                        final permLv =
+                            widget.controller.progress.launcherPermanentLevels[lt] ??
+                                1;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: InkWell(
+                            key: Key('place_launcher_${EnumName(lt).name}'),
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: canAfford
+                                ? () {
+                                    final ok = existing == null
+                                        ? _sim.placeLauncherInBattle(
+                                            slot.slotIndex,
+                                            lt,
+                                          )
+                                        : _sim.replaceLauncherInBattle(
+                                            slot.slotIndex,
+                                            lt,
+                                          );
+                                    if (ok) {
+                                      NightHaptics.instance.lightTap();
+                                      _frameNotifier.value++;
+                                      Navigator.of(ctx).pop();
+                                    }
+                                  }
+                                : null,
+                            child: MurimCard(
+                              borderColor: isRec
+                                  ? NightPalette.accentGold
+                                  : Color(lt.colorHex).withValues(
+                                      alpha: unlocked ? 0.60 : 0.25,
+                                    ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              child: Row(
+                                children: [
+                                  NightSpriteIcon(
+                                    assetPath: NightArtRegistry.launcherAsset(lt),
+                                    fallbackIcon: Icons.gps_fixed_rounded,
+                                    size: 44,
+                                    color: Color(lt.colorHex),
+                                    dimmed: !unlocked,
+                                    showFrame: true,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          spacing: 6,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          children: [
+                                            Text(
+                                              '${lt.name} (영구 $permLv단)',
+                                              style: TextStyle(
+                                                fontSize: 14.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: unlocked
+                                                    ? Color(lt.colorHex)
+                                                    : NightPalette.textMuted,
+                                              ),
+                                            ),
+                                            if (isRec)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 1.5,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: NightPalette.accentGold,
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  '★ 이 길목 추천',
+                                                  style: TextStyle(
+                                                    fontSize: 10.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          unlocked
+                                              ? lt.roleSummary
+                                              : '제${lt.unlockChapter}장 도달 시 개방되는 기관 발사대입니다.',
+                                          style: const TextStyle(
+                                            fontSize: 11.8,
+                                            color: NightPalette.textMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  FilledButton(
+                                    style: FilledButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      backgroundColor: isRec && canAfford
+                                          ? NightPalette.accentGold
+                                          : null,
+                                      foregroundColor: isRec && canAfford
+                                          ? Colors.black
+                                          : null,
+                                    ),
+                                    onPressed: canAfford
+                                        ? () {
+                                            final ok = existing == null
+                                                ? _sim.placeLauncherInBattle(
+                                                    slot.slotIndex,
+                                                    lt,
+                                                  )
+                                                : _sim.replaceLauncherInBattle(
+                                                    slot.slotIndex,
+                                                    lt,
+                                                  );
+                                            if (ok) {
+                                              NightHaptics.instance.lightTap();
+                                              _frameNotifier.value++;
+                                              Navigator.of(ctx).pop();
+                                            }
+                                          }
+                                        : null,
+                                    child: Text(
+                                      !unlocked
+                                          ? '${lt.unlockChapter}장 해금'
+                                          : (existing == null
+                                              ? '증표 ${lt.buildCostTokens}'
+                                              : '교체 $netCost'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (mounted && !_sim.isFinished) {
+      setState(() => _paused = wasPaused);
     }
   }
 
@@ -134,7 +527,10 @@ class _BattleScreenState extends State<BattleScreen>
           ],
         ),
         content: Text(
-          '현재 무대: ${widget.stage.title}\n전술 조언: ${widget.stage.tacticalHint}',
+          '현재 무대: ${widget.stage.title}\n'
+          '개방 초소: ${_sim.launchers.length}/${_sim.activeMounts.length}곳 배치됨\n'
+          '중앙 수호탑: ${_sim.centralManualMode ? "수동 조준 탄지 모드" : "자동 조준 발사 모드"}\n'
+          '전술 조언: ${widget.stage.tacticalHint}',
           style: const TextStyle(fontSize: 13.5, height: 1.45),
         ),
         actions: [
@@ -270,7 +666,12 @@ class _BattleScreenState extends State<BattleScreen>
     }
   }
 
-  void _showResultModal(BattleSummary summary) {
+  void _showResultModal(
+    BattleSummary summary, {
+    String? rescueBanner,
+    CompanionHero? rescuedHero,
+    SpiritBeast? rescuedBeast,
+  }) {
     showModalBottomSheet<void>(
       context: context,
       isDismissible: false,
@@ -283,7 +684,8 @@ class _BattleScreenState extends State<BattleScreen>
       builder: (ctx) {
         final maxDmg = summary.contributions.isEmpty
             ? 1.0
-            : summary.contributions.first.totalDamage.clamp(1.0, double.infinity);
+            : summary.contributions.first.totalDamage
+                .clamp(1.0, double.infinity);
 
         return SafeArea(
           child: Padding(
@@ -300,7 +702,7 @@ class _BattleScreenState extends State<BattleScreen>
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'BlackHanSans',
-                      fontSize: 22,
+                      fontSize: 21,
                       color: summary.victory
                           ? NightPalette.accentGold
                           : NightPalette.crimsonMoon,
@@ -321,6 +723,52 @@ class _BattleScreenState extends State<BattleScreen>
                         ),
                       ),
                     ),
+                  if (summary.victory && rescueBanner != null) ...[
+                    const SizedBox(height: 10),
+                    MurimCard(
+                      borderColor: NightPalette.jadeGreen,
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          if (rescuedHero != null)
+                            NightSpriteIcon(
+                              assetPath: NightArtRegistry.heroIdleAsset(
+                                rescuedHero,
+                              ),
+                              fallbackAssetPath: NightArtRegistry.heroFaceAsset(
+                                rescuedHero,
+                              ),
+                              fallbackIcon: Icons.person_add_alt_1_rounded,
+                              size: 52,
+                              showFrame: true,
+                              frameColor: NightPalette.jadeGreen,
+                            )
+                          else if (rescuedBeast != null)
+                            NightSpriteIcon(
+                              assetPath: NightArtRegistry.beastAsset(
+                                rescuedBeast,
+                              ),
+                              fallbackIcon: Icons.pets_rounded,
+                              size: 52,
+                              showFrame: true,
+                              frameColor: NightPalette.jadeGreen,
+                            ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              rescueBanner,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: NightPalette.jadeGreen,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   MurimCard(
                     child: Column(
@@ -351,17 +799,35 @@ class _BattleScreenState extends State<BattleScreen>
                           spacing: 12,
                           runSpacing: 6,
                           children: [
-                            Text('토벌 수: ${summary.killCount}마리',
-                                style: const TextStyle(color: NightPalette.textPrimary)),
-                            Text('절벽 뽀록: ${summary.pporokCount}회',
-                                style: const TextStyle(color: NightPalette.jadeGreen)),
-                            Text('어부지리 도탄: ${summary.bankShotCount}회',
-                                style: const TextStyle(color: NightPalette.jadeShield)),
-                            Text('연쇄 박살: ${summary.chainShatterCount}회',
-                                style: const TextStyle(color: Colors.orangeAccent)),
+                            Text(
+                              '토벌 수: ${summary.killCount}마리',
+                              style: const TextStyle(
+                                color: NightPalette.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              '절벽 뽀록: ${summary.pporokCount}회',
+                              style: const TextStyle(
+                                color: NightPalette.jadeGreen,
+                              ),
+                            ),
+                            Text(
+                              '어부지리 도탄: ${summary.bankShotCount}회',
+                              style: const TextStyle(
+                                color: NightPalette.jadeShield,
+                              ),
+                            ),
+                            Text(
+                              '연쇄 박살: ${summary.chainShatterCount}회',
+                              style: const TextStyle(color: Colors.orangeAccent),
+                            ),
                             if (summary.serendipityCount > 0)
-                              Text('설렘 기연 발동: ${summary.serendipityCount}회!',
-                                  style: const TextStyle(color: NightPalette.accentGold)),
+                              Text(
+                                '설렘 기연 발동: ${summary.serendipityCount}회!',
+                                style: const TextStyle(
+                                  color: NightPalette.accentGold,
+                                ),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -372,7 +838,8 @@ class _BattleScreenState extends State<BattleScreen>
                             _MiniVillageStatBadge(
                               assetPath: NightArtRegistry.villageGranary,
                               fallbackIcon: Icons.storefront_rounded,
-                              label: '식량 ${(summary.granaryRatio * 100).round()}%',
+                              label:
+                                  '식량 ${(summary.granaryRatio * 100).round()}%',
                             ),
                             _MiniVillageStatBadge(
                               assetPath: NightArtRegistry.villageCrops,
@@ -382,21 +849,25 @@ class _BattleScreenState extends State<BattleScreen>
                             _MiniVillageStatBadge(
                               assetPath: NightArtRegistry.villageLivestock,
                               fallbackIcon: Icons.pets_rounded,
-                              label: '가축 ${(summary.livestockRatio * 100).round()}%',
+                              label:
+                                  '가축 ${(summary.livestockRatio * 100).round()}%',
                             ),
                           ],
                         ),
                         const Divider(height: 16),
                         Text(
                           '💡 군사 조언: ${summary.coachingTip}',
-                          style: const TextStyle(fontSize: 14, color: NightPalette.textPrimary),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            color: NightPalette.textPrimary,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    '📊 자동 발사대 · 동료 처치 기여도 분석',
+                    '📊 수호 발사대 · 동료 처치 기여도 분석',
                     style: TextStyle(fontSize: 15, color: NightPalette.jadeGreen),
                   ),
                   const SizedBox(height: 6),
@@ -458,12 +929,17 @@ class _BattleScreenState extends State<BattleScreen>
                       const SizedBox(width: 10),
                       Expanded(
                         child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: NightPalette.accentGold,
+                            foregroundColor: Colors.black,
+                          ),
                           onPressed: () {
                             Navigator.of(ctx).pop();
                             if (summary.victory &&
-                                widget.stage.globalIndex < CampaignCatalog.allStages.length) {
-                              final nextStage =
-                                  CampaignCatalog.allStages[widget.stage.globalIndex];
+                                widget.stage.globalIndex <
+                                    CampaignCatalog.allStages.length) {
+                              final nextStage = CampaignCatalog
+                                  .allStages[widget.stage.globalIndex];
                               Navigator.of(context).pushReplacement(
                                 MaterialPageRoute(
                                   builder: (_) => BattleScreen(
@@ -485,7 +961,7 @@ class _BattleScreenState extends State<BattleScreen>
                             summary.victory &&
                                     widget.stage.globalIndex <
                                         CampaignCatalog.allStages.length
-                                ? '다음 밤 수호'
+                                ? '다음 수호 차례 진군'
                                 : '다시 도전하기',
                           ),
                         ),
@@ -516,18 +992,22 @@ class _BattleScreenState extends State<BattleScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // 상단 전장 상태 막대 (코덱스 전용 아이콘 적용)
+            // 상단 전장 상태 막대
             ValueListenableBuilder<int>(
               valueListenable: _frameNotifier,
               builder: (_, _, _) {
                 final shieldPct = _sim.centralSpec.shieldMaxHp > 0
-                    ? (_sim.shieldHp / _sim.centralSpec.shieldMaxHp * 100).round()
+                    ? (_sim.shieldHp / _sim.centralSpec.shieldMaxHp * 100)
+                        .round()
                     : 0;
                 final towerPct = _sim.centralSpec.coreMaxHp > 0
                     ? (_sim.towerHp / _sim.centralSpec.coreMaxHp * 100).round()
                     : 0;
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   color: NightPalette.bgPanel,
                   child: Column(
                     children: [
@@ -541,13 +1021,28 @@ class _BattleScreenState extends State<BattleScreen>
                             icon: const Icon(Icons.pause_circle_outline_rounded),
                           ),
                           Expanded(
-                            child: Text(
-                              '${widget.stage.title} · 물결 ${_sim.currentWaveIndex + 1}/${widget.stage.waves.length}',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 14.5,
-                                color: NightPalette.accentGold,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${widget.stage.title} · 물결 ${_sim.currentWaveIndex + 1}/${widget.stage.waves.length}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 13.8,
+                                    color: NightPalette.accentGold,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (widget.stage.hasRescueReward)
+                                  Text(
+                                    '🆘 구출 목표: ${widget.stage.rescueBadgeText}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11.2,
+                                      color: NightPalette.jadeGreen,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           SegmentedButton<int>(
@@ -574,6 +1069,23 @@ class _BattleScreenState extends State<BattleScreen>
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           _HudStatBadge(
+                            assetPath: NightArtRegistry.launcherAsset(
+                              LauncherType.rapid,
+                            ),
+                            fallbackIcon: Icons.add_location_alt_rounded,
+                            text:
+                                '초소 ${_sim.launchers.length}/${_sim.activeMounts.length}곳',
+                            color: _sim.launchers.isEmpty
+                                ? NightPalette.accentGold
+                                : NightPalette.jadeGreen,
+                          ),
+                          _HudStatBadge(
+                            assetPath: NightArtRegistry.nightToken,
+                            fallbackIcon: Icons.toll_rounded,
+                            text: '현장증표 ${_sim.fieldTokens}',
+                            color: Colors.amberAccent,
+                          ),
+                          _HudStatBadge(
                             assetPath: NightArtRegistry.fxBarrier,
                             fallbackIcon: Icons.shield_rounded,
                             text: '방어막 $shieldPct%',
@@ -591,23 +1103,12 @@ class _BattleScreenState extends State<BattleScreen>
                             text: '내공 ${_sim.qiBars.toStringAsFixed(1)}/3칸',
                             color: NightPalette.jadeGreen,
                           ),
-                          _HudStatBadge(
-                            assetPath: NightArtRegistry.nightToken,
-                            fallbackIcon: Icons.toll_rounded,
-                            text: '현장증표 ${_sim.fieldTokens}',
-                            color: Colors.amberAccent,
-                          ),
-                          _HudStatBadge(
-                            assetPath: NightArtRegistry.nightSupportSeal,
-                            fallbackIcon: Icons.campaign_rounded,
-                            text: '지원패 ${_sim.supportChargesLeft}',
-                            color: NightPalette.elixirPurple,
-                          ),
                           if (_sim.auroraCritTimer > 0)
                             _HudStatBadge(
                               assetPath: NightArtRegistry.fxCritical,
                               fallbackIcon: Icons.auto_awesome_rounded,
-                              text: '극광회심 ${_sim.auroraCritTimer.toStringAsFixed(1)}초',
+                              text:
+                                  '극광회심 ${_sim.auroraCritTimer.toStringAsFixed(1)}초',
                               color: Colors.orangeAccent,
                             ),
                         ],
@@ -618,7 +1119,7 @@ class _BattleScreenState extends State<BattleScreen>
               },
             ),
 
-            // 중앙 60프레임 심야 전장 화면 (배경 bg_night_ch* 전폭 파노라마 + 정비율 전술 전장 캔버스)
+            // 중앙 60프레임 심야 전장 화면
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
@@ -635,50 +1136,138 @@ class _BattleScreenState extends State<BattleScreen>
                   ),
                   DecoratedBox(
                     decoration: BoxDecoration(
-                      color: NightPalette.bgDeep.withValues(alpha: 0.42),
+                      color: NightPalette.bgDeep.withValues(alpha: 0.40),
                     ),
                   ),
                   Center(
                     child: AspectRatio(
-                      aspectRatio:
-                          CampaignCatalog.arenaWidth / CampaignCatalog.arenaHeight,
+                      aspectRatio: CampaignCatalog.arenaWidth /
+                          CampaignCatalog.arenaHeight,
                       child: LayoutBuilder(
                         builder: (ctx, arenaConstraints) {
                           return GestureDetector(
+                            key: const Key('battle_arena_gesture'),
+                            behavior: HitTestBehavior.opaque,
                             onTapUp: (details) {
                               if (arenaConstraints.maxWidth <= 0 ||
                                   arenaConstraints.maxHeight <= 0) {
                                 return;
                               }
-                              final lx = details.localPosition.dx /
-                                  arenaConstraints.maxWidth *
-                                  CampaignCatalog.arenaWidth;
-                              final ly = details.localPosition.dy /
-                                  arenaConstraints.maxHeight *
-                                  CampaignCatalog.arenaHeight;
-                              final tapPos = Vec2(lx, ly);
-                              for (int i = 0; i < _sim.launchers.length; i++) {
-                                if (_sim.launchers[i].pos.distanceTo(tapPos) < 28) {
-                                  _sim.upgradeLauncherInBattle(i);
-                                  break;
+                              final tapPos = _toArenaCoords(
+                                details.localPosition,
+                                arenaConstraints,
+                              );
+
+                              // 1) 개방된 빈 초소 또는 설치된 발사대 터치 → 직접 배치 / 승급·교체·철거 시트 오픈!
+                              final hitSlot = _hitMountSlot(tapPos);
+                              if (hitSlot != null) {
+                                _openMountBuildOrManageSheet(hitSlot);
+                                return;
+                              }
+
+                              // 2) 맨 아래 중앙 기명 수호탑 터치 → 자동 발사 ↔ 수동 탄지 즉시 전환!
+                              if (tapPos.distanceTo(
+                                    CampaignCatalog.centralTowerPos,
+                                  ) <=
+                                  34.0) {
+                                _sim.toggleCentralManualMode();
+                                NightHaptics.instance.lightTap();
+                                _frameNotifier.value++;
+                                setState(() {});
+                                return;
+                              }
+
+                              // 3) 수동 탄지 모드에서 전장 위쪽 허공 터치 → 해당 지점으로 수동 강화 탄지 발사!
+                              if (_sim.centralManualMode) {
+                                if (_sim.fireCentralManualAt(tapPos)) {
+                                  NightHaptics.instance.lightTap();
+                                  _frameNotifier.value++;
                                 }
                               }
+                            },
+                            onPanStart: (details) {
+                              if (arenaConstraints.maxWidth <= 0 ||
+                                  arenaConstraints.maxHeight <= 0) {
+                                return;
+                              }
+                              final startPos = _toArenaCoords(
+                                details.localPosition,
+                                arenaConstraints,
+                              );
+                              final nearTower = startPos.distanceTo(
+                                    CampaignCatalog.centralTowerPos,
+                                  ) <=
+                                  56.0;
+                              if (!nearTower && !_sim.centralManualMode) {
+                                return;
+                              }
+                              if (nearTower && !_sim.centralManualMode) {
+                                _sim.setCentralManualMode(true);
+                              }
+                              _draggingManualAim = true;
+                              _draggedFromTower = nearTower;
+                              _manualAimPreviewAngleRad =
+                                  _computeAimAngleFromArenaPoint(
+                                startPos,
+                                fromTower: nearTower,
+                              );
+                              _frameNotifier.value++;
+                            },
+                            onPanUpdate: (details) {
+                              if (!_draggingManualAim) return;
+                              final curPos = _toArenaCoords(
+                                details.localPosition,
+                                arenaConstraints,
+                              );
+                              _manualAimPreviewAngleRad =
+                                  _computeAimAngleFromArenaPoint(
+                                curPos,
+                                fromTower: _draggedFromTower,
+                              );
+                              _sim.centralAimAngleRad =
+                                  _manualAimPreviewAngleRad!;
+                              _frameNotifier.value++;
+                            },
+                            onPanEnd: (_) {
+                              if (!_draggingManualAim) return;
+                              final fireAngle = _manualAimPreviewAngleRad;
+                              _draggingManualAim = false;
+                              _manualAimPreviewAngleRad = null;
+                              if (fireAngle != null) {
+                                if (_sim.fireCentralManualAngle(fireAngle)) {
+                                  NightHaptics.instance.lightTap();
+                                }
+                              }
+                              _frameNotifier.value++;
+                            },
+                            onPanCancel: () {
+                              _draggingManualAim = false;
+                              _manualAimPreviewAngleRad = null;
+                              _frameNotifier.value++;
                             },
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 border: Border.symmetric(
                                   vertical: BorderSide(
-                                    color: NightPalette.borderGold.withValues(alpha: 0.35),
+                                    color: NightPalette.borderGold
+                                        .withValues(alpha: 0.35),
                                   ),
                                 ),
                               ),
                               child: ClipRect(
-                                child: CustomPaint(
-                                  size: Size.infinite,
-                                  painter: NightBattlePainter(
-                                    sim: _sim,
-                                    repaintTick: _frameNotifier,
-                                  ),
+                                child: ValueListenableBuilder<int>(
+                                  valueListenable: _frameNotifier,
+                                  builder: (_, _, _) {
+                                    return CustomPaint(
+                                      size: Size.infinite,
+                                      painter: NightBattlePainter(
+                                        sim: _sim,
+                                        repaintTick: _frameNotifier,
+                                        manualAimPreviewAngleRad:
+                                            _manualAimPreviewAngleRad,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                             ),
@@ -687,6 +1276,50 @@ class _BattleScreenState extends State<BattleScreen>
                       ),
                     ),
                   ),
+
+                  // 아직 배치한 초소가 0곳일 때 상단 친절 배치 유도 배지
+                  ValueListenableBuilder<int>(
+                    valueListenable: _frameNotifier,
+                    builder: (_, _, _) {
+                      if (_sim.launchers.isNotEmpty ||
+                          _sim.bossInvasionAlertTimer > 0) {
+                        return const SizedBox.shrink();
+                      }
+                      return Positioned(
+                        top: 8,
+                        left: 12,
+                        right: 12,
+                        child: IgnorePointer(
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xE00C1526),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: NightPalette.accentGold,
+                                  width: 1.3,
+                                ),
+                              ),
+                              child: Text(
+                                '👆 빛나는 길목 빈 초소(${_sim.activeMounts.length}곳)를 눌러 발사대를 직접 배치하세요!',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: NightPalette.accentGold,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
                   // 중간보스·우두머리 동반 침략 긴급 경보 배너
                   ValueListenableBuilder<int>(
                     valueListenable: _frameNotifier,
@@ -706,7 +1339,8 @@ class _BattleScreenState extends State<BattleScreen>
                             opacity: opacity,
                             child: Center(
                               child: Container(
-                                constraints: const BoxConstraints(maxWidth: 460),
+                                constraints:
+                                    const BoxConstraints(maxWidth: 460),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 14,
                                   vertical: 7,
@@ -767,59 +1401,106 @@ class _BattleScreenState extends State<BattleScreen>
               ),
             ),
 
-            // 하단 전술 비약 3종(potion_*.webp) & 자동 승급 & 무림수호단 출두(fx_chuldu.webp) 바
+            // 하단 전술 비약 3종 · 중앙탑 자동/수동 전환 · 자동 승급 · 무림수호단 출두 바
             ValueListenableBuilder<int>(
               valueListenable: _frameNotifier,
               builder: (_, _, _) {
                 final p = widget.controller.progress;
                 return Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   color: NightPalette.bgPanel,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Wrap(
                         spacing: 6,
-                        runSpacing: 6,
+                        runSpacing: 5,
                         alignment: WrapAlignment.center,
-                        children: TacticalConsumable.values.map((item) {
-                          final cnt = p.consumables[item] ?? 0;
-                          final shortLabel = switch (item) {
-                            TacticalConsumable.qiSurgePill => '기공단',
-                            TacticalConsumable.guardianRepairSeal => '수리패',
-                            TacticalConsumable.auroraCritCharm => '극광부',
-                          };
-                          return ActionChip(
-                            key: Key('use_consumable_${item.name}'),
+                        children: [
+                          ActionChip(
+                            key: const Key('battle_toggle_central_mode_btn'),
                             visualDensity: VisualDensity.compact,
-                            avatar: NightSpriteIcon(
-                              assetPath: NightArtRegistry.consumableAsset(item),
-                              fallbackIcon: Icons.local_pharmacy_rounded,
-                              size: 18,
-                              color: cnt > 0 ? Color(item.colorHex) : Colors.grey.shade600,
-                              dimmed: cnt <= 0,
-                              borderRadius: 4,
+                            backgroundColor: _sim.centralManualMode
+                                ? NightPalette.accentGold.withValues(alpha: 0.24)
+                                : NightPalette.bgDeep,
+                            side: BorderSide(
+                              color: _sim.centralManualMode
+                                  ? NightPalette.accentGold
+                                  : NightPalette.jadeGreen,
+                            ),
+                            avatar: Icon(
+                              _sim.centralManualMode
+                                  ? Icons.gps_fixed_rounded
+                                  : Icons.autorenew_rounded,
+                              size: 16,
+                              color: _sim.centralManualMode
+                                  ? NightPalette.accentGold
+                                  : NightPalette.jadeGreen,
                             ),
                             label: Text(
-                              '$shortLabel($cnt)',
+                              _sim.centralManualMode
+                                  ? '중앙탑: 수동탄지'
+                                  : '중앙탑: 자동발사',
                               style: TextStyle(
                                 fontSize: 11.5,
-                                color: cnt > 0
-                                    ? NightPalette.textPrimary
-                                    : NightPalette.textMuted,
+                                fontWeight: FontWeight.bold,
+                                color: _sim.centralManualMode
+                                    ? NightPalette.accentGold
+                                    : NightPalette.jadeGreen,
                               ),
                             ),
-                            onPressed: cnt > 0
-                                ? () {
-                                    if (_sim.activateConsumable(item)) {
-                                      widget.controller.notifyConsumableUsedInBattle();
-                                      setState(() {});
+                            onPressed: () {
+                              _sim.toggleCentralManualMode();
+                              NightHaptics.instance.lightTap();
+                              setState(() {});
+                            },
+                          ),
+                          ...TacticalConsumable.values.map((item) {
+                            final cnt = p.consumables[item] ?? 0;
+                            final shortLabel = switch (item) {
+                              TacticalConsumable.qiSurgePill => '기공단',
+                              TacticalConsumable.guardianRepairSeal => '수리패',
+                              TacticalConsumable.auroraCritCharm => '극광부',
+                            };
+                            return ActionChip(
+                              key: Key('use_consumable_${item.name}'),
+                              visualDensity: VisualDensity.compact,
+                              avatar: NightSpriteIcon(
+                                assetPath:
+                                    NightArtRegistry.consumableAsset(item),
+                                fallbackIcon: Icons.local_pharmacy_rounded,
+                                size: 17,
+                                color: cnt > 0
+                                    ? Color(item.colorHex)
+                                    : Colors.grey.shade600,
+                                dimmed: cnt <= 0,
+                                borderRadius: 4,
+                              ),
+                              label: Text(
+                                '$shortLabel($cnt)',
+                                style: TextStyle(
+                                  fontSize: 11.2,
+                                  color: cnt > 0
+                                      ? NightPalette.textPrimary
+                                      : NightPalette.textMuted,
+                                ),
+                              ),
+                              onPressed: cnt > 0
+                                  ? () {
+                                      if (_sim.activateConsumable(item)) {
+                                        widget.controller
+                                            .notifyConsumableUsedInBattle();
+                                        setState(() {});
+                                      }
                                     }
-                                  }
-                                : null,
-                          );
-                        }).toList(),
+                                  : null,
+                            );
+                          }),
+                        ],
                       ),
                       const SizedBox(height: 5),
                       Wrap(
@@ -832,8 +1513,8 @@ class _BattleScreenState extends State<BattleScreen>
                             visualDensity: VisualDensity.compact,
                             selected: _sim.preset.autoUpgradeInBattle,
                             label: const Text(
-                              '자동 승급(1→4형)',
-                              style: TextStyle(fontSize: 12),
+                              '배치초소 자동승급(1→4형)',
+                              style: TextStyle(fontSize: 11.5),
                             ),
                             onSelected: (v) {
                               widget.controller.updatePreset(
@@ -863,7 +1544,8 @@ class _BattleScreenState extends State<BattleScreen>
                                 : null,
                             icon: NightSpriteIcon(
                               assetPath: NightArtRegistry.fxChuldu,
-                              fallbackAssetPath: NightArtRegistry.nightSupportSeal,
+                              fallbackAssetPath:
+                                  NightArtRegistry.nightSupportSeal,
                               fallbackIcon: Icons.campaign_rounded,
                               size: 20,
                               color: _sim.supportChargesLeft > 0
@@ -874,7 +1556,7 @@ class _BattleScreenState extends State<BattleScreen>
                             ),
                             label: Text(
                               '무림수호단 출두! (${_sim.supportChargesLeft})',
-                              style: const TextStyle(fontSize: 12.5),
+                              style: const TextStyle(fontSize: 12.2),
                             ),
                           ),
                         ],
@@ -919,7 +1601,7 @@ class _HudStatBadge extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           text,
-          style: TextStyle(fontSize: 12, color: color),
+          style: TextStyle(fontSize: 11.8, color: color),
         ),
       ],
     );
@@ -958,7 +1640,10 @@ class _MiniVillageStatBadge extends StatelessWidget {
           const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: NightPalette.textPrimary),
+            style: const TextStyle(
+              fontSize: 12,
+              color: NightPalette.textPrimary,
+            ),
           ),
         ],
       ),

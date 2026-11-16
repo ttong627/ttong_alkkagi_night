@@ -24,10 +24,10 @@ class _SplashScreenState extends State<SplashScreen>
   bool _navigated = false;
 
   static const List<String> _tips = [
-    '중앙 기명 수호탑과 길목 발사대 5곳은 손대지 않아도 100% 자동으로 알을 쏩니다.',
-    '돌연변이가 떨어뜨리는 「증표」는 발사대 강화에, 「영약」은 영수·동료·내공 승급에 쓰입니다.',
-    '기명 심법 수련은 알까기 없이 단전 호흡과 혈자리 점등만으로 100% 성공합니다.',
-    '위기 순간 「무림수호단 출두야~~!!」 지원패를 누르면 화면 전체 변이체를 일소합니다!',
+    '전투 시작 시 길목은 비어 있으며, 빛나는 빈 초소(2→10곳)를 눌러 발사대를 직접 배치합니다!',
+    '맨 아래 중앙 기명 수호탑은 자동 발사와 수동 조준 탄지(화력 ×1.38·도탄 예측선)를 자유롭게 전환합니다.',
+    '관문을 순서대로 돌파할수록 동료 14인과 영수 5종이 차례로 구출되어 수호 본영에 합류합니다.',
+    '위기 순간 「무림수호단 출두야~~!!」 지원패를 누르면 화면 전체 변이 무리를 단숨에 일소합니다!',
   ];
 
   @override
@@ -49,6 +49,14 @@ class _SplashScreenState extends State<SplashScreen>
     const assets = [
       NightArtRegistry.bgNightSplash,
       NightArtRegistry.bgNightLobby,
+      NightArtRegistry.lobbyStageFortress,
+      NightArtRegistry.cardGateBattle,
+      NightArtRegistry.cardTrainingHall,
+      NightArtRegistry.cardAllyPavilion,
+      NightArtRegistry.cardForgeSanctum,
+      NightArtRegistry.cardSupplyConvoy,
+      NightArtRegistry.cardRescueBeacon,
+      NightArtRegistry.cardEndlessAbyss,
       NightArtRegistry.appLogo,
       'assets/images/chars/sabu_idle.webp',
       'assets/images/chars/banDal_idle.webp',
@@ -281,37 +289,33 @@ Future<void> showTutorialGuideDialog(
       speaker: '사부 현암',
       portrait: 'sabu',
       emblemAsset: NightArtRegistry.towerGuardian,
-      title: '1/4 · 손 피로도 0% 완전 자동 발사 진법',
-      body: '이곳에서는 손가락 아프게 직접 알을 튕기지 않아도 됩니다!\n'
-          '마을 한가운데 「중앙 기명 수호탑」과 길목 5곳의 「자동 알 발사대」, '
-          '그리고 「영수·동료」가 정해둔 조건에 맞춰 스스로 알을 쏘아 변이체를 물리칩니다.',
+      title: '1/4 · 빈 초소 직접 배치 & 초소 점진 확장(2→10곳)',
+      body: '전투가 시작되면 산길 길목은 비어 있고, 맨 아래 마을 어귀의 「중앙 기명 수호탑」만 가동됩니다.\n'
+          '구불구불한 북쪽 산길 옆 빛나는 「빈 초소」를 터치해 직접 발사대를 설치하세요! 관문이 나아갈수록 초소가 2곳에서 최대 10곳까지 늘어납니다.',
     ),
     (
       speaker: '의용대장 석두',
       portrait: 'seokdu',
       emblemAsset: NightArtRegistry.villageGranary,
-      title: '2/4 · 식량 창고 · 논밭 · 가축을 지켜라',
-      body: '심야 돌연변이들에게 외곽 기공 방어막과 중앙 수호탑이 모두 파괴되면 '
-          '식량이 바닥나고 농작물과 가축이 병들어 마을을 떠나야 합니다.\n'
-          '중갑 멧돼지엔 「중포 탄지기」, 뼈방패 야차엔 「곡사 회전기」로 상성을 맞춰보세요!',
+      title: '2/4 · 남단 마을 수호 & 중앙 수호탑 자동·수동 전환',
+      body: '식량 창고·논밭·외양간은 전장 맨 아래에 위치하며, 변이 무리가 위쪽 균열문에서 굽이쳐 쳐들어옵니다.\n'
+          '중앙 수호탑은 평소엔 자동으로 쏘지만, 「수동 탄지」로 전환하거나 드래그하면 도탄 예측선과 함께 강화 탄알(화력 ×1.38·관통 +2)을 직접 튕길 수 있습니다!',
     ),
     (
       speaker: '명궁 연비',
       portrait: 'yeonbi',
       emblemAsset: NightArtRegistry.nightToken,
-      title: '3/4 · 증표와 영약의 깔끔한 역할 분담',
-      body: '• 변이 처치 「증표」 → 중앙 수호탑 & 길목 발사대 강화 및 수호석 해금 전용!\n'
-          '• 「영약」 → 영수·동료 강화 및 내공 8경지 돌파 전용!\n'
-          '• 「기명 심법 수련」 → 알까기 없이 단전 호흡과 혈자리 터치만으로 실패 없이 100% 강해집니다.',
+      title: '3/4 · 순서대로 정화하며 동료 14인 · 영수 5종 구출',
+      body: '• 본영의 「이번 수호 차례」 황금 성문을 따라 순서대로 관문을 돌파하면 1~9장에 걸쳐 갇혀 있던 동료와 영수를 지속적으로 구출합니다!\n'
+          '• 소형 독쥐 떼엔 「속사 연발기」, 거대 중갑 멧돼지엔 「중포 탄지기」, 뼈방패 야차엔 「곡사 회전기」를 배치해 상성을 제압하세요.',
     ),
     (
       speaker: '기관장 정각',
       portrait: 'jeonggak',
       emblemAsset: NightArtRegistry.nightSupportSeal,
-      title: '4/4 · 무림수호단 출두 & 전술 비약',
-      body: '물자 호송·심야 탐색·보름달 기연으로 모은 「지원패」를 전장에서 누르면 '
-          '「무림수호단 출두야~~!!」 풍악과 함께 화면의 변이체를 싹 쓸어버립니다!\n'
-          '출석과 수호 임무 재료로 빚는 「전술 비약 3종」도 위기 탈출의 일등공신입니다.',
+      title: '4/4 · 증표 · 영약 분업 & 무림수호단 출두!',
+      body: '• 변이 처치 「증표」는 발사대 건설·승급·영구 강화에, 「영약」은 구출한 동료·영수·내공 경지 돌파에 쓰입니다.\n'
+          '• 위기 순간 「무림수호단 출두야~~!!」 지원패를 누르면 전군의 황금 수호알이 온 길목의 변이 무리를 쓸어버립니다!',
     ),
   ];
 

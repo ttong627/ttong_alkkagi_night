@@ -10,10 +10,18 @@ import '../theme/night_theme.dart';
 class NightArtRegistry {
   NightArtRegistry._();
 
-  // 1. 심야 배경 및 바닥 (assets/images/scenes/)
+  // 1. 심야 배경 및 바닥 · 게임 로비 원화 (assets/images/scenes/)
   static const String bgNightSplash = 'assets/images/scenes/bg_night_splash.webp';
   static const String bgNightLobby = 'assets/images/scenes/bg_night_lobby.webp';
   static const String bgLobbyFallback = 'assets/images/scenes/bg_lobby.webp';
+  static const String lobbyStageFortress = 'assets/images/scenes/lobby_stage_fortress.webp';
+  static const String cardGateBattle = 'assets/images/scenes/card_gate_battle.webp';
+  static const String cardTrainingHall = 'assets/images/scenes/card_training_hall.webp';
+  static const String cardForgeSanctum = 'assets/images/scenes/card_forge_sanctum.webp';
+  static const String cardAllyPavilion = 'assets/images/scenes/card_ally_pavilion.webp';
+  static const String cardRescueBeacon = 'assets/images/scenes/card_rescue_beacon.webp';
+  static const String cardSupplyConvoy = 'assets/images/scenes/card_supply_convoy.webp';
+  static const String cardEndlessAbyss = 'assets/images/scenes/card_endless_abyss.webp';
 
   // 2. 중앙 수호탑 · 마을 생태 3종 (assets/images/launchers/)
   static const String towerGuardian = 'assets/images/launchers/tower_guardian.webp';

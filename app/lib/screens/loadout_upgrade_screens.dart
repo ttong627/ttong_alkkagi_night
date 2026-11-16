@@ -189,84 +189,112 @@ class LoadoutScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // 3) 산·들 길목 거점 1~5번 자동 발사대 배치 (launcher_*.webp)
+                // 3) 전장 빈 초소(2→10곳) 직접 배치용 수호 발사대 도감 & 배치 비용 안내
                 MurimCard(
+                  borderColor: NightPalette.jadeShield,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '길목 거점별 자동 알 발사대 편성 (전투 중 1형→4형 승급)',
+                        '길목 초소(2→10곳) 직접 배치 발사대 5종 (전투 중 터치 건설)',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15.5,
                           color: NightPalette.accentGold,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '• 전투 시작 시 길목은 비어 있으며, 맨 아래 「중앙 기명 수호탑(자동·수동 전환)」만 가동됩니다.\n'
+                        '• 관문이 진행될수록 배치 가능한 빈 초소가 2곳에서 최대 10곳까지 늘어납니다!',
+                        style: TextStyle(
+                          fontSize: 12.2,
+                          color: NightPalette.textMuted,
+                          height: 1.38,
                         ),
                       ),
                       const SizedBox(height: 10),
-                      for (int idx = 0; idx < 5; idx++)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
+                      ...LauncherType.values.map((lt) {
+                        final unlocked =
+                            lt.unlockChapter <= p.highestUnlockedChapter + 1;
+                        final permLv = p.launcherPermanentLevels[lt] ?? 1;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
                             children: [
                               NightSpriteIcon(
-                                assetPath: NightArtRegistry.launcherAsset(
-                                  preset.mountTypes[idx],
-                                ),
+                                assetPath: NightArtRegistry.launcherAsset(lt),
                                 fallbackIcon: Icons.gps_fixed_rounded,
-                                size: 42,
-                                color: Color(preset.mountTypes[idx].colorHex),
+                                size: 40,
+                                color: Color(lt.colorHex),
+                                dimmed: !unlocked,
                                 showFrame: true,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
-                                child: DropdownButtonFormField<LauncherType>(
-                                  isExpanded: true,
-                                  initialValue: preset.mountTypes[idx],
-                                  decoration: InputDecoration(
-                                    labelText: '${idx + 1}번 길목 거점 발사대',
-                                  ),
-                                  items: LauncherType.values
-                                      .map(
-                                        (lt) => DropdownMenuItem(
-                                          value: lt,
-                                          child: Row(
-                                            children: [
-                                              NightSpriteIcon(
-                                                assetPath: NightArtRegistry
-                                                    .launcherAsset(lt),
-                                                fallbackIcon:
-                                                    Icons.gps_fixed_rounded,
-                                                size: 22,
-                                                color: Color(lt.colorHex),
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Expanded(
-                                                child: Text(
-                                                  '${lt.name} (강화 ${p.launcherPermanentLevels[lt] ?? 1}단) — ${lt.roleSummary}',
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (v) {
-                                    if (v != null) {
-                                      controller.updatePreset(
-                                        (pr) => pr.mountTypes[idx] = v,
-                                      );
-                                    }
-                                  },
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${lt.name} (영구 $permLv단 · 배치 증표 ${lt.buildCostTokens})',
+                                      style: TextStyle(
+                                        fontSize: 13.8,
+                                        fontWeight: FontWeight.bold,
+                                        color: unlocked
+                                            ? Color(lt.colorHex)
+                                            : NightPalette.textMuted,
+                                      ),
+                                    ),
+                                    Text(
+                                      unlocked
+                                          ? lt.roleSummary
+                                          : '제${lt.unlockChapter}장 진군 시 개방',
+                                      style: const TextStyle(
+                                        fontSize: 11.8,
+                                        color: NightPalette.textMuted,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                        ),
+                        );
+                      }),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
+
+                // 구출 현황 및 다음 동료·영수 구출 목표 안내 배너
+                if (p.nextRescueStage != null) ...[
+                  MurimCard(
+                    borderColor: NightPalette.jadeGreen,
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.volunteer_activism_rounded,
+                          color: NightPalette.jadeGreen,
+                          size: 26,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '🆘 지속 구출 현황: 동료 ${p.unlockedCompanionCount}/14인 · 영수 ${p.unlockedBeastCount}/5종\n'
+                            '다음 구출 관문: [${p.nextRescueStage!.code}] ${p.nextRescueStage!.rescueBadgeText}',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: NightPalette.jadeGreen,
+                              height: 1.38,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // 4) 영수 동행 및 자동 발동 조건 (pet_*.webp)
                 MurimCard(
@@ -381,9 +409,7 @@ class LoadoutScreen extends StatelessWidget {
                         runSpacing: 6,
                         children: CompanionHero.values
                             .where(
-                              (h) =>
-                                  h != CompanionHero.mukhyeon &&
-                                  (p.companionLevels[h] ?? 0) > 0,
+                              (h) => (p.companionLevels[h] ?? 0) > 0,
                             )
                             .map((hero) {
                           final selected = preset.companions.contains(hero);

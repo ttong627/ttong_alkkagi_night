@@ -49,6 +49,9 @@ except Exception:
 SIZE_MAP = {
     "bg": (1080, 1920),
     "floor": (1024, 1024),
+    "scene_wide": (1280, 720),
+    "card_wide": (640, 360),
+    "card_sq": (512, 512),
     "mutant": (384, 384),
     "launcher": (384, 384),
     "stone": (280, 280),
@@ -60,6 +63,9 @@ SIZE_MAP = {
 DEST_FOLDER = {
     "bg": "scenes",
     "floor": "scenes",
+    "scene_wide": "scenes",
+    "card_wide": "scenes",
+    "card_sq": "scenes",
     "mutant": "mutants",
     "launcher": "launchers",
     "stone": "stones",
@@ -239,6 +245,8 @@ def apply_one(item: dict) -> Path | None:
     target_sz = SIZE_MAP[base_kind]
     if base_kind in ("bg", "floor"):
         cover_crop(im.convert("RGB"), target_sz).save(dest, "WEBP", quality=84, method=6)
+    elif base_kind in ("scene_wide", "card_wide", "card_sq"):
+        cover_crop(im.convert("RGB"), target_sz).save(dest, "WEBP", quality=90, method=6)
     else:
         cutout_square(im, target_sz, chroma).save(dest, "WEBP", quality=90, method=6)
     return dest
@@ -327,13 +335,26 @@ def cmd_apply(args) -> int:
 def cmd_sheet(args) -> int:
     spec = load_spec()
     SHEET_OUT.mkdir(parents=True, exist_ok=True)
+    groups = {x.strip() for x in args.group.split(",") if x.strip()}
     by_group: dict[str, list[dict]] = {}
     for it in spec["items"]:
+        if groups and it["group"] not in groups:
+            continue
         by_group.setdefault(it["group"], []).append(it)
 
     for grp, items in by_group.items():
-        cell = (216, 384) if grp == "bg" else ((220, 220) if grp == "floor" else (180, 180))
-        cols = 6 if grp in ("bg", "floor") else 5
+        if grp == "lobby_game_ui_8":
+            cell = (420, 320)
+            cols = 4
+        elif grp == "bg":
+            cell = (216, 384)
+            cols = 6
+        elif grp == "floor":
+            cell = (220, 220)
+            cols = 6
+        else:
+            cell = (180, 180)
+            cols = 5
         rows = (len(items) + cols - 1) // cols
         canvas = Image.new("RGB", (cols * cell[0], rows * cell[1]), (22, 26, 40))
         for idx, it in enumerate(items):

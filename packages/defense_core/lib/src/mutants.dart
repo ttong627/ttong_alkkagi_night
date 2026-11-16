@@ -1,17 +1,21 @@
-/// 심야 돌연변이·중간보스·대수괴 12종 분류 및 전투력 3대 분화(스피드·맷집·공격력) 정의.
+/// 심야 돌연변이·중간보스·대수괴 12종 분류 및 전투력 3대 분화(스피드·맷집·공격력) + 6단계 체급(초소형~초거대) 정의.
 enum MutantKind {
   swarmRat(
     id: 'swarmRat',
     name: '심야 독쥐',
     roleTag: '속공 군집형',
+    sizeClassLabel: '초소형 군집',
     speedRating: 4,
     toughnessRating: 1,
     attackRating: 1,
     baseHp: 34.0,
+    swarmHpFactor: 0.56,
     speed: 64.0,
     mass: 0.75,
-    radius: 11.0,
-    dropTokens: 3,
+    radius: 8.2,
+    visualDiameter: 19.0,
+    bodyWidthRatio: 0.96,
+    dropTokens: 2,
     attackPower: 10.0,
     armorReduction: 0.0,
     frontShieldReduction: 0.0,
@@ -27,14 +31,18 @@ enum MutantKind {
     id: 'sickHound',
     name: '역병 들개',
     roleTag: '초고속 추격형',
+    sizeClassLabel: '소형 추격',
     speedRating: 5,
     toughnessRating: 2,
     attackRating: 2,
     baseHp: 52.0,
+    swarmHpFactor: 0.64,
     speed: 76.0,
     mass: 0.95,
-    radius: 12.5,
-    dropTokens: 4,
+    radius: 10.5,
+    visualDiameter: 27.0,
+    bodyWidthRatio: 1.15,
+    dropTokens: 2,
     attackPower: 15.0,
     armorReduction: 0.0,
     frontShieldReduction: 0.0,
@@ -50,14 +58,18 @@ enum MutantKind {
     id: 'ironBoar',
     name: '철피 멧돼지',
     roleTag: '중장갑 돌파형',
+    sizeClassLabel: '대형 중갑',
     speedRating: 2,
     toughnessRating: 4,
     attackRating: 3,
     baseHp: 138.0,
+    swarmHpFactor: 0.80,
     speed: 41.0,
     mass: 2.35,
-    radius: 16.5,
-    dropTokens: 8,
+    radius: 19.5,
+    visualDiameter: 58.0,
+    bodyWidthRatio: 1.18,
+    dropTokens: 6,
     attackPower: 28.0,
     armorReduction: 0.14,
     frontShieldReduction: 0.25,
@@ -73,14 +85,18 @@ enum MutantKind {
     id: 'shieldYacha',
     name: '뼈방패 야차',
     roleTag: '전면 방패형',
+    sizeClassLabel: '중형 방패병',
     speedRating: 2,
     toughnessRating: 4,
     attackRating: 3,
     baseHp: 115.0,
+    swarmHpFactor: 0.76,
     speed: 45.0,
     mass: 1.75,
-    radius: 15.0,
-    dropTokens: 8,
+    radius: 15.2,
+    visualDiameter: 43.0,
+    bodyWidthRatio: 1.06,
+    dropTokens: 5,
     attackPower: 24.0,
     armorReduction: 0.08,
     frontShieldReduction: 0.58,
@@ -96,14 +112,18 @@ enum MutantKind {
     id: 'plagueToad',
     name: '독안개 두꺼비',
     roleTag: '맹독 침식형',
+    sizeClassLabel: '대형 맹독수',
     speedRating: 1,
     toughnessRating: 3,
     attackRating: 3,
     baseHp: 96.0,
+    swarmHpFactor: 0.78,
     speed: 37.0,
     mass: 1.45,
-    radius: 15.5,
-    dropTokens: 9,
+    radius: 17.5,
+    visualDiameter: 51.0,
+    bodyWidthRatio: 1.20,
+    dropTokens: 6,
     attackPower: 23.0,
     armorReduction: 0.05,
     frontShieldReduction: 0.0,
@@ -119,14 +139,18 @@ enum MutantKind {
     id: 'bloodCocoon',
     name: '혈독 분열충',
     roleTag: '자폭 분열형',
+    sizeClassLabel: '중소형 분열충',
     speedRating: 3,
     toughnessRating: 3,
     attackRating: 2,
     baseHp: 88.0,
+    swarmHpFactor: 0.72,
     speed: 49.0,
     mass: 1.25,
-    radius: 14.5,
-    dropTokens: 7,
+    radius: 13.0,
+    visualDiameter: 35.0,
+    bodyWidthRatio: 1.04,
+    dropTokens: 5,
     attackPower: 20.0,
     armorReduction: 0.0,
     frontShieldReduction: 0.0,
@@ -142,14 +166,18 @@ enum MutantKind {
     id: 'swiftShadowBoss',
     name: '혈영 질풍귀',
     roleTag: '초고속 기습 중간보스',
+    sizeClassLabel: '특대형 기습보스',
     speedRating: 5,
     toughnessRating: 2,
     attackRating: 3,
     baseHp: 210.0,
+    swarmHpFactor: 1.0,
     speed: 78.0,
     mass: 1.85,
-    radius: 18.5,
-    dropTokens: 18,
+    radius: 22.0,
+    visualDiameter: 74.0,
+    bodyWidthRatio: 1.04,
+    dropTokens: 20,
     attackPower: 34.0,
     armorReduction: 0.05,
     frontShieldReduction: 0.0,
@@ -165,14 +193,18 @@ enum MutantKind {
     id: 'ironColossusBoss',
     name: '현철 중갑거수',
     roleTag: '난공불락 맷집 중간보스',
+    sizeClassLabel: '거신형 철갑보스',
     speedRating: 1,
     toughnessRating: 5,
     attackRating: 3,
     baseHp: 350.0,
+    swarmHpFactor: 1.0,
     speed: 29.0,
     mass: 3.35,
-    radius: 21.0,
-    dropTokens: 24,
+    radius: 26.5,
+    visualDiameter: 92.0,
+    bodyWidthRatio: 1.18,
+    dropTokens: 26,
     attackPower: 36.0,
     armorReduction: 0.22,
     frontShieldReduction: 0.30,
@@ -188,14 +220,18 @@ enum MutantKind {
     id: 'crimsonBreakerBoss',
     name: '적염 파성귀',
     roleTag: '파성 강타 중간보스',
+    sizeClassLabel: '특대형 파성보스',
     speedRating: 3,
     toughnessRating: 3,
     attackRating: 5,
     baseHp: 255.0,
+    swarmHpFactor: 1.0,
     speed: 45.0,
     mass: 2.45,
-    radius: 19.5,
-    dropTokens: 22,
+    radius: 23.5,
+    visualDiameter: 82.0,
+    bodyWidthRatio: 1.10,
+    dropTokens: 24,
     attackPower: 64.0,
     armorReduction: 0.08,
     frontShieldReduction: 0.10,
@@ -211,14 +247,18 @@ enum MutantKind {
     id: 'heukpung',
     name: '약탈 선봉 흑풍',
     roleTag: '약탈 돌격 우두머리',
+    sizeClassLabel: '특대형 돌격장',
     speedRating: 3,
     toughnessRating: 4,
     attackRating: 4,
     baseHp: 390.0,
+    swarmHpFactor: 1.0,
     speed: 40.0,
     mass: 2.90,
-    radius: 20.0,
-    dropTokens: 28,
+    radius: 23.5,
+    visualDiameter: 80.0,
+    bodyWidthRatio: 1.08,
+    dropTokens: 30,
     attackPower: 52.0,
     armorReduction: 0.14,
     frontShieldReduction: 0.20,
@@ -235,14 +275,18 @@ enum MutantKind {
     id: 'mukhyeonBoss',
     name: '독기에 물든 묵현',
     roleTag: '흑화 검기 우두머리',
+    sizeClassLabel: '특대형 흑화검귀',
     speedRating: 4,
     toughnessRating: 4,
     attackRating: 5,
     baseHp: 460.0,
+    swarmHpFactor: 1.0,
     speed: 46.0,
     mass: 2.75,
-    radius: 20.0,
-    dropTokens: 34,
+    radius: 23.0,
+    visualDiameter: 78.0,
+    bodyWidthRatio: 1.02,
+    dropTokens: 36,
     attackPower: 58.0,
     armorReduction: 0.16,
     frontShieldReduction: 0.25,
@@ -259,14 +303,18 @@ enum MutantKind {
     id: 'chapterBoss',
     name: '심야 대요마',
     roleTag: '천상 대수괴',
+    sizeClassLabel: '초거대 대수괴',
     speedRating: 2,
     toughnessRating: 5,
     attackRating: 5,
     baseHp: 560.0,
+    swarmHpFactor: 1.0,
     speed: 36.0,
     mass: 3.40,
-    radius: 23.0,
-    dropTokens: 45,
+    radius: 30.0,
+    visualDiameter: 108.0,
+    bodyWidthRatio: 1.12,
+    dropTokens: 50,
     attackPower: 75.0,
     armorReduction: 0.20,
     frontShieldReduction: 0.22,
@@ -284,13 +332,17 @@ enum MutantKind {
     required this.id,
     required this.name,
     required this.roleTag,
+    required this.sizeClassLabel,
     required this.speedRating,
     required this.toughnessRating,
     required this.attackRating,
     required this.baseHp,
+    required this.swarmHpFactor,
     required this.speed,
     required this.mass,
     required this.radius,
+    required this.visualDiameter,
+    required this.bodyWidthRatio,
     required this.dropTokens,
     required this.attackPower,
     required this.armorReduction,
@@ -308,13 +360,17 @@ enum MutantKind {
   final String id;
   final String name;
   final String roleTag;
+  final String sizeClassLabel;
   final int speedRating;
   final int toughnessRating;
   final int attackRating;
   final double baseHp;
+  final double swarmHpFactor;
   final double speed;
   final double mass;
   final double radius;
+  final double visualDiameter;
+  final double bodyWidthRatio;
   final int dropTokens;
   final double attackPower;
   final double armorReduction;
@@ -349,33 +405,33 @@ enum MutantKind {
     return (raw * bossScale).round();
   }
 
-  /// 스피드·맷집·공격력 특징 및 상성 공략법 설명.
+  /// 스피드·맷집·공격력·체급 특징 및 상성 공략법 설명.
   String get traitDesc {
     switch (this) {
       case MutantKind.swarmRat:
-        return '빠른 발로 떼 지어 길목을 파고들지만 맷집과 공격력은 약합니다. 속사 탄지기와 가벼운 만년기주로 손쉽게 일소하세요.';
+        return '[초소형 군집] 작은 몸집으로 수십 마리씩 바글바글 떼 지어 길목을 파고듭니다. 속사 탄지기의 연속 관통탄으로 한꺼번에 쓸어버리세요.';
       case MutantKind.sickHound:
-        return '매우 빠른 질주와 주기적 도약 가속으로 방어막에 순식간에 달라붙습니다. 한빙 역장기의 냉기 감속으로 발을 묶으세요.';
+        return '[소형 추격] 날렵한 체형으로 무리 지어 질주하며 도약 가속으로 방어막을 덮칩니다. 한빙 역장기의 냉기 감속으로 발을 묶으세요.';
       case MutantKind.ironBoar:
-        return '두꺼운 철갑 외피와 무거운 체중으로 밀침을 버티며 돌진합니다. 현철·운철 등 고밀도 수호석과 중포 탄지기로 장갑을 관통하세요.';
+        return '[대형 중갑] 독쥐의 3배에 달하는 육중한 강철 덩치로 밀침을 버티며 돌진합니다. 현철·운철 수호석과 중포 탄지기로 장갑을 부수세요.';
       case MutantKind.shieldYacha:
-        return '정면의 거대한 뼈방패로 직선 수호 알 피해를 대폭 흘려냅니다. 곡사 회전기나 담장·회전 기둥 도탄으로 측면을 노리세요.';
+        return '[중형 방패병] 정면의 두꺼운 뼈방패로 직선 수호 알 피해를 흘려냅니다. 곡사 회전기나 담장·회전 기둥 도탄으로 옆구리를 노리세요.';
       case MutantKind.plagueToad:
-        return '폴짝이며 도약 전진하고 마을 근처에서 독안개를 뿜어 논밭을 시들게 합니다. 사거리 밖에서 회심 타격으로 조기 정화하세요.';
+        return '[대형 맹독수] 묵직하게 도약 전진하며 마을 근처에서 독안개를 뿜어 논밭을 시들게 합니다. 사거리 밖에서 회심 타격으로 조기 정화하세요.';
       case MutantKind.bloodCocoon:
-        return '일반 타격으로 쓰러지면 독쥐 두 마리로 분열합니다. 회심 박살을 일으키면 분열을 원천 봉쇄하고 연쇄 폭발을 터뜨립니다.';
+        return '[중소형 분열충] 등 위의 붉은 독주머니가 터지면 독쥐 무리로 분열합니다. 회심 박살을 일으키면 분열을 봉쇄하고 연쇄 폭발을 터뜨립니다.';
       case MutantKind.swiftShadowBoss:
-        return '중간보스 · 주기적으로 질풍보를 발동해 1.55배 초고속으로 기습합니다! 한빙 역장기와 예측 조준 수련으로 기동력을 꺾으세요.';
+        return '[특대형 기습보스] 질풍보를 발동해 1.55배 초고속으로 기습하는 중간보스입니다! 한빙 역장기와 수동 탄지 조준으로 기동력을 꺾으세요.';
       case MutantKind.ironColossusBoss:
-        return '중간보스 · 걸음은 느리지만 삼중 현철갑과 거대한 질량을 지닌 난공불락 거수입니다! 중포 탄지기와 무거운 수호석으로 장갑을 반관통하세요.';
+        return '[거신형 철갑보스] 길을 가득 메우는 거대한 삼중 현철갑 골렘입니다! 중포 탄지기와 고밀도 수호석으로 두꺼운 장갑을 반관통하세요.';
       case MutantKind.crimsonBreakerBoss:
-        return '중간보스 · 방어막과 수호탑에 치명적인 파성 철퇴 강타와 진동 충격파를 퍼붓습니다! 방어막 접근 전 내공탄과 어기어석으로 집중 제압하세요.';
+        return '[특대형 파성보스] 방어막과 수호탑에 치명적인 파성 철퇴 강타를 퍼붓습니다! 마을 접근 전 내공탄과 수동 탄지로 집중 제압하세요.';
       case MutantKind.raiderHeukpung:
-        return '우두머리 · 약탈 무리를 이끌고 쌍식칼로 맹돌격하는 선봉장입니다. 중포 탄지기 승급과 동료 석두의 밀침으로 진격을 저지하세요.';
+        return '[특대형 돌격장] 대규모 약탈 무리를 이끌고 쌍식칼로 맹돌격하는 선봉장입니다. 중포 탄지기 승급과 동료 석두의 밀침으로 저지하세요.';
       case MutantKind.rivalMukhyeon:
-        return '우두머리 · 빠른 검기 활보와 독기 오라, 매서운 참격을 겸비한 숙적입니다. 내공 증폭기와 정화 회심탄으로 독기를 씻어내세요.';
+        return '[특대형 흑화검귀] 빠른 검기 활보와 독기 오라, 매서운 참격을 겸비한 숙적입니다. 내공 증폭기와 정화 회심탄으로 독기를 씻어내세요.';
       case MutantKind.chapterOverlord:
-        return '대수괴 · 압도적인 체력과 중갑, 파멸적인 공격력으로 마을 전체를 위협하는 최종 재앙입니다. 전 거점 승급과 영수·동료 총력전으로 맞서세요.';
+        return '[초거대 대수괴] 전장을 압도하는 거대한 마신 체구와 파멸적 공격력을 지닌 최종 재앙입니다. 6대 초소 완비와 영수·동료 총력전으로 맞서세요.';
     }
   }
 }

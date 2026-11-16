@@ -1146,4 +1146,162 @@ void main() {
       expect(sim.bursts.any((b) => b.isTriangleShatter), isTrue);
     });
   });
+
+  group('초기 무배치 직접 설치 · 점진 초소 확장(2→10) · 중앙 자동/수동 · 동료/영수 구출 · 30초 이상 지속 검증', () {
+    test('실제 전투 시작 시 길목 발사대는 0개이며, 플레이어가 직접 배치·승급·교체·철거(80% 환급)한다', () {
+      final p = PlayerProgress(tokens: 200);
+      final stage = CampaignCatalog.stageAt(1, 1);
+      final sim = DefenseBattleSim(
+        stage: stage,
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        seed: 42,
+      );
+
+      expect(sim.launchers, isEmpty);
+      expect(sim.activeMounts.length, 2);
+      expect(sim.nextRecommendedSlotIndex(), 0);
+      expect(CampaignCatalog.villageCenter.y, greaterThanOrEqualTo(600.0));
+      expect(CampaignCatalog.centralTowerPos.y, greaterThanOrEqualTo(570.0));
+
+      // 180프레임 진행해도 autoBuildForSimVerify == false 이면 빈 초소에 자동 설치되지 않음!
+      for (int i = 0; i < 180; i++) {
+        sim.step(1 / 60);
+      }
+      expect(sim.launchers, isEmpty);
+
+      // 플레이어 직접 배치 → 승급 → 교체 → 철거 환급 검증
+      sim.fieldTokens = 250;
+      expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
+      expect(sim.launchers.length, 1);
+      expect(sim.nextRecommendedSlotIndex(), 1);
+      expect(sim.placeLauncherInBattle(2, LauncherType.rapid), isFalse); // 1-1은 0,1번 2곳만 개방!
+
+      expect(sim.upgradeLauncherAtSlot(0), isTrue);
+      expect(sim.launcherAtSlot(0)!.tier, 2);
+
+      expect(sim.replaceLauncherInBattle(0, LauncherType.heavy), isTrue);
+      expect(sim.launcherAtSlot(0)!.type, LauncherType.heavy);
+
+      final beforeTokens = sim.fieldTokens;
+      final refunded = sim.dismantleLauncherInBattle(0);
+      expect(refunded, greaterThan(0));
+      expect(sim.fieldTokens, beforeTokens + refunded);
+      expect(sim.launchers, isEmpty);
+    });
+
+    test('관문이 진행될수록 배치 가능한 초소 개수가 2곳(1-1)에서 최대 10곳(9~10장)까지 점진적으로 늘어난다', () {
+      final s1 = CampaignCatalog.stageAt(1, 1);
+      final s1End = CampaignCatalog.stageAt(1, 10);
+      final s3 = CampaignCatalog.stageAt(3, 8);
+      final s6 = CampaignCatalog.stageAt(6, 10);
+      final s9 = CampaignCatalog.stageAt(9, 12);
+      final s10 = CampaignCatalog.stageAt(10, 10);
+
+      expect(s1.maxMountCount, 2);
+      expect(s1End.maxMountCount, 4);
+      expect(s3.maxMountCount, 6);
+      expect(s6.maxMountCount, 8);
+      expect(s9.maxMountCount, 10);
+      expect(s10.maxMountCount, 10);
+
+      for (final ch in CampaignCatalog.chapters) {
+        expect(ch.mounts.length, greaterThanOrEqualTo(4));
+        for (int l = 0; l < ch.lanes.length; l++) {
+          final curve = ch.smoothedLane(l);
+          expect(curve.length, greaterThan(40));
+          expect(curve.first.y, lessThan(40.0));
+          expect(curve.last.y, greaterThan(570.0));
+        }
+      }
+    });
+
+    test('중앙 기명 수호탑은 자동·수동 전환이 가능하며 수동 조준 탄지 및 도탄 예측선이 정상 작동한다', () {
+      final p = PlayerProgress();
+      final sim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 1),
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        allowSerendipity: false,
+      );
+
+      expect(sim.centralManualMode, isFalse);
+      sim.toggleCentralManualMode();
+      expect(sim.centralManualMode, isTrue);
+
+      // 수동 모드에서는 적이 있어도 자동 사격하지 않고 플레이어 조준을 대기함
+      sim.centralFireTimer = 0.0;
+      sim.mutants.add(
+        ActiveMutant(
+          uid: 501,
+          kind: MutantKind.ironBoar,
+          laneIndex: 0,
+          waypoints: sim.chapter.smoothedLane(0),
+          pos: const Vec2(200, 360),
+          maxHp: 300,
+          speed: 20,
+        ),
+      );
+      sim.step(1 / 60);
+      expect(sim.projectiles, isEmpty);
+
+      // 도탄 궤적 예측선 및 수동 탄지 발사 검증
+      final ray = sim.previewCentralManualRay(-1.15);
+      expect(ray.length, greaterThanOrEqualTo(2));
+      expect(sim.fireCentralManualAt(const Vec2(200, 320)), isTrue);
+      expect(sim.projectiles.length, 1);
+      expect(sim.projectiles.first.pierceLeft, greaterThanOrEqualTo(2));
+    });
+
+    test('제1장~제9장에 걸쳐 동료 13인과 영수 4종이 지속 구출되어 전원(동료 14인·영수 5종) 합류한다', () {
+      final p = PlayerProgress();
+      expect(p.unlockedCompanionCount, 1); // 석두
+      expect(p.unlockedBeastCount, 1); // 날쌘돌
+      expect(p.nextRescueStage, isNotNull);
+      expect(p.nextRescueStage!.code, '1-4');
+
+      int rescueStageCount = 0;
+      for (final st in CampaignCatalog.allStages) {
+        if (st.hasRescueReward) rescueStageCount++;
+        p.onBattleFinished(
+          stage: st,
+          victory: true,
+          stars: 3,
+          earnedTokens: 40,
+          earnedElixirs: 2,
+          usedSupportCount: 0,
+        );
+      }
+
+      expect(rescueStageCount, 16);
+      expect(p.unlockedCompanionCount, CompanionHero.values.length); // 14인 전원 합류!
+      expect(p.unlockedBeastCount, SpiritBeast.values.length); // 5종 전원 합류!
+      expect(p.activePreset.companions.length, 3); // 구출 동료 자동 슬롯 편성 확인!
+    });
+
+    test('변이체 6단계 시각 체급(19px~108px) 구분과 가장 쉬운 1-1 쉬움 판 32초 이상 지속을 보장한다', () {
+      expect(MutantKind.swarmRat.visualDiameter, lessThan(22.0));
+      expect(MutantKind.sickHound.visualDiameter, inInclusiveRange(25.0, 32.0));
+      expect(MutantKind.ironBoar.visualDiameter, inInclusiveRange(52.0, 62.0));
+      expect(MutantKind.swiftShadowBoss.visualDiameter, inInclusiveRange(58.0, 82.0));
+      expect(MutantKind.chapterOverlord.visualDiameter, greaterThanOrEqualTo(100.0));
+
+      final p = PlayerProgress(centralGuardianLevel: 3);
+      final sim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 1),
+        difficulty: DefenseDifficulty.easy,
+        progress: p,
+        allowSupportTokens: false,
+        allowSerendipity: false,
+        autoBuildForSimVerify: true,
+      );
+      const dt = 1.0 / 30.0;
+      for (int i = 0; i < 6000 && !sim.isFinished; i++) {
+        sim.step(dt);
+      }
+      expect(sim.isFinished, isTrue);
+      expect(sim.isVictory, isTrue);
+      expect(sim.elapsedSec, greaterThanOrEqualTo(32.0));
+    });
+  });
 }
