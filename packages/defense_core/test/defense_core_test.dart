@@ -1623,5 +1623,62 @@ void main() {
       expect(sim.liveRangeLv, 1);
       expect(sim.effectiveCentralManualRange, greaterThan(baseManualR));
     });
+
+    test('연속 단전 운기(meditateBatch)·수호석 장별 순차 해금·1~4배속 미세 분할 물리 일치·생사경 만렙 달성이 정상 작동한다', () {
+      final p = PlayerProgress(tokens: 5000);
+      // 1장만 열려 있을 때는 1장 수호석(만년기주)만 해금 가능하고 3장 수호석(흑요석)은 잠겨 있어야 함!
+      expect(p.canUnlockStone(StoneMaterial.manyeonGiju), isTrue);
+      expect(p.canUnlockStone(StoneMaterial.obsidian), isFalse);
+      expect(p.unlockStoneWithTokens(StoneMaterial.obsidian), isFalse);
+      expect(p.unlockStoneWithTokens(StoneMaterial.manyeonGiju), isTrue);
+
+      // 3장 개방 후에는 흑요석 해금 가능!
+      p.highestClearedGlobalStage = 22;
+      expect(p.canUnlockStone(StoneMaterial.obsidian), isTrue);
+      expect(p.unlockStoneWithTokens(StoneMaterial.obsidian), isTrue);
+
+      // 새로운 날 깨달음 잔여 횟수(10회) 조회 및 10회 연속 일괄 운기 검증!
+      expect(p.remainingDailyEnlightenment(todayKey: '2026-11-17'), 10);
+      final batch = p.meditateBatch(
+        count: 10,
+        hitGoldenRing: true,
+        rng: Random(1234),
+        todayKey: '2026-11-17',
+      );
+      expect(batch.gainedNaegong, greaterThanOrEqualTo(480));
+      expect(batch.gainedSeals, greaterThanOrEqualTo(140));
+      expect(p.remainingDailyEnlightenment(todayKey: '2026-11-17'), 0);
+      // 다음 날이 되면 첫 운기 전에도 즉시 10회로 표시되어야 함!
+      expect(p.remainingDailyEnlightenment(todayKey: '2026-11-18'), 10);
+
+      // 1배속(dt=1/60 × 600회)과 4배속(dt=4/60 × 150회) 미세 분할 물리가 동일한 결과를 내는지 검증!
+      final pA = PlayerProgress();
+      final pB = PlayerProgress();
+      final sim1x = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 3),
+        difficulty: DefenseDifficulty.normal,
+        progress: pA,
+        seed: 20261117,
+        allowSerendipity: false,
+        autoBuildForSimVerify: true,
+      );
+      final sim4x = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 3),
+        difficulty: DefenseDifficulty.normal,
+        progress: pB,
+        seed: 20261117,
+        allowSerendipity: false,
+        autoBuildForSimVerify: true,
+      );
+      for (int i = 0; i < 600; i++) {
+        sim1x.step(1.0 / 60.0);
+      }
+      for (int i = 0; i < 150; i++) {
+        sim4x.step(4.0 / 60.0);
+      }
+      expect(sim4x.elapsedSec, closeTo(sim1x.elapsedSec, 1e-6));
+      expect(sim4x.killCount, sim1x.killCount);
+      expect(sim4x.shieldHp, closeTo(sim1x.shieldHp, 1e-5));
+    });
   });
 }

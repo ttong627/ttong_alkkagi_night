@@ -743,10 +743,8 @@ class UpgradeScreen extends StatelessWidget {
         ...StoneMaterial.values.map((s) {
           final owned = p.unlockedStones.contains(s);
           final shards = p.stoneShards[s] ?? 0;
-          final canCraft = !owned &&
-              (s.isShardStone
-                  ? shards >= s.shardRequired
-                  : p.tokens >= s.unlockTokens);
+          final chapterLocked = !s.isShardStone && p.highestUnlockedChapter < s.minChapter;
+          final canCraft = p.canUnlockStone(s);
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: MurimCard(
@@ -792,7 +790,9 @@ class UpgradeScreen extends StatelessWidget {
                       child: Text(
                         s.isShardStone
                             ? '조각 $shards/${s.shardRequired}'
-                            : '증표 ${s.unlockTokens}',
+                            : chapterLocked
+                                ? '제${s.minChapter}장 개방'
+                                : '증표 ${s.unlockTokens}',
                       ),
                     ),
                 ],

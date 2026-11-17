@@ -142,6 +142,25 @@ class GameController extends ChangeNotifier {
     return res;
   }
 
+  /// 손목 부담 없는 연속 단전 운기 일괄 수행 (기본 10회 · 오늘의 깨달음 6배 포함 · 즉시 저장).
+  MeditationResult meditateBatch(int count, {bool hitGoldenRing = true}) {
+    final res = _progress.meditateBatch(
+      count: count,
+      hitGoldenRing: hitGoldenRing,
+      rng: _rng,
+    );
+    if (res.wasCriticalSerendipity || res.wasOneMoreSerendipity) {
+      NightAudioController.instance.playAsset('serendipity_jackpot.wav');
+      NightHaptics.instance.meridianOpen();
+    } else {
+      NightAudioController.instance.playAsset('motion_meridian.wav');
+      NightHaptics.instance.lightTap();
+    }
+    saveToDisk();
+    notifyListeners();
+    return res;
+  }
+
   /// 십대 경맥 개통 (혈자리 점등 완료 시 실패 0% 개통!).
   MeridianStepSpec? openMeridian() {
     final opened = _progress.openNextMeridian();

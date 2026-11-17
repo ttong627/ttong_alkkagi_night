@@ -56,7 +56,7 @@ class _BattleScreenState extends State<BattleScreen>
   @override
   void initState() {
     super.initState();
-    _speedMultiplier = widget.controller.battleSpeedMultiplier.clamp(1, 3);
+    _speedMultiplier = widget.controller.battleSpeedMultiplier.clamp(1, 4);
     _startNewSim(showIntroToast: true);
     final chapter = CampaignCatalog.chapterOf(widget.stage.chapterNumber);
     final bgm = widget.stage.isBossStage ? 'bgm_boss.ogg' : chapter.bgmAsset;
@@ -135,10 +135,14 @@ class _BattleScreenState extends State<BattleScreen>
       }
     }
 
-    for (int s = 0; s < _speedMultiplier; s++) {
-      if (!_sim.isFinished) {
-        _sim.step(rawDt);
-      }
+    // 2~4배속 고속 진행 중에도 돌파 비급 3택 1 반응 시간은 실제 벽시계 기준 6.5초를 온전히 보장!
+    if (_speedMultiplier > 1 &&
+        _sim.pendingPerkChoices.isNotEmpty &&
+        !_sim.autoChoosePerks) {
+      _sim.perkChoiceTimer += rawDt * (_speedMultiplier - 1);
+    }
+    if (!_sim.isFinished) {
+      _sim.step(rawDt * _speedMultiplier);
     }
 
     NightAudioController.instance.flushBattleCues(_sim.pendingSounds);
@@ -642,18 +646,28 @@ class _BattleScreenState extends State<BattleScreen>
                             ),
                           ),
                           SegmentedButton<int>(
+                            showSelectedIcon: false,
                             segments: const [
                               ButtonSegment(value: 1, label: Text('1배')),
                               ButtonSegment(value: 2, label: Text('2배')),
                               ButtonSegment(value: 3, label: Text('3배')),
+                              ButtonSegment(value: 4, label: Text('4배')),
                             ],
                             selected: {_speedMultiplier},
                             onSelectionChanged: (s) {
-                              widget.controller.battleSpeedMultiplier = s.first;
-                              setState(() => _speedMultiplier = s.first);
+                              widget.controller.battleSpeedMultiplier = s.first.clamp(1, 4);
+                              setState(() => _speedMultiplier = s.first.clamp(1, 4));
                             },
                             style: const ButtonStyle(
                               visualDensity: VisualDensity.compact,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: WidgetStatePropertyAll(
+                                EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              ),
+                              minimumSize: WidgetStatePropertyAll(Size(28, 30)),
+                              textStyle: WidgetStatePropertyAll(
+                                TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
                         ],

@@ -68,6 +68,14 @@ class _TrainingScreenState extends State<TrainingScreen>
     });
   }
 
+  void _performBatchMeditation() {
+    final res = widget.controller.meditateBatch(10, hitGoldenRing: true);
+    setState(() {
+      _lastLog =
+          '🔥 10회 연속 대주천 완료! 내공 +${res.gainedNaegong} · 수련 인장 +${res.gainedSeals} 일괄 적립!';
+    });
+  }
+
   void _tapAcupoint(int idx, MeridianStepSpec spec) {
     setState(() {
       _litAcupoints.add(idx);
@@ -102,7 +110,7 @@ class _TrainingScreenState extends State<TrainingScreen>
       builder: (context, _) {
         final p = widget.controller.progress;
         final nextRealm = p.realm.nextRealm;
-        final remainBonus = (10 - p.dailyEnlightenmentUsed).clamp(0, 10);
+        final remainBonus = p.remainingDailyEnlightenment();
 
         return DefaultTabController(
           length: 3,
@@ -338,9 +346,27 @@ class _TrainingScreenState extends State<TrainingScreen>
                 },
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const Key('meditate_batch_10_btn'),
+              style: FilledButton.styleFrom(
+                backgroundColor: NightPalette.accentGold,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              onPressed: _performBatchMeditation,
+              icon: const Icon(Icons.bolt_rounded),
+              label: Text(
+                p.remainingDailyEnlightenment() > 0
+                    ? '⚡ 오늘의 깨달음 10회 연속 운기 (6배 대박)'
+                    : '⚡ 10회 연속 대주천 운기 (즉시 수련)',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 12),
             const Text(
-              '1회 운기마다 휴대폰에 즉시 자동 저장됩니다',
+              '1회·10회 운기마다 휴대폰에 즉시 자동 저장되며 전투 승리 시에도 내공이 오릅니다',
+              textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12.5, color: NightPalette.jadeGreen),
             ),
           ],

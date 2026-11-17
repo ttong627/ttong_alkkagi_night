@@ -615,6 +615,15 @@ class PlayerProgress {
   double get coreFortitudeBonus => (coreStatLevels[CoreStatType.fortitude] ?? 0) * 0.045;
   double get corePrecisionBonus => (coreStatLevels[CoreStatType.precision] ?? 0) * 0.035;
 
+  /// 오늘 남은 일일 깨달음(고배율 운기) 횟수 조회 (새로운 날 진입 시 즉시 10회 반환).
+  int remainingDailyEnlightenment({String? todayKey}) {
+    final day = todayKey ?? _todayString();
+    if (lastMeditationDayKey.isEmpty || day.compareTo(lastMeditationDayKey) > 0) {
+      return 10;
+    }
+    return (10 - dailyEnlightenmentUsed).clamp(0, 10);
+  }
+
   /// 1) 초간단 단전 운기 호흡 (아무 때나 눌러도 100% 성공 · 실패 0%!).
   MeditationResult meditateOnce({
     required bool hitGoldenRing,
@@ -632,8 +641,8 @@ class PlayerProgress {
       dailyEnlightenmentUsed++;
     }
 
-    int baseNaegong = hasDailyBonus ? 18 : 4;
-    int baseSeals = hasDailyBonus ? 6 : 2;
+    int baseNaegong = hasDailyBonus ? 24 : 12;
+    int baseSeals = hasDailyBonus ? 7 : 3;
 
     final serendipityChance = (hitGoldenRing ? 0.45 : 0.16) + meridianSerendipityBonus;
     final isCrit = hitGoldenRing || rng.nextDouble() < serendipityChance * 0.5;
@@ -663,6 +672,39 @@ class PlayerProgress {
       wasCriticalSerendipity: isCrit,
       wasOneMoreSerendipity: isOneMore,
       remainingDailyBonusCount: (10 - dailyEnlightenmentUsed).clamp(0, 10),
+    );
+  }
+
+  /// 10회 연속 단전 운기 편의 실행 (손가락 피로 없이 한 번에 10회 수련!).
+  MeditationResult meditateBatch({
+    required int count,
+    required bool hitGoldenRing,
+    required Random rng,
+    String? todayKey,
+  }) {
+    final safeCount = count.clamp(1, 20);
+    int totNaegong = 0;
+    int totSeals = 0;
+    bool anyBonus = false;
+    bool anyCrit = false;
+    bool anyOneMore = false;
+    int lastRemain = 0;
+    for (int i = 0; i < safeCount; i++) {
+      final r = meditateOnce(hitGoldenRing: hitGoldenRing, rng: rng, todayKey: todayKey);
+      totNaegong += r.gainedNaegong;
+      totSeals += r.gainedSeals;
+      if (r.wasEnlightenmentBonus) anyBonus = true;
+      if (r.wasCriticalSerendipity) anyCrit = true;
+      if (r.wasOneMoreSerendipity) anyOneMore = true;
+      lastRemain = r.remainingDailyBonusCount;
+    }
+    return MeditationResult(
+      gainedNaegong: totNaegong,
+      gainedSeals: totSeals,
+      wasEnlightenmentBonus: anyBonus,
+      wasCriticalSerendipity: anyCrit,
+      wasOneMoreSerendipity: anyOneMore,
+      remainingDailyBonusCount: lastRemain,
     );
   }
 
@@ -717,6 +759,15 @@ class PlayerProgress {
     return true;
   }
 
+  bool canUnlockStone(StoneMaterial stone) {
+    if (unlockedStones.contains(stone)) return false;
+    if (stone.isShardStone) {
+      return (stoneShards[stone] ?? 0) >= stone.shardRequired;
+    }
+    if (highestUnlockedChapter < stone.minChapter) return false;
+    return tokens >= stone.unlockTokens;
+  }
+
   bool unlockStoneWithTokens(StoneMaterial stone) {
     if (unlockedStones.contains(stone)) return false;
     if (stone.isShardStone) {
@@ -726,6 +777,7 @@ class PlayerProgress {
       unlockedStones.add(stone);
       return true;
     }
+    if (highestUnlockedChapter < stone.minChapter) return false;
     if (tokens < stone.unlockTokens) return false;
     tokens -= stone.unlockTokens;
     unlockedStones.add(stone);
@@ -1185,6 +1237,17 @@ class PlayerProgress {
       recordDeed(NightDeed.battleWin, 1, todayKey: todayKey);
       if (stars >= 3) {
         recordDeed(NightDeed.perfectDefense, 1, todayKey: todayKey);
+      }
+
+      // 실전 방어 승리로 단전 내공과 수련 인장이 함께 성장 (전투와 수련의 유기적 선순환!)
+      naegongPoints += 16 + stage.chapterNumber * 5 + (stage.isBossStage ? 22 : 0);
+      trainingSeals += 4 + (stage.chapterNumber ~/ 2) + (stage.isBossStage ? 5 : 0);
+      if (stage.isBossStage) {
+        elixirs += 2 + (stage.chapterNumber ~/ 3);
+        _grantRandomShards(
+          stage.stageNumber >= 10 ? 3 : 1,
+          Random(totalMutantKills + stage.globalIndex + 17),
+        );
       }
 
       // 승리 시 수호 재료 1종 확정 획득

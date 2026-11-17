@@ -680,7 +680,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('초소 1/2곳'), findsOneWidget);
 
-    // 3) 3배속 진행 중 조기 호출로 뜬 「📜 심야 돌파 비급 선택 (3택 1)」도 미클릭 시 멈춤 없이 자동 통과!
+    // 3) 기력이 모인 상태에서 실시간 「⚔️화력업+0」 및 「🔭사거리업+0」 단추 존재·작동 검증!
+    final fireBtn = find.byKey(const Key('live_upg_firepower_btn'));
+    final rangeBtn = find.byKey(const Key('live_upg_range_btn'));
+    expect(fireBtn, findsOneWidget);
+    expect(rangeBtn, findsOneWidget);
+
+    // 4) 4배속 전환 지원 및 3배속 진행 중 조기 호출로 뜬 「📜 심야 돌파 비급 선택 (3택 1)」도 미클릭 시 멈춤 없이 자동 통과!
+    expect(find.text('4배'), findsOneWidget);
+    await tester.tap(find.text('4배'));
+    await tester.pump();
+    expect(controller.battleSpeedMultiplier, 4);
     await tester.tap(find.text('3배'));
     await tester.pump();
     for (int f = 0; f < 180; f++) {
@@ -694,22 +704,74 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.textContaining('심야 돌파 비급 선택 (3택 1)'), findsOneWidget);
 
-    // 3배속에서도 실제 벽시계 기준 6.5초 카운트다운이므로 7.0초(50ms×140) 경과 시 자동 패스 검증!
-    for (int i = 0; i < 140; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    expect(find.textContaining('심야 돌파 비급 선택 (3택 1)'), findsNothing);
-
-    // 4) 기력이 모인 상태에서 실시간 「⚔️화력업+0」 및 「🔭사거리업+0」 단추 존재·작동 검증!
-    final fireBtn = find.byKey(const Key('live_upg_firepower_btn'));
-    final rangeBtn = find.byKey(const Key('live_upg_range_btn'));
-    expect(fireBtn, findsOneWidget);
-    expect(rangeBtn, findsOneWidget);
     if (find.textContaining('⚔️화력업+0').evaluate().isNotEmpty) {
       await tester.ensureVisible(fireBtn);
       await tester.tap(fireBtn);
       await tester.pump(const Duration(milliseconds: 100));
     }
+
+    // 3배속에서도 실제 벽시계 기준 6.5초 카운트다운이므로 미클릭 시 멈춤 없이 자동 패스 검증!
+    // (전투 중 도깨비 처치·다음 물결 진입으로 비급이 연속 대기열에 들어온 경우에도 모두 자동 패스됨)
+    for (int cycle = 0; cycle < 3; cycle++) {
+      if (find.textContaining('심야 돌파 비급 선택 (3택 1)').evaluate().isEmpty) {
+        break;
+      }
+      for (int i = 0; i < 140; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+    expect(find.textContaining('심야 돌파 비급 선택 (3택 1)'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('기명 심법 수련실 10회 연속 운기 단추 및 대장간 수호석 장별 개방 표시 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final controller = GameController(
+      initialProgress: PlayerProgress(
+        tokens: 2000,
+        naegongPoints: 0,
+        tutorialSeen: true,
+        bgmVolume: 0.0,
+        sfxVolume: 0.0,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: TrainingScreen(controller: controller)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final batchBtn = find.byKey(const Key('meditate_batch_10_btn'));
+    expect(batchBtn, findsOneWidget);
+    await tester.ensureVisible(batchBtn);
+    await tester.tap(batchBtn);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(controller.progress.naegongPoints, greaterThanOrEqualTo(480));
+    expect(controller.progress.remainingDailyEnlightenment(), 0);
+    expect(find.textContaining('10회 연속 대주천 완료!'), findsOneWidget);
+
+    await tester.pumpWidget(
+      MaterialApp(home: UpgradeScreen(controller: controller)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.scrollUntilVisible(
+      find.textContaining('제3장 개방'),
+      320.0,
+      scrollable: find.descendant(
+        of: find.byType(ListView),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('제3장 개방'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

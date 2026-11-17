@@ -133,6 +133,7 @@ class ActiveMutant {
   double attackAnimTimer = 0.0;
   double hitFlashTimer = 0.0;
   double dashBurstTimer = 0.0;
+  bool roarShockUsed = false;
   double dashCooldown = 2.6;
   double spawnPortalTimer = 0.45;
 
@@ -343,6 +344,7 @@ class DefenseBattleSim {
   int fieldTokens = 0;
   int earnedPermanentTokens = 0;
   int earnedElixirs = 0;
+  double _permTokenCarry = 0.0;
 
   /// 내공 게이지 (0.0 ~ 3.0칸) 및 전술 비약 버프 타이머.
   double qiBars = 0.0;
@@ -1739,7 +1741,7 @@ class DefenseBattleSim {
     }
     if (waveIdx >= stage.waves.length) return;
     final groups = stage.waves[waveIdx];
-    final startGrace = (waveIdx == 0 && !appendExisting) ? 2.6 : 0.45;
+    final startGrace = (waveIdx == 0 && !appendExisting) ? 2.0 : 0.40;
     bool hasBossInWave = false;
     int groupIdx = 0;
     for (final g in groups) {
@@ -1749,7 +1751,7 @@ class DefenseBattleSim {
         lanePortalEnergy[lIdx] = max(lanePortalEnergy[lIdx], 0.75);
       }
       // 제1물결에서는 선봉 독쥐가 먼저 내려오고 고속 들개·중형 변이가 순차 합류해 초반 인지 여유 확보!
-      final groupStagger = (waveIdx == 0 && !appendExisting) ? groupIdx * 4.2 : 0.0;
+      final groupStagger = (waveIdx == 0 && !appendExisting) ? groupIdx * 3.0 : 0.0;
       groupIdx++;
       for (int i = 0; i < g.count; i++) {
         _spawnQueue.add(
@@ -1949,9 +1951,18 @@ class DefenseBattleSim {
     return true;
   }
 
-  /// 물리 1스텝 진행 (표준 dt = 1/60초).
+  /// 물리 진행 (1배~4배 고속 배속에서도 탄알 터널링·궤도 이탈이 0건이 되도록 1/60초 이하 미세 분할 연산).
   void step(double dt) {
     if (isFinished || !dt.isFinite || dt <= 0) return;
+    final subSteps = ((dt - 1e-9) / (1.0 / 60.0)).ceil().clamp(1, 8);
+    final subDt = dt / subSteps;
+    for (int s = 0; s < subSteps && !isFinished; s++) {
+      _stepSingle(subDt);
+    }
+  }
+
+  void _stepSingle(double dt) {
+    if (isFinished) return;
     elapsedSec += dt;
     centralGearAngle += dt * 1.8;
 
@@ -2233,7 +2244,7 @@ class DefenseBattleSim {
       if (wavePauseTimer <= 0) {
         wavesClearedCount = max(wavesClearedCount, currentWaveIndex + 1);
         currentWaveIndex++;
-        wavePauseTimer = 1.45;
+        wavePauseTimer = 1.15;
         _enqueueWave(currentWaveIndex);
         _announceNewlyUnlockedPads();
 
@@ -2308,23 +2319,28 @@ class DefenseBattleSim {
     infiltratorSpawnCount++;
     final fromLeft = (infiltratorSpawnCount + squadOffsetIndex).isEven;
     final MutantKind kind = isTunnel
-        ? (stage.chapterNumber >= 3 && squadOffsetIndex == 0
-            ? MutantKind.plagueToad
-            : MutantKind.bloodCocoon)
-        : (squadOffsetIndex == 0 ? MutantKind.sickHound : MutantKind.swarmRat);
+        ? (stage.chapterNumber >= 5 && squadOffsetIndex == 0
+            ? MutantKind.ironBoar
+            : (stage.chapterNumber >= 3 && squadOffsetIndex == 0
+                ? MutantKind.plagueToad
+                : MutantKind.bloodCocoon))
+        : (stage.chapterNumber >= 6 && squadOffsetIndex == 0
+            ? MutantKind.shieldYacha
+            : (squadOffsetIndex == 0 ? MutantKind.sickHound : MutantKind.swarmRat));
     encounteredMutants.add(kind);
 
     final Vec2 startPos;
     final List<Vec2> offRoadWaypoints;
     if (isTunnel) {
       final tx = fromLeft
-          ? (84.0 + (squadOffsetIndex * 24.0) % 70.0)
-          : (316.0 - (squadOffsetIndex * 24.0) % 70.0);
-      final ty = 285.0 + (squadOffsetIndex % 3) * 34.0;
+          ? (88.0 + (squadOffsetIndex * 24.0) % 68.0)
+          : (312.0 - (squadOffsetIndex * 24.0) % 68.0);
+      final baseTy = stage.chapterNumber >= 5 ? 345.0 : 285.0;
+      final ty = baseTy + (squadOffsetIndex % 3) * 32.0;
       startPos = Vec2(tx, ty);
       final midTarget = Vec2(
-        fromLeft ? 138.0 : 262.0,
-        (ty + 125.0).clamp(380.0, 520.0),
+        fromLeft ? 144.0 : 256.0,
+        (ty + 118.0).clamp(390.0, 535.0),
       );
       offRoadWaypoints = [
         startPos,
@@ -2333,10 +2349,10 @@ class DefenseBattleSim {
         CampaignCatalog.villageCenter,
       ];
     } else {
-      final sy = 165.0 + (squadOffsetIndex * 46.0) % 160.0;
+      final sy = (stage.chapterNumber >= 5 ? 215.0 : 165.0) + (squadOffsetIndex * 46.0) % 150.0;
       startPos = Vec2(fromLeft ? 22.0 : CampaignCatalog.arenaWidth - 22.0, sy);
-      final mid1 = Vec2(fromLeft ? 74.0 : 326.0, sy + 95.0);
-      final mid2 = Vec2(fromLeft ? 116.0 : 284.0, (sy + 215.0).clamp(360.0, 535.0));
+      final mid1 = Vec2(fromLeft ? 78.0 : 322.0, sy + 95.0);
+      final mid2 = Vec2(fromLeft ? 122.0 : 278.0, (sy + 210.0).clamp(370.0, 540.0));
       offRoadWaypoints = [
         startPos,
         mid1,
@@ -2346,10 +2362,12 @@ class DefenseBattleSim {
       ];
     }
 
-    final chScale = 1.0 + (stage.chapterNumber - 1) * 0.21 + (stage.stageNumber - 1) * 0.038;
+    final chScale = _monsterHpScale;
     final ch1Ease = stage.chapterNumber == 1 ? 0.68 : 1.0;
-    final maxHp = kind.baseHp * kind.swarmHpFactor * chScale * ch1Ease * difficulty.hpMult * 0.88;
-    final spd = kind.speed * (isTunnel ? 0.95 : 1.05) * difficulty.speedMult;
+    final eliteFactor = stage.chapterNumber >= 5 ? 1.04 : 0.86;
+    final maxHp =
+        kind.baseHp * kind.swarmHpFactor * chScale * ch1Ease * difficulty.hpMult * eliteFactor;
+    final spd = kind.speed * (isTunnel ? 1.02 : 1.12) * difficulty.speedMult;
 
     final m = ActiveMutant(
       uid: _nextMutantUid++,
@@ -2403,6 +2421,40 @@ class DefenseBattleSim {
     }
   }
 
+  static const List<double> _chapterMonsterHpCurve = <double>[
+    1.00, // 1장
+    1.55, // 2장
+    2.30, // 3장
+    3.35, // 4장
+    4.75, // 5장
+    6.60, // 6장
+    9.00, // 7장
+    12.10, // 8장
+    16.00, // 9장
+    21.00, // 10장 (결전 보스 10연전)
+  ];
+
+  /// 플레이어 영구 강화·내공 경지·수호석 성장에 비례하는 장별 변이체 체력 배율.
+  double get _monsterHpScale {
+    final chIdx = (stage.chapterNumber - 1).clamp(0, _chapterMonsterHpCurve.length - 1);
+    final baseCh = _chapterMonsterHpCurve[chIdx];
+    if (stage.globalIndex >= 900) {
+      return baseCh * (1.0 + currentWaveIndex * 0.14);
+    }
+    return baseCh * (1.0 + (stage.stageNumber - 1) * 0.042);
+  }
+
+  /// 장 진행 및 난이도에 따른 변이체 방어막·수호탑 공격력 배율 (1-1 보통은 1.00 정확 유지).
+  double get _mutantAttackScale {
+    final chMult = 1.0 + (stage.chapterNumber - 1) * 0.24;
+    final diffMult = switch (difficulty) {
+      DefenseDifficulty.easy => 0.82,
+      DefenseDifficulty.normal => 1.0,
+      DefenseDifficulty.nightmare => 1.28,
+    };
+    return chMult * diffMult;
+  }
+
   void _spawnMutant(_PendingSpawn item) {
     encounteredMutants.add(item.kind);
     final laneIdx = item.laneIndex % chapter.lanes.length;
@@ -2411,18 +2463,16 @@ class DefenseBattleSim {
       lanePortalEnergy[laneIdx] = 1.0;
     }
 
-    final chScale = stage.globalIndex >= 900
-        ? (1.0 + (stage.chapterNumber - 1) * 0.14 + currentWaveIndex * 0.16)
-        : (1.0 + (stage.chapterNumber - 1) * 0.23 + (stage.stageNumber - 1) * 0.042);
+    final chScale = _monsterHpScale;
     final ch1Ease = stage.chapterNumber == 1 ? (item.kind.isBoss ? 0.48 : 0.78) : 1.0;
     final maxHp = item.kind.baseHp *
         item.kind.swarmHpFactor *
         chScale *
         ch1Ease *
         difficulty.hpMult;
-    // 2.1배 길어진 구곡양장 아홉 굽이 협곡길 위를 역동적으로 휘돌아 내려오도록 행군 속도 1.28배 조율!
+    // 2.1배 길어진 구곡양장 아홉 굽이 협곡길 위를 역동적으로 휘돌아 내려오도록 행군 속도 1.34배 조율!
     final spd =
-        item.kind.speed * 1.28 * (1.0 + (stage.chapterNumber - 1) * 0.02) * difficulty.speedMult;
+        item.kind.speed * 1.34 * (1.0 + (stage.chapterNumber - 1) * 0.022) * difficulty.speedMult;
     final latOffset = item.kind.isBoss ? 0.0 : (rng.nextDouble() - 0.5) * 14.0;
     final spawnPos = lane.first + Vec2(latOffset * 0.65, 0);
 
@@ -2673,9 +2723,47 @@ class DefenseBattleSim {
         cropsHealth = (cropsHealth - 0.018 * dt).clamp(0.0, 1.0);
       }
 
+      // 제2장 이상 중간보스·대수괴 마기 포효 충격파 (체력 60% 이하 또는 중원 진입 시 1회 외곽 결계 진동 압박!)
+      if (!m.roarShockUsed &&
+          m.kind.isBoss &&
+          stage.chapterNumber >= 2 &&
+          (m.hp <= m.maxHp * 0.60 || m.pos.y >= 245.0) &&
+          shieldHp > shieldMaxHpDynamic * 0.22) {
+        m.roarShockUsed = true;
+        final baseRatio = m.kind.isMidBoss ? 0.14 : 0.26;
+        final diffScale = switch (difficulty) {
+          DefenseDifficulty.easy => 0.55,
+          DefenseDifficulty.normal => 1.0,
+          DefenseDifficulty.nightmare => 1.48,
+        };
+        final shockDmg = shieldMaxHpDynamic * baseRatio * diffScale;
+        shieldHp = max(shieldMaxHpDynamic * 0.18, shieldHp - shockDmg);
+        screenShakeTimer = max(screenShakeTimer, 0.26);
+        screenShakeIntensity = max(screenShakeIntensity, m.kind.isMidBoss ? 4.4 : 6.5);
+        bursts.add(
+          FxBurst(
+            pos: m.pos,
+            colorHex: m.kind.colorHex,
+            maxRadius: m.kind.isMidBoss ? 52 : 76,
+            isTriangleShatter: true,
+          ),
+        );
+        callouts.add(
+          FloatingCallout(
+            pos: m.pos + const Vec2(0, -22),
+            text: m.kind.isMidBoss
+                ? '💢 중간보스 마기 포효!! 결계가 흔들립니다!'
+                : '🌋 대수괴 광폭 마기 포효!! 결계 수복·출두 대비!',
+            colorHex: 0xFFFF595E,
+            ttlSec: 1.6,
+            isBigBanner: !m.kind.isMidBoss,
+          ),
+        );
+      }
+
       // 외곽 기공 방어막 충돌 처리 (attackPower 비례 타격 & 덮치기 모션)
       if (shieldHp > 0 && distToCenter <= CampaignCatalog.outerShieldRadius + m.kind.radius * 0.5) {
-        shieldHp = max(0, shieldHp - m.kind.attackPower);
+        shieldHp = max(0, shieldHp - m.kind.attackPower * _mutantAttackScale);
         m.attackAnimTimer = 1.0;
         if (m.kind.toughnessRating >= 4 || m.kind == MutantKind.crimsonBreakerBoss) {
           heavyHitsOnShield++;
@@ -2749,7 +2837,7 @@ class DefenseBattleSim {
               m.pos.distanceTo(CampaignCatalog.centralTowerPos) <=
                   CampaignCatalog.centralTowerRadius + m.kind.radius * 0.6)) {
         // 방어막이 깨진 상태에서 중앙 자동 보호 장치 직접 타격 → attackPower 비례 피해!
-        towerHp = max(0, towerHp - m.kind.attackPower * 0.95);
+        towerHp = max(0, towerHp - m.kind.attackPower * 0.95 * _mutantAttackScale);
         m.attackAnimTimer = 1.0;
         final ecoHit = (0.05 + m.kind.attackPower * 0.0012).clamp(0.05, 0.14);
         granaryHealth = (granaryHealth - ecoHit).clamp(0.0, 1.0);
@@ -3106,22 +3194,24 @@ class DefenseBattleSim {
     if (!mukhyeonTriggered &&
         launchers.isNotEmpty &&
         (progress.companionLevels[CompanionHero.mukhyeon] ?? 0) > 0 &&
-        shieldHp <= shieldMaxHpDynamic * 0.25 &&
+        shieldHp <= shieldMaxHpDynamic * 0.35 &&
         mutants.isNotEmpty) {
       mukhyeonTriggered = true;
+      final mukLv = (progress.companionLevels[CompanionHero.mukhyeon] ?? 1).clamp(1, 10);
+      shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.25);
       callouts.add(
         FloatingCallout(
           pos: const Vec2(200, 310),
-          text: '⚔️ 묵현 긴급 난입! "그 마을을 무너뜨리게 두진 않겠다!"',
+          text: '⚔️ 묵현 긴급 난입(Lv.$mukLv)! "그 마을을 무너뜨리게 두진 않겠다!"',
           colorHex: 0xFFC77DFF,
           isBigBanner: true,
         ),
       );
       for (final m in List<ActiveMutant>.from(mutants)) {
-        if (m.pos.y > 280) {
+        if (m.pos.y > 240) {
           _applyDamageToMutant(
             m,
-            centralSpec.baseDamage * 4.5,
+            centralSpec.baseDamage * 4.5 * (1.0 + (mukLv - 1) * 0.24),
             sourceKey: 'hero_mukhyeon',
             sourceLabel: '동료 묵현 (위기 난입)',
             knockDir: const Vec2(0, -1),
@@ -4268,7 +4358,10 @@ class DefenseBattleSim {
         }
       } else if (m.kind.splitsOnDeath) {
         for (final dx in [-10.0, 10.0]) {
-          final childSpd = MutantKind.swarmRat.speed * difficulty.speedMult;
+          final childSpd = MutantKind.swarmRat.speed *
+              1.30 *
+              (1.0 + (stage.chapterNumber - 1) * 0.02) *
+              difficulty.speedMult;
           mutants.add(
             ActiveMutant(
               uid: _nextMutantUid++,
@@ -4279,8 +4372,10 @@ class DefenseBattleSim {
               maxHp: m.maxHp * 0.28,
               speed: childSpd,
               lateralSeed: rng.nextDouble() * pi * 2,
-              laneLateralOffset: dx * 0.7,
+              laneLateralOffset: m.isInfiltrator ? 0.0 : dx * 0.7,
             )
+              ..isInfiltrator = m.isInfiltrator
+              ..infiltratorStyle = m.infiltratorStyle
               ..waypointIndex = m.waypointIndex
               ..headingRad = m.headingRad
               ..smoothVel = m.smoothVel.length > 2.0
@@ -4341,7 +4436,12 @@ class DefenseBattleSim {
         .round()
         .clamp(1, 200);
     fieldTokens += drop;
-    earnedPermanentTokens += (drop * 0.55).round().clamp(1, 150);
+    _permTokenCarry += drop * 0.28;
+    final permWhole = _permTokenCarry.floor();
+    if (permWhole > 0) {
+      _permTokenCarry -= permWhole;
+      earnedPermanentTokens += permWhole.clamp(1, 150);
+    }
     // 화면이 지저분해지지 않도록 1⚡ 소형 구슬은 2마리당 1번씩 묶어 쏘고 중대형·보스는 즉시 발사!
     if (drop >= 2 || killCount.isEven) {
       _spawnFlyingQiOrb(

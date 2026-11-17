@@ -381,21 +381,21 @@ class NightAchievementSpec {
     ),
     NightAchievementSpec(
       id: 'ach_ch1_clear',
-      title: '청석촌 구원자',
-      subtitle: '제1장 모든 밤(11단계) 완전 평정',
-      reward: NightRewardBundle(tokens: 150, elixirs: 3, supportTokens: 1),
+      title: '흙먼지 마을 구원자',
+      subtitle: '제1장 흙먼지 마을 모든 밤(10단계) 완전 평정',
+      reward: NightRewardBundle(tokens: 150, elixirs: 4, supportTokens: 1),
     ),
     NightAchievementSpec(
       id: 'ach_ch3_clear',
-      title: '유리 나루터 파수꾼',
-      subtitle: '제3장 유화당 심야 수호 완료',
-      reward: NightRewardBundle(tokens: 240, elixirs: 4, shards: 2),
+      title: '거북 장터 파수꾼',
+      subtitle: '제3장 거북 장터 종자·우시장 심야 수호 완료',
+      reward: NightRewardBundle(tokens: 240, elixirs: 6, shards: 3),
     ),
     NightAchievementSpec(
       id: 'ach_ch6_clear',
-      title: '용문 객잔의 영웅',
-      subtitle: '제6장 혈무교주 격퇴 및 묵현 합류',
-      reward: NightRewardBundle(tokens: 380, elixirs: 6, supportTokens: 2),
+      title: '무림맹 대광장의 영웅',
+      subtitle: '제6장 흑화 마룡수 격퇴 및 숙적 묵현 귀순 합류',
+      reward: NightRewardBundle(tokens: 380, elixirs: 10, supportTokens: 2),
     ),
     NightAchievementSpec(
       id: 'ach_ch10_clear',
@@ -464,20 +464,20 @@ class EndlessWaveBuilder {
       final groups = <WaveSpawnGroup>[
         WaveSpawnGroup(
           kind: MutantKind.swarmRat,
-          count: 10 + w * 3,
-          intervalSec: (0.48 - w * 0.008).clamp(0.22, 0.48),
+          count: 9 + w * 2,
+          intervalSec: (0.28 - w * 0.005).clamp(0.16, 0.28),
           laneIndex: w % 3,
         ),
         WaveSpawnGroup(
           kind: MutantKind.sickHound,
-          count: 6 + w * 2,
-          intervalSec: (0.58 - w * 0.008).clamp(0.28, 0.58),
+          count: 5 + w * 2,
+          intervalSec: (0.34 - w * 0.005).clamp(0.18, 0.34),
           laneIndex: (w + 2) % 3,
         ),
         WaveSpawnGroup(
           kind: w % 2 == 0 ? MutantKind.plagueToad : MutantKind.shieldYacha,
-          count: 4 + (w ~/ 2),
-          intervalSec: 0.82,
+          count: 3 + (w ~/ 2),
+          intervalSec: 0.52,
           laneIndex: (w + 1) % 3,
         ),
       ];
@@ -485,8 +485,8 @@ class EndlessWaveBuilder {
         groups.add(
           WaveSpawnGroup(
             kind: w % 3 == 0 ? MutantKind.bloodCocoon : MutantKind.ironBoar,
-            count: 3 + (w ~/ 2),
-            intervalSec: 0.95,
+            count: 2 + (w ~/ 2),
+            intervalSec: 0.62,
             laneIndex: (w + 2) % 3,
           ),
         );
@@ -615,6 +615,18 @@ class OddsDisclosureRow {
       name: '물자 호송 / 심야 탐색 대풍년 기연',
       rateText: '대풍년 26~34% · 한 번 더 22~28%',
       detail: '보상 2배 또는 지원패 +1 추가 수령 · 보름달 길조 게이지 100% 도달 시 특급 기연 100% 확정',
+    ),
+    OddsDisclosureRow(
+      category: '전장 소환 · 돌림판',
+      name: '운빨 할인 초소 소환 (35기력)',
+      rateText: '3형 신화 16.0% · 2형 희귀 34.0% · 1형 일반 50.0%',
+      detail: '5종 발사대 계통 균등(각 20.0%) 무작위 강림 · 같은 종류와 형 2곳 합체 시 100% 상위 형 진화',
+    ),
+    OddsDisclosureRow(
+      category: '전장 소환 · 돌림판',
+      name: '운명의 태극 기연 돌림판',
+      rateText: '5종 특급 보상 각 20.0% 균등 (꽝 0.0%)',
+      detail: '천뢰 무한 폭사 · 군수 기력 대박(+85) · 태초 신기 각성 · 3배 폭주진 · 무료 출두 균등 당첨',
     ),
   ];
 }

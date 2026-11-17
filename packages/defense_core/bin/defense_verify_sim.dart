@@ -9,22 +9,22 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
     tokens: 500,
     elixirs: 50,
     trainingSeals: 200,
-    naegongPoints: (ch - 1) * 280 + 40,
-    realmIndex: ((ch - 1) * 0.78).floor().clamp(0, 7),
-    centralGuardianLevel: 1 + (ch - 1) * 2,
+    naegongPoints: (ch - 1) * 320 + 60,
+    realmIndex: ((ch - 1) * 0.85).round().clamp(0, 7),
+    centralGuardianLevel: 1 + ((ch - 1) * 2.2).round(),
     supportTokens: 3,
     highestClearedGlobalStage: CampaignCatalog.stagesOfChapter(ch).first.globalIndex - 1,
-    openedMeridianStep: (ch - 1).clamp(0, 10),
+    openedMeridianStep: ((ch - 1) * 1.12).round().clamp(0, 10),
   );
 
   for (final lt in LauncherType.values) {
-    p.launcherPermanentLevels[lt] = 1 + ((ch - 1) * 1.45).round();
+    p.launcherPermanentLevels[lt] = 1 + ((ch - 1) * 1.85).round();
   }
   for (final cs in CoreStatType.values) {
-    p.coreStatLevels[cs] = (ch - 1);
+    p.coreStatLevels[cs] = ((ch - 1) * 1.15).round();
   }
 
-  final stoneIdx = (ch - 1).clamp(0, 9);
+  final stoneIdx = ch >= 10 ? 12 : (ch - 1).clamp(0, 9);
   final chosenStone = StoneMaterial.values[stoneIdx];
   p.unlockedStones.add(chosenStone);
 
