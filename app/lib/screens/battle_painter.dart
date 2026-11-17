@@ -208,23 +208,23 @@ class NightBattlePainter extends CustomPainter {
 
   void _drawInvasionLanes(Canvas canvas) {
     final borderShadow = Paint()
-      ..color = const Color(0x880B101D)
+      ..color = const Color(0x94080D18)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 31;
+      ..strokeWidth = 24.5;
     final outerRoad = Paint()
-      ..color = const Color(0x7825324B)
+      ..color = const Color(0x8824314A)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 25;
+      ..strokeWidth = 19.5;
     final innerRoad = Paint()
-      ..color = const Color(0x72526382)
+      ..color = const Color(0x8255688A)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 14.5;
+      ..strokeWidth = 11.2;
 
     // 1단계: 모든 곡선 산길 바닥을 먼저 연결감 있게 렌더링
     for (int laneIdx = 0; laneIdx < sim.chapter.lanes.length; laneIdx++) {
@@ -756,7 +756,7 @@ class NightBattlePainter extends CustomPainter {
     // 중앙 탑 바로 아래 직관적인 자동/수동 상태 알약 배지
     _paintMiniText(
       canvas,
-      sim.centralManualMode ? '🎯수동 저격(전장)' : '⚙️근접 방어(자동)',
+      sim.centralManualMode ? '🎯수동 탄지(제한 사거리)' : '⚙️근접 방어(자동)',
       center + const Offset(0, 32),
       sim.centralManualMode ? NightPalette.accentGold : NightPalette.jadeGreen,
       10.2,
@@ -946,39 +946,102 @@ class NightBattlePainter extends CustomPainter {
     }
   }
 
-  /// 초소 간 진법 시너지 광선 연결 & 선택된 초소의 실제 사거리 원(295px) 표시!
+  /// 초소 간 진법 시너지 광선 연결 & 각 초소·중앙탑의 실제 제한된 전술 사거리 원 표시!
   void _drawSynergyAndRangeRings(Canvas canvas) {
+    final tc = Offset(
+      CampaignCatalog.centralTowerPos.x,
+      CampaignCatalog.centralTowerPos.y,
+    );
     if (!sim.centralManualMode) {
-      final tc = Offset(
-        CampaignCatalog.centralTowerPos.x,
-        CampaignCatalog.centralTowerPos.y,
-      );
+      final autoR = sim.effectiveCentralAutoRange;
       canvas.drawCircle(
         tc,
-        DefenseBattleSim.centralAutoMaxRange,
+        autoR,
         Paint()
-          ..color = NightPalette.jadeShield.withValues(alpha: 0.14)
+          ..color = NightPalette.jadeShield.withValues(alpha: 0.17)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.2,
       );
+    } else {
+      final manualR = sim.effectiveCentralManualRange;
+      canvas.drawArc(
+        Rect.fromCircle(center: tc, radius: manualR),
+        pi * 1.04,
+        pi * 0.92,
+        false,
+        Paint()
+          ..color = NightPalette.accentGold.withValues(alpha: 0.34)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6,
+      );
+      _paintMiniText(
+        canvas,
+        '🎯수동 유효 사거리 한계',
+        tc + Offset(0, -manualR - 8),
+        NightPalette.accentGold,
+        9.0,
+        withBg: true,
+      );
+    }
+
+    // 설치된 모든 길목 초소의 실제 유효 사거리 고리 표시 (적이 사거리 안 굽이로 들어오면 밝게 점등!)
+    for (final l in sim.launchers) {
+      final lc = Offset(l.pos.x, l.pos.y);
+      final r = sim.effectiveLauncherRange(l);
+      final minR = l.type.minRangePx;
+      final col = Color(l.type.colorHex);
+      final engaged = sim.mutants.any((m) {
+        final d = m.pos.distanceTo(l.pos);
+        return d <= r && d >= minR;
+      });
+
+      if (engaged) {
+        canvas.drawCircle(
+          lc,
+          r,
+          Paint()..color = col.withValues(alpha: 0.045),
+        );
+      }
+      canvas.drawCircle(
+        lc,
+        r,
+        Paint()
+          ..color = col.withValues(alpha: engaged ? 0.36 : 0.16)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = engaged ? 1.4 : 1.0,
+      );
+      if (minR > 0) {
+        canvas.drawCircle(
+          lc,
+          minR,
+          Paint()
+            ..color = const Color(0x55E63946)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0,
+        );
+      }
     }
 
     if (selectedSlotIndex != null) {
       final slot = sim.mountSlotByIndex(selectedSlotIndex!);
       if (slot != null) {
         final sc = Offset(slot.pos.x, slot.pos.y);
+        final built = sim.launcherAtSlot(slot.slotIndex);
+        final selR = built != null
+            ? sim.effectiveLauncherRange(built)
+            : sim.previewSlotRange(slot);
         canvas.drawCircle(
           sc,
-          295.0,
-          Paint()..color = NightPalette.jadeGreen.withValues(alpha: 0.08),
+          selR,
+          Paint()..color = NightPalette.jadeGreen.withValues(alpha: 0.09),
         );
         canvas.drawCircle(
           sc,
-          295.0,
+          selR,
           Paint()
-            ..color = NightPalette.jadeGreen.withValues(alpha: 0.48)
+            ..color = NightPalette.jadeGreen.withValues(alpha: 0.58)
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.6,
+            ..strokeWidth = 1.8,
         );
       }
     }

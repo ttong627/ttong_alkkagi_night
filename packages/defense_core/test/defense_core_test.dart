@@ -1537,5 +1537,91 @@ void main() {
       expect(prize, isNotNull);
       expect(sim.rouletteSpinsAvailable, 0);
     });
+
+    test('구곡양장 장거리 아홉 굽이 경로(1,250px 이상)와 제한된 전술 사거리·비거리 소멸·실시간 사거리 강화가 작동한다', () {
+      // 1) 전 10장의 침공 경로가 1,250px 이상의 긴 지그재그 아홉 굽이길로 구성되었는지 검증
+      for (final ch in CampaignCatalog.chapters) {
+        for (int l = 0; l < ch.lanes.length; l++) {
+          final pts = ch.smoothedLane(l);
+          double totalLen = 0.0;
+          for (int i = 1; i < pts.length; i++) {
+            totalLen += pts[i].distanceTo(pts[i - 1]);
+          }
+          expect(totalLen, greaterThan(1250.0), reason: '${ch.number}장 $l번 경로 길이 부족: $totalLen');
+        }
+      }
+
+      // 2) 초소 사거리가 제한(108~162px)되어 남단 초소가 북단 스폰구 괴물을 절대 공격하지 못하며 비거리 한계에서 소멸함!
+      final p = PlayerProgress();
+      final sim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 1),
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        allowSerendipity: false,
+      );
+      sim.mutants.clear();
+      expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue); // (198, 448), 사거리 ~122px
+      final launcher0 = sim.launcherAtSlot(0)!;
+      expect(sim.effectiveLauncherRange(launcher0), lessThan(140.0));
+
+      // 북단 1굽이(y=90)에 있는 적은 사거리 밖이므로 절대 사격하지 않음!
+      sim.mutants.add(
+        ActiveMutant(
+          uid: 7001,
+          kind: MutantKind.ironBoar,
+          laneIndex: 0,
+          waypoints: sim.chapter.smoothedLane(0),
+          pos: const Vec2(200, 90),
+          maxHp: 300,
+          speed: 0,
+        ),
+      );
+      for (int i = 0; i < 20; i++) {
+        sim.step(1 / 60);
+      }
+      expect(sim.projectiles, isEmpty, reason: '사거리 밖 먼 굽이 괴물을 공격하면 안 됨');
+
+      // 중포 탄지기는 최소 사거리 사각(34px) 안으로 파고든 적을 쏘지 못함!
+      sim.fieldTokens = 200;
+      expect(sim.placeLauncherInBattle(1, LauncherType.heavy), isTrue);
+      final heavyL = sim.launcherAtSlot(1)!;
+      sim.mutants
+        ..clear()
+        ..add(
+          ActiveMutant(
+            uid: 7002,
+            kind: MutantKind.swarmRat,
+            laneIndex: 0,
+            waypoints: sim.chapter.smoothedLane(0),
+            pos: heavyL.pos + const Vec2(10, 0), // 10px 코앞 사각지대!
+            maxHp: 100,
+            speed: 0,
+          ),
+        );
+      heavyL.cooldown = 0;
+      sim.step(1 / 60);
+      expect(
+        sim.projectiles.where((pr) => pr.sourceKey == 'launcher_1'),
+        isEmpty,
+        reason: '중포 최소 사거리 사각지대 안 적은 사격 불가',
+      );
+
+      // 수동 탄지 조준선 및 탄알도 무제한이 아니라 수동 사거리 한계(기본 195px 내외)에서 멈추고 소멸함!
+      final baseManualR = sim.effectiveCentralManualRange;
+      expect(baseManualR, lessThan(210.0));
+      sim.toggleCentralManualMode();
+      sim.centralFireTimer = 0;
+      expect(sim.fireCentralManualAngle(-1.5707963), isTrue);
+      for (int i = 0; i < 60; i++) {
+        sim.step(1 / 60); // 1초 경과 시 유효 비거리 초과로 자연 소멸!
+      }
+      expect(sim.projectiles, isEmpty);
+
+      // 실시간 사거리 강화(🔭사거리업) 작동 검증!
+      sim.fieldTokens = 200;
+      expect(sim.upgradeLiveRange(), isTrue);
+      expect(sim.liveRangeLv, 1);
+      expect(sim.effectiveCentralManualRange, greaterThan(baseManualR));
+    });
   });
 }

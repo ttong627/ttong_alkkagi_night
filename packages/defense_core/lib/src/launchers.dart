@@ -1,13 +1,15 @@
-/// 길목 알 자동 발사대 5계통 × 버전(1형~4형) 및 중앙 자동 보호 장치 모델.
+/// 길목 알 자동 발사대 5계통 × 버전(1형~5형) 및 고유 전술 사거리·중앙 자동 보호 장치 모델.
 enum LauncherType {
   rapid(
     id: 'rapid',
     name: '속사 탄지기',
-    roleSummary: '초고속 다연발(2~5갈래) 관통 탄막으로 몰려오는 독쥐·들개 대군을 순식간에 갈아버림',
+    roleSummary: '근·중거리(122) 굽이 안에 들어온 적에게 초고속 다연발(2~7갈래) 탄막 집중 사격',
     tierNames: ['1형 쌍발 속사기', '2형 삼연발 연노기', '3형 사연속 폭풍기', '4형 오발 천뢰 기관진'],
     baseCooldownSec: 0.38,
-    baseDamage: 14.5,
-    projectileSpeed: 495.0,
+    baseDamage: 18.0,
+    projectileSpeed: 485.0,
+    baseRangePx: 122.0,
+    minRangePx: 0.0,
     unlockChapter: 1,
     buildCostTokens: 45,
     colorHex: 0xFF4EA8DE,
@@ -15,11 +17,13 @@ enum LauncherType {
   heavy(
     id: 'heavy',
     name: '중포 탄지기',
-    roleSummary: '묵직한 대구경 포탄으로 중갑 변이체 장갑 파쇄·대폭발 충격파 및 절벽 추락 유도',
+    roleSummary: '장거리(162 · 코앞 34 사각) 대구경 곡사 포격으로 먼 굽이 중갑 변이 파쇄 및 절벽 추락',
     tierNames: ['1형 강타 투석포', '2형 철심 폭렬포', '3형 파쇄 진동대포', '4형 천추 파성 거포'],
-    baseCooldownSec: 1.08,
-    baseDamage: 52.0,
-    projectileSpeed: 430.0,
+    baseCooldownSec: 1.06,
+    baseDamage: 64.0,
+    projectileSpeed: 420.0,
+    baseRangePx: 162.0,
+    minRangePx: 34.0,
     unlockChapter: 1,
     buildCostTokens: 55,
     colorHex: 0xFFF77F00,
@@ -27,11 +31,13 @@ enum LauncherType {
   curveSpin(
     id: 'curveSpin',
     name: '곡사 회전기',
-    roleSummary: 'S자로 휘어 치는 고속 다중 관통 회전 칼날탄으로 방패병 측면과 적 대열을 통째로 훑음',
+    roleSummary: '중거리(134) S자 부메랑 칼날탄으로 위·아래 두 굽이 대열과 방패병 측면을 동시에 훑음',
     tierNames: ['1형 회전 비검기', '2형 쌍류 부메랑포', '3형 갈고리 파쇄포', '4형 태극 칼날 회오리포'],
-    baseCooldownSec: 0.76,
-    baseDamage: 24.0,
-    projectileSpeed: 450.0,
+    baseCooldownSec: 0.74,
+    baseDamage: 29.5,
+    projectileSpeed: 440.0,
+    baseRangePx: 134.0,
+    minRangePx: 0.0,
     unlockChapter: 2,
     buildCostTokens: 52,
     colorHex: 0xFF72EFDD,
@@ -39,11 +45,13 @@ enum LauncherType {
   frostField(
     id: 'frostField',
     name: '한빙 역장기',
-    roleSummary: '부채꼴 냉기 산탄(2~3발)으로 적 대군을 얼려 묶고 서리 폭발로 연쇄 쇄빙 타격',
+    roleSummary: '초근접(108) 굽이 목지점 전용! 짧은 사거리 대신 지나가는 대군을 통째로 얼려 묶음',
     tierNames: ['1형 쌍발 냉기포', '2형 서리 산탄기', '3형 삼발 빙결 족쇄포', '4형 만년 빙옥 폭풍포'],
-    baseCooldownSec: 0.90,
-    baseDamage: 16.5,
-    projectileSpeed: 415.0,
+    baseCooldownSec: 0.86,
+    baseDamage: 21.0,
+    projectileSpeed: 405.0,
+    baseRangePx: 108.0,
+    minRangePx: 0.0,
     unlockChapter: 3,
     buildCostTokens: 50,
     colorHex: 0xFF90E0EF,
@@ -51,11 +59,13 @@ enum LauncherType {
   qiAmplifier(
     id: 'qiAmplifier',
     name: '내공 증폭기',
-    roleSummary: '고속 관통 기공탄 사격 + 주변 초소 폭풍 가속·화력 증폭 및 중앙탑 내공 급속 충전',
+    roleSummary: '중거리(138) 관통 기공탄 + 인접(125) 초소 사거리·연사·화력 증폭 및 내공 충전',
     tierNames: ['1형 기운 공명석', '2형 문파 가속 주입기', '3형 회심 폭주 진법', '4형 기명 천하 사방진'],
-    baseCooldownSec: 1.05,
-    baseDamage: 23.0,
-    projectileSpeed: 460.0,
+    baseCooldownSec: 1.00,
+    baseDamage: 28.0,
+    projectileSpeed: 445.0,
+    baseRangePx: 138.0,
+    minRangePx: 0.0,
     unlockChapter: 5,
     buildCostTokens: 60,
     colorHex: 0xFFFFD166,
@@ -69,6 +79,8 @@ enum LauncherType {
     required this.baseCooldownSec,
     required this.baseDamage,
     required this.projectileSpeed,
+    required this.baseRangePx,
+    required this.minRangePx,
     required this.unlockChapter,
     required this.buildCostTokens,
     required this.colorHex,
@@ -81,9 +93,15 @@ enum LauncherType {
   final double baseCooldownSec;
   final double baseDamage;
   final double projectileSpeed;
+  final double baseRangePx;
+  final double minRangePx;
   final int unlockChapter;
   final int buildCostTokens;
   final int colorHex;
+
+  /// 승급 단계(1~5형)에 따른 기본 유효 사거리 (단당 +6%만 정밀 확장하여 초소 위치 전략성 유지!).
+  double effectiveBaseRange(int tier) =>
+      baseRangePx * (1.0 + (tier.clamp(1, 5) - 1) * 0.06);
 
   String tierLabel(int tier) {
     if (tier >= 5) return '★5형 태초 신기($name)';

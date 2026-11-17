@@ -342,12 +342,13 @@ void main() {
     expect(find.text('중앙탑: 수동탄지'), findsOneWidget);
     expect(find.text('초소 0/2곳'), findsOneWidget);
 
-    // 1-2 전장의 1번 빈 초소 좌표(arena: 200, 392)를 터치해 직접 발사대 설치 시트 오픈!
+    // 1-2 전장의 첫 번째 빈 초소 좌표를 동적으로 읽어 터치해 빠른 선택 띠 오픈!
     expect(find.textContaining('군수기력 ⚡'), findsOneWidget);
     final arenaBox = tester.getRect(find.byKey(const Key('battle_arena_gesture')));
+    final firstSlotPos = CampaignCatalog.chapterOf(1).mounts.first.pos;
     final slotTapOffset = Offset(
-      arenaBox.left + arenaBox.width * (200.0 / CampaignCatalog.arenaWidth),
-      arenaBox.top + arenaBox.height * (392.0 / CampaignCatalog.arenaHeight),
+      arenaBox.left + arenaBox.width * (firstSlotPos.x / CampaignCatalog.arenaWidth),
+      arenaBox.top + arenaBox.height * (firstSlotPos.y / CampaignCatalog.arenaHeight),
     );
     await tester.tapAt(slotTapOffset);
     await tester.pump();
@@ -659,9 +660,10 @@ void main() {
 
     // 1) 빈 초소 터치 시 전체 모달이 아니라 하단 4.8초 실시간 빠른 띠가 열리며, 안 누르고 5.2초가 지나면 게임이 멈추지 않고 자동 통과!
     final arenaBox = tester.getRect(find.byKey(const Key('battle_arena_gesture')));
+    final firstSlotPos = CampaignCatalog.chapterOf(1).mounts.first.pos;
     final slotTapOffset = Offset(
-      arenaBox.left + arenaBox.width * (200.0 / CampaignCatalog.arenaWidth),
-      arenaBox.top + arenaBox.height * (392.0 / CampaignCatalog.arenaHeight),
+      arenaBox.left + arenaBox.width * (firstSlotPos.x / CampaignCatalog.arenaWidth),
+      arenaBox.top + arenaBox.height * (firstSlotPos.y / CampaignCatalog.arenaHeight),
     );
     await tester.tapAt(slotTapOffset);
     await tester.pump(const Duration(milliseconds: 100));
@@ -698,9 +700,11 @@ void main() {
     }
     expect(find.textContaining('심야 돌파 비급 선택 (3택 1)'), findsNothing);
 
-    // 4) 기력이 모인 상태에서 실시간 「⚔️화력업+0」 클릭 시 즉시 +1단으로 강화되는지 검증!
+    // 4) 기력이 모인 상태에서 실시간 「⚔️화력업+0」 및 「🔭사거리업+0」 단추 존재·작동 검증!
     final fireBtn = find.byKey(const Key('live_upg_firepower_btn'));
+    final rangeBtn = find.byKey(const Key('live_upg_range_btn'));
     expect(fireBtn, findsOneWidget);
+    expect(rangeBtn, findsOneWidget);
     if (find.textContaining('⚔️화력업+0').evaluate().isNotEmpty) {
       await tester.ensureVisible(fireBtn);
       await tester.tap(fireBtn);

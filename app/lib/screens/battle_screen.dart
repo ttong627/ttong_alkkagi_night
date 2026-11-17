@@ -2098,6 +2098,43 @@ class _BattleScreenState extends State<BattleScreen>
                             ),
                             const SizedBox(width: 5),
                             ActionChip(
+                              key: const Key('live_upg_range_btn'),
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: _sim.liveRangeLv < 4 &&
+                                      _sim.fieldTokens >= _sim.liveRangeCost
+                                  ? const Color(0xFF10343A)
+                                  : NightPalette.bgDeep,
+                              side: BorderSide(
+                                color: _sim.liveRangeLv < 4 &&
+                                        _sim.fieldTokens >= _sim.liveRangeCost
+                                    ? NightPalette.jadeGreen
+                                    : Colors.white24,
+                              ),
+                              label: Text(
+                                _sim.liveRangeLv >= 4
+                                    ? '🔭사거리만땅'
+                                    : '🔭사거리업+${_sim.liveRangeLv}(${_sim.liveRangeCost}⚡)',
+                                style: TextStyle(
+                                  fontSize: 11.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: _sim.liveRangeLv < 4 &&
+                                          _sim.fieldTokens >= _sim.liveRangeCost
+                                      ? NightPalette.jadeGreen
+                                      : NightPalette.textMuted,
+                                ),
+                              ),
+                              onPressed: _sim.liveRangeLv < 4 &&
+                                      _sim.fieldTokens >= _sim.liveRangeCost
+                                  ? () {
+                                      if (_sim.upgradeLiveRange()) {
+                                        NightHaptics.instance.lightTap();
+                                        setState(() {});
+                                      }
+                                    }
+                                  : null,
+                            ),
+                            const SizedBox(width: 5),
+                            ActionChip(
                               key: const Key('live_upg_barrier_btn'),
                               visualDensity: VisualDensity.compact,
                               backgroundColor:

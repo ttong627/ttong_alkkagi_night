@@ -168,6 +168,7 @@ class ActiveStoneProjectile {
     this.isGiantCritSerendipity = false,
     this.clonedByGate = false,
     this.splitChild = false,
+    this.maxTravelDist = 230.0,
     int extraBounces = 0,
   }) : bouncesLeft = shape.maxBounces + extraBounces;
 
@@ -192,6 +193,8 @@ class ActiveStoneProjectile {
   final bool isGiantCritSerendipity;
   bool clonedByGate;
   final bool splitChild;
+  double maxTravelDist;
+  double traveledDist = 0.0;
 
   int bouncesLeft;
   bool bouncedOffObstacle = false;
@@ -307,8 +310,11 @@ class DefenseBattleSim {
   /// 운빨 무작위 초소 소환 비용 (일반 지정 건설 45~60기력보다 저렴하며 대박 시 2·3형 즉시 강림!).
   static const int luckySummonCostTokens = 35;
 
-  /// 중앙 기명 수호탑의 자동 모드 근접 경계 사거리 (위쪽 산길은 길목 초소나 수동 저격이 담당해야 함!).
-  static const double centralAutoMaxRange = 165.0;
+  /// 중앙 기명 수호탑의 자동 모드 근접 경계 사거리 (본진 결계 코앞 마지막 굽이만 경계!).
+  static const double centralAutoMaxRange = 136.0;
+
+  /// 중앙 기명 수호탑의 수동 탄지 기본 유효 사거리 (무제한 전장 저격 차단 · 하단~중하단 권역 정밀 도탄!).
+  static const double centralManualBaseRange = 195.0;
 
   late final CentralGuardianSpec centralSpec;
   late double shieldMaxHpDynamic;
@@ -358,10 +364,40 @@ class DefenseBattleSim {
   int pendingPerkRolls = 0;
   double perkChoiceTimer = 0.0;
 
-  /// 전투 중 멈춤 없이 실시간 기력(⚡)으로 누르는 전군 일괄 업그레이드 3종 레벨!
+  /// 전투 중 멈춤 없이 실시간 기력(⚡)으로 누르는 전군 일괄 업그레이드 4종(화력·연사·사거리·결계) 레벨!
   int liveFirepowerLv = 0;
   int liveReloadLv = 0;
+  int liveRangeLv = 0;
   int liveBarrierLv = 0;
+
+  /// 실시간 사거리 강화 배율 (최대 4단, 단당 +11% 확장 — 무분별한 전체 맵 공격 차단!).
+  double get liveRangeMultiplier => 1.0 + liveRangeLv.clamp(0, 4) * 0.11;
+
+  /// 중앙 기명 수호탑의 현재 자동 경계 유효 사거리.
+  double get effectiveCentralAutoRange =>
+      (centralAutoMaxRange * liveRangeMultiplier).clamp(120.0, 185.0);
+
+  /// 중앙 기명 수호탑의 현재 수동 탄지 유효 사거리 (조준선 및 탄알 비거리 한계선).
+  double get effectiveCentralManualRange =>
+      (centralManualBaseRange * liveRangeMultiplier).clamp(190.0, 282.0);
+
+  /// 개별 길목 초소(ActiveLauncher)의 현재 유효 사거리 (발사대 계통별 고유 사거리 + 승급 + 인접 증폭기 + 실시간 사거리업 반영).
+  double effectiveLauncherRange(ActiveLauncher l) {
+    double mult = liveRangeMultiplier * (1.0 + progress.corePrecisionBonus * 0.30);
+    for (final other in launchers) {
+      if (other != l &&
+          other.type == LauncherType.qiAmplifier &&
+          other.pos.distanceTo(l.pos) <= 125.0) {
+        mult += 0.12 + other.tier * 0.02;
+        break;
+      }
+    }
+    return (l.type.effectiveBaseRange(l.tier) * mult).clamp(96.0, 236.0);
+  }
+
+  /// 빈 초소 선택·미리보기 시 표시할 예정 유효 사거리.
+  double previewSlotRange(LauncherMountSlot slot) =>
+      (slot.recommendedType.baseRangePx * liveRangeMultiplier).clamp(96.0, 220.0);
 
   /// 길이 아닌 옆숲·땅굴 비정규 침투 기습 타이머 및 출몰 카운트!
   double infiltrationTimer = 8.8;
@@ -480,21 +516,21 @@ class DefenseBattleSim {
 
     launchers.clear();
 
-    // 전장 핀볼 기물 초기화: ×2→×3 진화 복제 마법진 + 🎯화력 증폭 과녁패 + 좌우 심야 화약통 2기!
+    // 전장 핀볼 기물 초기화: 구곡양장 아홉 굽이길 중하단 요충지에 배치하여 제한된 사거리·도탄으로 노리는 재미 극대화!
     cloneGate = CloneGateZone(
-      baseCenter: const Vec2(200, 250),
-      radius: 24.0,
-      swayAmplitude: 56.0,
+      baseCenter: const Vec2(200, 402),
+      radius: 23.0,
+      swayAmplitude: 54.0,
     );
     powerTarget = PowerTargetProp(
-      baseCenter: const Vec2(200, 174),
+      baseCenter: const Vec2(200, 298),
       radius: 19.0,
-      swayAmplitude: 62.0,
+      swayAmplitude: 58.0,
     );
     powderKegs
       ..clear()
-      ..add(PowderKegProp(pos: const Vec2(82, 276)))
-      ..add(PowderKegProp(pos: const Vec2(318, 276)));
+      ..add(PowderKegProp(pos: const Vec2(88, 366)))
+      ..add(PowderKegProp(pos: const Vec2(312, 248)));
 
     for (final _ in chapter.pillars) {
       pillarAngles.add(0.0);
@@ -1143,7 +1179,28 @@ class DefenseBattleSim {
 
   int get liveFirepowerCost => 28 + liveFirepowerLv * 18;
   int get liveReloadCost => 28 + liveReloadLv * 18;
+  int get liveRangeCost => 32 + liveRangeLv * 22;
   int get liveBarrierCost => 26 + liveBarrierLv * 16;
+
+  /// 실시간 전군 사거리 일괄 확장 업그레이드 (최대 4단 · 단당 +11% 사거리 확장, 멈춤 없음!).
+  bool upgradeLiveRange() {
+    if (isFinished || liveRangeLv >= 4 || fieldTokens < liveRangeCost) {
+      return false;
+    }
+    fieldTokens -= liveRangeCost;
+    liveRangeLv++;
+    manualResonanceTimer = max(manualResonanceTimer, 8.0);
+    pendingSounds.add(SoundCue.gearMotion);
+    bursts.add(FxBurst(pos: CampaignCatalog.centralTowerPos, colorHex: 0xFF72EFDD, maxRadius: 52));
+    callouts.add(
+      FloatingCallout(
+        pos: CampaignCatalog.centralTowerPos + const Vec2(0, -44),
+        text: '🔭 전군 유효 사거리 확장 $liveRangeLv단! (+${liveRangeLv * 11}%)',
+        colorHex: 0xFF72EFDD,
+      ),
+    );
+    return true;
+  }
 
   /// 실시간 전군 화력 일괄 업그레이드 (+22%/단, 멈춤 없음!).
   bool upgradeLiveFirepower() {
@@ -1405,14 +1462,14 @@ class DefenseBattleSim {
     return atan2(vy, vx);
   }
 
-  /// 수동 탄지 도탄 궤적 예측선 계산 (벽면 및 회전 기둥 1회 반사 포함).
-  List<Vec2> previewCentralManualRay(double rawAngleRad, {double maxDist = 610.0}) {
+  /// 수동 탄지 도탄 궤적 예측선 계산 (현재 수동 유효 사거리 한계선 및 벽면·기둥 1회 반사 반영).
+  List<Vec2> previewCentralManualRay(double rawAngleRad, {double? maxDist}) {
     final angle = sanitizeManualAimAngle(rawAngleRad);
     final origin = CampaignCatalog.centralTowerPos;
     Vec2 cur = origin;
     Vec2 dir = Vec2(cos(angle), sin(angle)).normalized;
     final pts = <Vec2>[origin];
-    double rem = maxDist;
+    double rem = maxDist ?? effectiveCentralManualRange;
     int bounces = 0;
 
     const stepLen = 8.0;
@@ -1649,6 +1706,7 @@ class DefenseBattleSim {
         ignoresShield: bypassShield,
         isGiantCritSerendipity: isCritSerendipity,
         extraBounces: 2 + ricochetStacks * 2,
+        maxTravelDist: effectiveCentralManualRange * 1.15,
       ),
     );
 
@@ -1669,6 +1727,7 @@ class DefenseBattleSim {
           radius: 8.8 * radiusScale,
           pierceLeft: max(0, pierce - 1),
           extraBounces: 1 + ricochetStacks * 2,
+          maxTravelDist: effectiveCentralManualRange * 1.15,
         ),
       );
     }
@@ -2361,7 +2420,9 @@ class DefenseBattleSim {
         chScale *
         ch1Ease *
         difficulty.hpMult;
-    final spd = item.kind.speed * (1.0 + (stage.chapterNumber - 1) * 0.02) * difficulty.speedMult;
+    // 2.1배 길어진 구곡양장 아홉 굽이 협곡길 위를 역동적으로 휘돌아 내려오도록 행군 속도 1.28배 조율!
+    final spd =
+        item.kind.speed * 1.28 * (1.0 + (stage.chapterNumber - 1) * 0.02) * difficulty.speedMult;
     final latOffset = item.kind.isBoss ? 0.0 : (rng.nextDouble() - 0.5) * 14.0;
     final spawnPos = lane.first + Vec2(latOffset * 0.65, 0);
 
@@ -2512,12 +2573,23 @@ class DefenseBattleSim {
         final slowFactor = m.slowTimer > 0 ? 0.58 : 1.0;
         final effectiveSpeed = m.speed * slowFactor * gaitMult;
 
-        // Catmull-Rom 곡선 경로 전방 주시(Look-Ahead Pure Pursuit) + 관성 속도 보간(smoothVel)!
+        // Catmull-Rom 곡선 경로 전방 주시(Look-Ahead Pure Pursuit) + 급커브 궤도 맴돎 원천 차단!
         if (m.waypoints.isNotEmpty) {
           int wpIdx = m.waypointIndex.clamp(0, m.waypoints.length - 1);
-          while (wpIdx + 1 < m.waypoints.length &&
-              m.pos.distanceTo(m.waypoints[wpIdx]) < 15.0) {
-            wpIdx++;
+          while (wpIdx + 1 < m.waypoints.length) {
+            final curWp = m.waypoints[wpIdx];
+            final distToWp = m.pos.distanceTo(curWp);
+            if (distToWp < 24.0) {
+              wpIdx++;
+              continue;
+            }
+            final segNext = m.waypoints[wpIdx + 1] - curWp;
+            final relPos = m.pos - curWp;
+            if (distToWp < 42.0 && (relPos.x * segNext.x + relPos.y * segNext.y) > 0) {
+              wpIdx++;
+              continue;
+            }
+            break;
           }
           m.waypointIndex = wpIdx;
 
@@ -2572,7 +2644,7 @@ class DefenseBattleSim {
           }
 
           final desiredVel = steerDir * effectiveSpeed;
-          final velBlend = min(1.0, dt * 8.6);
+          final velBlend = min(1.0, dt * 13.5);
           if (m.smoothVel.length < 1.0) {
             m.smoothVel = desiredVel;
           } else {
@@ -2714,7 +2786,7 @@ class DefenseBattleSim {
     if (mutants.isEmpty) return;
 
     final origin = CampaignCatalog.centralTowerPos;
-    final maxR = centralManualMode ? 580.0 : centralAutoMaxRange;
+    final maxR = centralManualMode ? effectiveCentralManualRange : effectiveCentralAutoRange;
     final target = _pickMostThreateningMutant(origin, maxRange: maxR);
     if (target == null) return;
 
@@ -2755,6 +2827,7 @@ class DefenseBattleSim {
           radius: 6.5,
           pierceLeft: 0,
           aoeSplashRadius: 0.0,
+          maxTravelDist: effectiveCentralAutoRange * 1.15,
         )..bouncesLeft = 0,
       );
       return;
@@ -2778,6 +2851,7 @@ class DefenseBattleSim {
         speed: 350,
         pullsEnemies: true,
         aoeRadius: 72,
+        maxTravelDist: effectiveCentralAutoRange * 1.25,
       );
       return;
     }
@@ -2797,12 +2871,18 @@ class DefenseBattleSim {
       speed: 345,
       pierceBonus: 0,
       sectTech: useSectTech ? preset.sectTechnique : null,
+      maxTravelDist: effectiveCentralAutoRange * 1.18,
     );
   }
 
   void _fireAutoEogieoseok(ActiveMutant primaryTarget) {
     final origin = CampaignCatalog.centralTowerPos;
     final count = progress.realm.eogieoseokCount + 1;
+    final maxEogiRange = (215.0 * liveRangeMultiplier).clamp(210.0, 290.0);
+    final candidates = mutants
+        .where((m) => m.pos.distanceTo(origin) <= maxEogiRange)
+        .toList();
+    final pool = candidates.isNotEmpty ? candidates : <ActiveMutant>[primaryTarget];
     callouts.add(
       FloatingCallout(
         pos: origin + const Vec2(0, -52),
@@ -2811,14 +2891,13 @@ class DefenseBattleSim {
         isBigBanner: true,
       ),
     );
-    final sorted = List<ActiveMutant>.from(mutants)
-      ..sort(
-        (a, b) => a.pos
-            .distanceTo(CampaignCatalog.villageCenter)
-            .compareTo(b.pos.distanceTo(CampaignCatalog.villageCenter)),
-      );
+    pool.sort(
+      (a, b) => a.pos
+          .distanceTo(CampaignCatalog.villageCenter)
+          .compareTo(b.pos.distanceTo(CampaignCatalog.villageCenter)),
+    );
     for (int i = 0; i < count; i++) {
-      final tgt = sorted[i % sorted.length];
+      final tgt = pool[i % pool.length];
       _spawnStoneShot(
         sourceKey: 'central_tower',
         sourceLabel: '중앙 기명 수호탑 (어기어석)',
@@ -2829,6 +2908,7 @@ class DefenseBattleSim {
         pierceBonus: 3,
         aoeRadius: 52,
         ignoresShield: true,
+        maxTravelDist: maxEogiRange * 1.16,
       );
     }
 
@@ -2886,7 +2966,7 @@ class DefenseBattleSim {
       for (final other in launchers) {
         if (other != l &&
             other.type == LauncherType.qiAmplifier &&
-            other.pos.distanceTo(l.pos) < 185) {
+            other.pos.distanceTo(l.pos) <= 125) {
           ampReload += 0.16 + other.tier * 0.06;
           ampDamage += 0.15 + other.tier * 0.07;
           ampCrit += 0.05 * other.tier;
@@ -2928,7 +3008,7 @@ class DefenseBattleSim {
 
       final permScale = 1.0 + (l.permanentLevel - 1) * 0.14;
       final dmg = l.type.baseDamage *
-          1.22 *
+          1.42 *
           l.type.tierDamageMultiplier(l.tier) *
           permScale *
           ampDamage *
@@ -2939,6 +3019,9 @@ class DefenseBattleSim {
               progress.codexPowerBonus);
 
       final shotCount = l.type.projectilesPerShot(l.tier);
+      final launcherRange = effectiveLauncherRange(l);
+      final maxShotDist =
+          launcherRange * (l.type == LauncherType.curveSpin ? 1.28 : 1.16);
       final launcherPierce = synPierce +
           switch (l.type) {
             LauncherType.rapid => 1 + (l.tier >= 3 ? 1 : 0),
@@ -2975,6 +3058,7 @@ class DefenseBattleSim {
           aoeRadius: launcherSplash,
           freezesOnHit: l.type == LauncherType.frostField,
           knockbackScale: l.type == LauncherType.heavy ? (1.65 + l.tier * 0.22) : 1.15,
+          maxTravelDist: maxShotDist,
         );
       }
     }
@@ -3071,7 +3155,8 @@ class DefenseBattleSim {
   }
 
   void _executeSpiritBeast(SpiritBeast beast, int lv) {
-    final target = _pickMostThreateningMutant(CampaignCatalog.villageCenter, maxRange: 520);
+    final allyMaxR = (212.0 * liveRangeMultiplier).clamp(205.0, 285.0);
+    final target = _pickMostThreateningMutant(CampaignCatalog.villageCenter, maxRange: allyMaxR);
     if (target == null) return;
     final allyMult = 1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45;
     final power =
@@ -3086,6 +3171,7 @@ class DefenseBattleSim {
           target: target,
           baseDamage: power,
           speed: 375,
+          maxTravelDist: allyMaxR * 1.15,
         );
         break;
       case SpiritBeast.geumgangTurtle:
@@ -3108,6 +3194,7 @@ class DefenseBattleSim {
           speed: 410,
           pierceBonus: 2,
           ignoresShield: true,
+          maxTravelDist: allyMaxR * 1.15,
         );
         break;
       case SpiritBeast.baekho:
@@ -3121,12 +3208,17 @@ class DefenseBattleSim {
             speed: 360,
             knockbackScale: 1.85,
             aoeRadius: 42,
+            maxTravelDist: allyMaxR * 1.15,
           );
         }
         break;
       case SpiritBeast.geumryong:
+        final inRange = mutants
+            .where((m) => m.pos.distanceTo(CampaignCatalog.villageCenter) <= allyMaxR)
+            .toList();
+        final pool = inRange.isNotEmpty ? inRange : <ActiveMutant>[target];
         for (int i = 0; i < 4; i++) {
-          final tgt = mutants[i % mutants.length];
+          final tgt = pool[i % pool.length];
           _spawnStoneShot(
             sourceKey: 'beast_geumryong',
             sourceLabel: '영수 금룡',
@@ -3137,6 +3229,7 @@ class DefenseBattleSim {
             pierceBonus: 2,
             aoeRadius: 50,
             ignoresShield: true,
+            maxTravelDist: allyMaxR * 1.18,
           );
         }
         break;
@@ -3144,7 +3237,8 @@ class DefenseBattleSim {
   }
 
   void _executeCompanionSkill(CompanionHero hero, int lv) {
-    final target = _pickMostThreateningMutant(CampaignCatalog.villageCenter, maxRange: 500);
+    final allyMaxR = (212.0 * liveRangeMultiplier).clamp(205.0, 285.0);
+    final target = _pickMostThreateningMutant(CampaignCatalog.villageCenter, maxRange: allyMaxR);
     if (target == null) return;
     final allyMult = 1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45;
     final baseDmg =
@@ -3154,7 +3248,14 @@ class DefenseBattleSim {
 
     switch (hero) {
       case CompanionHero.seokdu:
-        final heavyTgt = mutants.where((m) => m.kind.isBoss || m.kind == MutantKind.ironBoar).firstOrNull ?? target;
+        final heavyTgt = mutants
+                .where(
+                  (m) =>
+                      (m.kind.isBoss || m.kind == MutantKind.ironBoar) &&
+                      m.pos.distanceTo(CampaignCatalog.villageCenter) <= allyMaxR,
+                )
+                .firstOrNull ??
+            target;
         _spawnStoneShot(
           sourceKey: key,
           sourceLabel: label,
@@ -3286,8 +3387,12 @@ class DefenseBattleSim {
         );
         break;
       case CompanionHero.geomhwang:
+        final inRange = mutants
+            .where((m) => m.pos.distanceTo(CampaignCatalog.villageCenter) <= allyMaxR)
+            .toList();
+        final pool = inRange.isNotEmpty ? inRange : <ActiveMutant>[target];
         for (int i = 0; i < 3; i++) {
-          final tgt = mutants[i % mutants.length];
+          final tgt = pool[i % pool.length];
           _spawnStoneShot(
             sourceKey: key,
             sourceLabel: label,
@@ -3297,6 +3402,7 @@ class DefenseBattleSim {
             speed: 415,
             extraCrit: 0.25,
             ignoresShield: true,
+            maxTravelDist: allyMaxR * 1.15,
           );
         }
         break;
@@ -3340,6 +3446,7 @@ class DefenseBattleSim {
     bool ignoresShield = false,
     double knockbackScale = 1.0,
     SectTechnique? sectTech,
+    double maxTravelDist = 235.0,
   }) {
     if (projectiles.length >= 180) {
       projectiles.removeAt(0);
@@ -3428,6 +3535,7 @@ class DefenseBattleSim {
         ignoresShield: bypassShield,
         isGiantCritSerendipity: isCritSerendipity,
         extraBounces: ricochetStacks * 2,
+        maxTravelDist: maxTravelDist,
       ),
     );
 
@@ -3447,6 +3555,7 @@ class DefenseBattleSim {
           colorHex: 0xFFC77DFF,
           radius: 8.2 * radiusScale,
           extraBounces: ricochetStacks * 2,
+          maxTravelDist: maxTravelDist,
         ),
       );
     }
@@ -3471,13 +3580,20 @@ class DefenseBattleSim {
         p.vel = p.vel + perp * (p.spinCurve * 95.0 * dt);
       }
 
-      p.pos = p.pos + p.vel * dt;
+      final stepDelta = p.vel * dt;
+      p.pos = p.pos + stepDelta;
+      p.traveledDist += stepDelta.length;
+      if (p.traveledDist >= p.maxTravelDist) {
+        projectiles.removeAt(i);
+        continue;
+      }
 
       // 1) ×2→×3 진화 배율 복제 마법진 통과 시 알이 2개 또는 3개(폭주 시!)로 복제 증식!
       if (!p.clonedByGate &&
           projectiles.length + spawnedClones.length < 180 &&
           p.pos.distanceTo(cloneGate.center) <= cloneGate.radius + p.radius * 0.5) {
         p.clonedByGate = true;
+        p.maxTravelDist = min(315.0, p.maxTravelDist + 48.0);
         cloneGate.pulseAnim = 1.0;
         cloneSplitCount++;
         final isTriple = cloneGate.tripleOverdriveTimer > 0;
@@ -3524,6 +3640,7 @@ class DefenseBattleSim {
                 ignoresShield: p.ignoresShield,
                 clonedByGate: true,
                 splitChild: p.splitChild,
+                maxTravelDist: max(125.0, p.maxTravelDist - p.traveledDist + 48.0),
               )..bouncesLeft = p.bouncesLeft,
             );
           }
@@ -3553,6 +3670,7 @@ class DefenseBattleSim {
               ignoresShield: p.ignoresShield,
               clonedByGate: true,
               splitChild: p.splitChild,
+              maxTravelDist: max(125.0, p.maxTravelDist - p.traveledDist + 48.0),
             )..bouncesLeft = p.bouncesLeft,
           );
           bursts.add(FxBurst(pos: cloneGate.center, colorHex: 0xFF72EFDD, maxRadius: 30));
@@ -3665,6 +3783,7 @@ class DefenseBattleSim {
           p.bouncesLeft--;
           p.bouncedOffObstacle = true;
           p.ignoresShield = true;
+          p.maxTravelDist = min(315.0, p.maxTravelDist + 42.0);
         } else {
           projectiles.removeAt(i);
           continue;
@@ -3688,6 +3807,7 @@ class DefenseBattleSim {
           p.bouncesLeft--;
           p.bouncedOffObstacle = true;
           p.ignoresShield = true;
+          p.maxTravelDist = min(315.0, p.maxTravelDist + 42.0);
           bursts.add(FxBurst(pos: p.pos, colorHex: 0xFFFFD166, maxRadius: 22));
         }
       }
@@ -4249,9 +4369,11 @@ class DefenseBattleSim {
   ActiveMutant? _pickTargetForLauncher(ActiveLauncher l) {
     ActiveMutant? best;
     double bestScore = -999999;
+    final maxR = effectiveLauncherRange(l);
+    final minR = l.type.minRangePx;
     for (final m in mutants) {
       final dist = m.pos.distanceTo(l.pos);
-      if (dist > 295) continue;
+      if (dist > maxR || dist < minR) continue;
       double score = 600.0 - m.pos.distanceTo(CampaignCatalog.villageCenter);
       if (m.isInfiltrator) {
         score += 110.0; // 길 밖에서 직선 기습하는 월담·땅굴 침투조 우선 요격!
