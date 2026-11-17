@@ -177,40 +177,61 @@ class SettingsScreen extends StatelessWidget {
           appBar: AppBar(title: const Text('환경 설정 · 백업 · 정보')),
           body: NightSceneBackdrop(
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(18, 48, 18, 36),
               children: [
-                // 1. 음향 및 진동 설정
+                // 3초 덩어리 압축 및 시각 중심 정렬을 위한 통합 수호 설정반
                 MurimCard(
-                  borderColor: NightPalette.accentGold,
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
-                        children: [
-                          NightSpriteIcon(
-                            assetPath: NightArtRegistry.iconSettings,
-                            fallbackIcon: Icons.tune_rounded,
-                            size: 36,
-                            showFrame: true,
-                            frameColor: NightPalette.accentGold,
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              '🎵 3층 국악 음향 및 손맛 진동 설정',
-                              style: TextStyle(
-                                fontFamily: 'BlackHanSans',
-                                fontSize: 18,
+                      // 1. 상단 중앙 집중 한지 주인공 명패 (시선 1순위 가운데 위 고정)
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 300),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3DEC0),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
                                 color: NightPalette.accentGold,
+                                width: 2.0,
                               ),
                             ),
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                NightSpriteIcon(
+                                  assetPath: NightArtRegistry.appLogo,
+                                  fallbackIcon: Icons.tune_rounded,
+                                  size: 46,
+                                  borderRadius: 12,
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  '국악 음향 · 손맛 진동',
+                                  maxLines: 1,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontFamily: 'BlackHanSans',
+                                    fontSize: 18,
+                                    color: Color(0xFF1B2538),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 18),
                       Row(
                         children: [
-                          const SizedBox(width: 88, child: Text('배경음악')),
+                          const SizedBox(width: 118, child: Text('배경음악')),
                           Expanded(
                             child: Slider(
                               value: p.bgmVolume,
@@ -229,12 +250,12 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       Row(
                         children: [
-                          const SizedBox(width: 88, child: Text('효과음·모션음')),
+                          const SizedBox(width: 118, child: Text('효과음·모션음')),
                           Expanded(
                             child: Slider(
                               value: p.sfxVolume,
                               onChanged: controller.setSfxVolume,
-                              activeColor: NightPalette.jadeGreen,
+                              activeColor: NightPalette.accentGold,
                             ),
                           ),
                           SizedBox(
@@ -268,29 +289,33 @@ class SettingsScreen extends StatelessWidget {
                             ].map((pair) {
                               return ChoiceChip(
                                 selected: p.vibrationStrength == pair.$1,
+                                selectedColor: NightPalette.accentGold,
+                                labelStyle: TextStyle(
+                                  color: p.vibrationStrength == pair.$1
+                                      ? const Color(0xFF1B2538)
+                                      : NightPalette.textPrimary,
+                                  fontWeight: p.vibrationStrength == pair.$1
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
                                 label: Text(pair.$2),
                                 onSelected: (_) => controller.setVibration(strength: pair.$1),
                               );
                             }),
                           ],
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Divider(height: 1),
+                      ),
 
-                // 2. 오프라인 기기 이전 백업
-                MurimCard(
-                  borderColor: NightPalette.jadeShield,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                      // 2. 오프라인 기기 이전 백업
                       const Text(
-                        '📦 오프라인 진행도 백업 · 기기 이전',
+                        '오프라인 진행도 백업 · 기기 이전',
                         style: TextStyle(
                           fontFamily: 'BlackHanSans',
-                          fontSize: 18,
-                          color: NightPalette.jadeShield,
+                          fontSize: 17.5,
+                          color: NightPalette.accentGold,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -304,8 +329,12 @@ class SettingsScreen extends StatelessWidget {
                         spacing: 10,
                         runSpacing: 8,
                         children: [
-                          FilledButton.icon(
+                          OutlinedButton.icon(
                             key: const Key('export_backup_btn'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: NightPalette.accentGold,
+                              side: const BorderSide(color: NightPalette.borderGold),
+                            ),
                             onPressed: () => _showExportDialog(context),
                             icon: const Icon(Icons.copy_all_rounded, size: 18),
                             label: const Text('백업 부호 복사하기'),
@@ -318,15 +347,14 @@ class SettingsScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Divider(height: 1),
+                      ),
 
-                // 3. 교범 · 투명성 · 제작노트 · 만든 이
-                MurimCard(
-                  child: Column(
-                    children: [
+                      // 3. 교범 · 투명성 · 제작노트 · 만든 이
+                      Column(
+                        children: [
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: NightSpriteIcon(
@@ -396,6 +424,8 @@ class SettingsScreen extends StatelessWidget {
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(builder: (_) => const CreditsScreen()),
                         ),
+                      ),
+                        ],
                       ),
                     ],
                   ),

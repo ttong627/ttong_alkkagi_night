@@ -712,7 +712,7 @@ void main() {
 
     // 3배속에서도 실제 벽시계 기준 6.5초 카운트다운이므로 미클릭 시 멈춤 없이 자동 패스 검증!
     // (전투 중 도깨비 처치·다음 물결 진입으로 비급이 연속 대기열에 들어온 경우에도 모두 자동 패스됨)
-    for (int cycle = 0; cycle < 3; cycle++) {
+    for (int cycle = 0; cycle < 6; cycle++) {
       if (find.textContaining('심야 돌파 비급 선택 (3택 1)').evaluate().isEmpty) {
         break;
       }

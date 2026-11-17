@@ -66,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen>
           body: NightSceneBackdrop(
             assetPath: NightArtRegistry.bgNightLobby,
             fallbackAssetPath: NightArtRegistry.bgLobbyFallback,
-            overlayOpacity: 0.72,
+            overlayOpacity: 0.86,
             child: SafeArea(
               child: LayoutBuilder(
                 builder: (context, viewport) {
@@ -77,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen>
                       : (viewport.maxWidth >= 900 ? 1.58 : 1.44);
 
                   return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 22),
+                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -118,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontSize: 11.8,
-                                    color: NightPalette.jadeGreen,
+                                    color: NightPalette.textMuted,
                                   ),
                                 ),
                               ],
@@ -209,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen>
                       // 입문 수호 교범 미열람 시 1회 안내 배너
                       if (!p.tutorialSeen) ...[
                         MurimCard(
-                          borderColor: NightPalette.jadeGreen,
+                          borderColor: NightPalette.borderGold,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 8,
@@ -221,23 +221,28 @@ class _HomeScreenState extends State<HomeScreen>
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               const Text(
-                                '📜 길목 빈 초소 직접 배치 & 중앙 수호탑 자동·수동 비급을 30초 만에 확인하세요!',
+                                '길목 빈 초소 직접 배치와 중앙 수호탑 자동·수동 비급을 30초 만에 확인하세요.',
                                 style: TextStyle(
                                   fontSize: 12.2,
-                                  color: NightPalette.textPrimary,
+                                  color: NightPalette.textMuted,
                                 ),
                               ),
-                              FilledButton.tonalIcon(
+                              OutlinedButton.icon(
                                 key: const Key('home_open_tutorial_btn'),
-                                style: FilledButton.styleFrom(
+                                style: OutlinedButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
+                                  foregroundColor: NightPalette.accentGold,
+                                  side: BorderSide(
+                                    color: NightPalette.borderGold
+                                        .withValues(alpha: 0.55),
+                                  ),
                                 ),
                                 onPressed: () => showTutorialGuideDialog(
                                   context,
                                   widget.controller,
                                 ),
                                 icon:
-                                    const Icon(Icons.school_rounded, size: 16),
+                                    const Icon(Icons.school_rounded, size: 15),
                                 label: const Text('수호 교범 열기'),
                               ),
                             ],
@@ -246,14 +251,25 @@ class _HomeScreenState extends State<HomeScreen>
                         const SizedBox(height: 10),
                       ],
 
-                      // 2) 성채 라이브 디오라마 무대 + 황금 성문 순서 출정 카드 (가로 대화면에서는 좌우 2단 배치!)
-                      if (isWide)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 12,
-                              child: _FortressDioramaStage(
+                        // 2) 제1 주인공: 상단 중앙 통합 출정 지령대 (시선 1순위 단일 주인공 집중!)
+                        _SequentialBattleGateBanner(
+                          controller: widget.controller,
+                          chSpec: chSpec,
+                          nextStage: nextStage,
+                          preset: preset,
+                          minHeight: isWide ? 196 : 182,
+                        ),
+                        const SizedBox(height: 12),
+
+                        // 3) 제2 받침 묶음: 성채 디오라마와 6대 전각을 하나의 정돈된 석판 전각군으로 통합 (3초 덩어리 압축!)
+                        MurimCard(
+                          backgroundColor: const Color(0xFF3E5278),
+                          borderColor: NightPalette.borderGold,
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _FortressDioramaStage(
                                 ambientAnim: _ambientAnim,
                                 progress: p,
                                 preset: preset,
@@ -273,174 +289,131 @@ class _HomeScreenState extends State<HomeScreen>
                                   );
                                 },
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 10,
-                              child: _SequentialBattleGateBanner(
-                                controller: widget.controller,
-                                chSpec: chSpec,
-                                nextStage: nextStage,
-                                preset: preset,
-                                minHeight: 236,
+                              const SizedBox(height: 10),
+                              _FacilityCardMatrix(
+                                columns: gridColumns,
+                                aspectRatio: gridAspect,
+                                spacing: 8,
+                                children: [
+                                  _GameImageFacilityCard(
+                                    tileKey: const Key('menu_training_btn'),
+                                    sceneAsset: NightArtRegistry.cardTrainingHall,
+                                    emblemAsset: NightArtRegistry.nightMeridian,
+                                    fallbackIcon: Icons.self_improvement_rounded,
+                                    title: '기명 심법 수련관',
+                                    tagLine:
+                                        '단전 운기 · 경맥 ${p.openedMeridianStep}/10단 개통',
+                                    accent: NightPalette.accentGold,
+                                    badge: p.canOpenNextMeridian() ? '개통 가능' : null,
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => TrainingScreen(
+                                          controller: widget.controller,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  _GameImageFacilityCard(
+                                    tileKey: const Key('menu_loadout_btn'),
+                                    sceneAsset: NightArtRegistry.cardAllyPavilion,
+                                    emblemAsset: NightArtRegistry.beastAsset(
+                                      preset.equippedBeast,
+                                    ),
+                                    fallbackIcon: Icons.groups_rounded,
+                                    title: '수호 진법 · 동료각',
+                                    tagLine:
+                                        '구출 동료 ${p.unlockedCompanionCount}/14 · 영수 ${p.unlockedBeastCount}/5',
+                                    accent: NightPalette.accentGold,
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => LoadoutScreen(
+                                          controller: widget.controller,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  _GameImageFacilityCard(
+                                    tileKey: const Key('menu_forge_btn'),
+                                    sceneAsset: NightArtRegistry.cardForgeSanctum,
+                                    emblemAsset: NightArtRegistry.towerGuardian,
+                                    fallbackIcon:
+                                        Icons.precision_manufacturing_rounded,
+                                    title: '증표 대장간 · 영약각',
+                                    tagLine:
+                                        '수호탑 ${p.centralGuardianLevel}단 · 발사대/수호석 강화',
+                                    accent: NightPalette.accentGold,
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => UpgradeScreen(
+                                          controller: widget.controller,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  _GameImageFacilityCard(
+                                    tileKey: const Key('menu_convoy_btn'),
+                                    sceneAsset: NightArtRegistry.cardSupplyConvoy,
+                                    emblemAsset: NightArtRegistry.nightConvoyCart,
+                                    fallbackIcon: Icons.local_shipping_rounded,
+                                    title: '물자 호송 · 지원패',
+                                    tagLine:
+                                        '호송 마차 · 심야 탐색 · 출두 ${p.supportTokens}패',
+                                    accent: NightPalette.accentGold,
+                                    badge: (p.moonOmenGauge >= 100 ||
+                                            (p.convoyActive &&
+                                                p.convoyBattlesRemaining == 0) ||
+                                            (p.exploreActive &&
+                                                p.exploreBattlesRemaining == 0))
+                                        ? '보상 도착'
+                                        : null,
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => ConvoyAndSerendipityScreen(
+                                          controller: widget.controller,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  _GameImageFacilityCard(
+                                    tileKey: const Key('menu_daily_btn'),
+                                    sceneAsset: NightArtRegistry.cardRescueBeacon,
+                                    emblemAsset: NightArtRegistry.iconAttendance,
+                                    fallbackIcon: Icons.event_available_rounded,
+                                    title: '출석 · 임무 · 비약방',
+                                    tagLine: '7일 출석 · 수호 임무 · 전술 비약 제조',
+                                    accent: NightPalette.accentGold,
+                                    badge: hasQuestReward ? '수령 가능' : null,
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => DailyAndQuestsScreen(
+                                          controller: widget.controller,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  _GameImageFacilityCard(
+                                    tileKey: const Key('menu_endless_btn'),
+                                    sceneAsset: NightArtRegistry.cardEndlessAbyss,
+                                    emblemAsset: NightArtRegistry.nightEndless,
+                                    fallbackIcon:
+                                        Icons.local_fire_department_rounded,
+                                    title: '심야 무한 혈전장',
+                                    tagLine:
+                                        '최고 ${p.bestEndlessWave}물결 돌파 · 한계 시험장',
+                                    accent: NightPalette.accentGold,
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => EndlessSurvivalScreen(
+                                          controller: widget.controller,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        )
-                      else ...[
-                        _FortressDioramaStage(
-                          ambientAnim: _ambientAnim,
-                          progress: p,
-                          preset: preset,
-                          nextRescue: nextRescue,
-                          onOpenRescueMap: () {
-                            if (nextRescue != null) {
-                              widget.controller.setSelectedChapter(
-                                nextRescue.chapterNumber,
-                              );
-                            }
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => CampaignScreen(
-                                  controller: widget.controller,
-                                ),
-                              ),
-                            );
-                          },
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 12),
-                        _SequentialBattleGateBanner(
-                          controller: widget.controller,
-                          chSpec: chSpec,
-                          nextStage: nextStage,
-                          preset: preset,
-                          minHeight: 186,
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-
-                      // 3) 본영 전각 일러스트 카드 6종 그리드 (중첩 Scrollable 없는 고성능 행렬 배치)
-                      _FacilityCardMatrix(
-                        columns: gridColumns,
-                        aspectRatio: gridAspect,
-                        spacing: 10,
-                        children: [
-                          _GameImageFacilityCard(
-                            tileKey: const Key('menu_training_btn'),
-                            sceneAsset: NightArtRegistry.cardTrainingHall,
-                            emblemAsset: NightArtRegistry.nightMeridian,
-                            fallbackIcon: Icons.self_improvement_rounded,
-                            title: '기명 심법 수련관',
-                            tagLine:
-                                '단전 운기 · 경맥 ${p.openedMeridianStep}/10단 개통',
-                            accent: NightPalette.jadeGreen,
-                            badge: p.canOpenNextMeridian() ? '개통 가능!' : null,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => TrainingScreen(
-                                  controller: widget.controller,
-                                ),
-                              ),
-                            ),
-                          ),
-                          _GameImageFacilityCard(
-                            tileKey: const Key('menu_loadout_btn'),
-                            sceneAsset: NightArtRegistry.cardAllyPavilion,
-                            emblemAsset: NightArtRegistry.beastAsset(
-                              preset.equippedBeast,
-                            ),
-                            fallbackIcon: Icons.groups_rounded,
-                            title: '수호 진법 · 동료각',
-                            tagLine:
-                                '구출 동료 ${p.unlockedCompanionCount}/14 · 영수 ${p.unlockedBeastCount}/5',
-                            accent: NightPalette.jadeShield,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => LoadoutScreen(
-                                  controller: widget.controller,
-                                ),
-                              ),
-                            ),
-                          ),
-                          _GameImageFacilityCard(
-                            tileKey: const Key('menu_forge_btn'),
-                            sceneAsset: NightArtRegistry.cardForgeSanctum,
-                            emblemAsset: NightArtRegistry.towerGuardian,
-                            fallbackIcon:
-                                Icons.precision_manufacturing_rounded,
-                            title: '증표 대장간 · 영약각',
-                            tagLine:
-                                '수호탑 ${p.centralGuardianLevel}단 · 발사대/수호석 강화',
-                            accent: NightPalette.accentGold,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => UpgradeScreen(
-                                  controller: widget.controller,
-                                ),
-                              ),
-                            ),
-                          ),
-                          _GameImageFacilityCard(
-                            tileKey: const Key('menu_convoy_btn'),
-                            sceneAsset: NightArtRegistry.cardSupplyConvoy,
-                            emblemAsset: NightArtRegistry.nightConvoyCart,
-                            fallbackIcon: Icons.local_shipping_rounded,
-                            title: '물자 호송 · 지원패',
-                            tagLine:
-                                '호송 마차 · 심야 탐색 · 출두 ${p.supportTokens}패',
-                            accent: NightPalette.elixirPurple,
-                            badge: (p.moonOmenGauge >= 100 ||
-                                    (p.convoyActive &&
-                                        p.convoyBattlesRemaining == 0) ||
-                                    (p.exploreActive &&
-                                        p.exploreBattlesRemaining == 0))
-                                ? '보상 도착!'
-                                : null,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ConvoyAndSerendipityScreen(
-                                  controller: widget.controller,
-                                ),
-                              ),
-                            ),
-                          ),
-                          _GameImageFacilityCard(
-                            tileKey: const Key('menu_daily_btn'),
-                            sceneAsset: NightArtRegistry.cardRescueBeacon,
-                            emblemAsset: NightArtRegistry.iconAttendance,
-                            fallbackIcon: Icons.event_available_rounded,
-                            title: '출석 · 임무 · 비약방',
-                            tagLine: '7일 출석 · 수호 임무 · 전술 비약 제조',
-                            accent: Colors.amberAccent,
-                            badge: hasQuestReward ? '수령 가능!' : null,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => DailyAndQuestsScreen(
-                                  controller: widget.controller,
-                                ),
-                              ),
-                            ),
-                          ),
-                          _GameImageFacilityCard(
-                            tileKey: const Key('menu_endless_btn'),
-                            sceneAsset: NightArtRegistry.cardEndlessAbyss,
-                            emblemAsset: NightArtRegistry.nightEndless,
-                            fallbackIcon:
-                                Icons.local_fire_department_rounded,
-                            title: '심야 무한 혈전장',
-                            tagLine:
-                                '최고 ${p.bestEndlessWave}물결 돌파 · 한계 시험장',
-                            accent: NightPalette.crimsonMoon,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => EndlessSurvivalScreen(
-                                  controller: widget.controller,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
                     ),
                   );
@@ -481,23 +454,16 @@ class _FortressDioramaStage extends StatelessWidget {
     }
 
     return Container(
-      height: 236,
+      height: 196,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: NightPalette.accentGold.withValues(alpha: 0.82),
-          width: 1.6,
+          color: Colors.white.withValues(alpha: 0.14),
+          width: 1.0,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x88040812),
-            blurRadius: 16,
-            offset: Offset(0, 8),
-          ),
-        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16.5),
+        borderRadius: BorderRadius.circular(13),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -513,7 +479,7 @@ class _FortressDioramaStage extends StatelessWidget {
               ),
             ),
 
-            // 2) 원근감 비네팅 그라데이션
+            // 2) 원근감 청람 석판 톤 통일 그라데이션
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -521,9 +487,9 @@ class _FortressDioramaStage extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   stops: [0.0, 0.45, 1.0],
                   colors: [
-                    Color(0x66060A14),
-                    Color(0x180B1324),
-                    Color(0xCC060A14),
+                    Color(0xB425344F),
+                    Color(0x982A3B59),
+                    Color(0xEC223049),
                   ],
                 ),
               ),
@@ -581,12 +547,13 @@ class _FortressDioramaStage extends StatelessWidget {
                     // 좌측 호위 동료 전신 스탠딩
                     if (heroes.isNotEmpty)
                       Align(
-                        alignment: const Alignment(-0.62, 0.56),
+                        alignment: const Alignment(-0.62, 0.14),
                         child: Transform.translate(
                           offset: Offset(0, hoverA * 0.6),
                           child: _DioramaHeroStandee(
                             hero: heroes[0],
                             level: progress.companionLevels[heroes[0]] ?? 1,
+                            height: 76,
                           ),
                         ),
                       ),
@@ -594,12 +561,13 @@ class _FortressDioramaStage extends StatelessWidget {
                     // 우측 호위 동료 전신 스탠딩 (2인 이상 구출 시)
                     if (heroes.length >= 2)
                       Align(
-                        alignment: const Alignment(0.62, 0.56),
+                        alignment: const Alignment(0.62, 0.14),
                         child: Transform.translate(
                           offset: Offset(0, hoverB * 0.6),
                           child: _DioramaHeroStandee(
                             hero: heroes[1],
                             level: progress.companionLevels[heroes[1]] ?? 1,
+                            height: 76,
                           ),
                         ),
                       ),
@@ -607,13 +575,13 @@ class _FortressDioramaStage extends StatelessWidget {
                     // 좌측 후열 3번째 동료 (3인 편성 시)
                     if (heroes.length >= 3)
                       Align(
-                        alignment: const Alignment(-0.28, 0.42),
+                        alignment: const Alignment(-0.28, 0.12),
                         child: Transform.translate(
                           offset: Offset(0, -hoverA * 0.5),
                           child: _DioramaHeroStandee(
                             hero: heroes[2],
                             level: progress.companionLevels[heroes[2]] ?? 1,
-                            height: 76,
+                            height: 68,
                           ),
                         ),
                       ),
@@ -723,21 +691,19 @@ class _FortressDioramaStage extends StatelessWidget {
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xEE10323A), Color(0xEE194A52)],
-                          ),
+                          color: const Color(0xE0263652),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: NightPalette.jadeGreen,
-                            width: 1.2,
+                            color: NightPalette.borderGold.withValues(alpha: 0.6),
+                            width: 1.0,
                           ),
                         ),
                         child: Text(
-                          '🆘 다음 구출: ${nextRescue!.code} ${nextRescue!.rescueBadgeText}',
+                          '다음 구출: ${nextRescue!.code} ${nextRescue!.rescueBadgeText}',
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 11.2,
-                            color: NightPalette.jadeGreen,
+                            color: NightPalette.accentGold,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -881,228 +847,223 @@ class _SequentialBattleGateBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(minHeight: minHeight),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
+        color: const Color(0xFF3E5278),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: NightPalette.accentGold, width: 1.8),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x66FFD166),
-            blurRadius: 12,
-            offset: Offset(0, 3),
-          ),
-        ],
+        border: Border.all(
+          color: NightPalette.borderGold.withValues(alpha: 0.36),
+          width: 1.0,
+        ),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16.2),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.asset(
-                NightArtRegistry.cardGateBattle,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Image.asset(
-                  chSpec.bgAsset,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) =>
-                      const ColoredBox(color: NightPalette.bgPanel),
-                ),
-              ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3DEC0),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: NightPalette.accentGold, width: 2.0),
             ),
-            const Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Color(0xEB070C18),
-                      Color(0xC60E182C),
-                      Color(0xDC080E1C),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14.2),
+              child: Stack(
                 children: [
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 5,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: NightPalette.accentGold,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '▶ 이번 수호 차례 (${nextStage.globalIndex}/${CampaignCatalog.allStages.length})',
-                          style: const TextStyle(
-                            fontSize: 11.2,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xCC13263B),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: NightPalette.jadeShield.withValues(alpha: 0.7),
-                          ),
-                        ),
-                        child: Text(
-                          '빈 초소 ${nextStage.maxMountCount}곳 개방 · ${nextStage.waves.length}물결',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: NightPalette.jadeShield,
-                          ),
-                        ),
-                      ),
-                      if (nextStage.hasRescueReward)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xDD143D38),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: NightPalette.jadeGreen),
-                          ),
-                          child: Text(
-                            '🆘 ${nextStage.rescueBadgeText}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: NightPalette.jadeGreen,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      NightSpriteIcon(
-                        assetPath: NightArtRegistry.charFace(
-                          chSpec.bossPortraitPrefix,
-                        ),
-                        fallbackIcon: Icons.shield_rounded,
-                        size: 50,
-                        borderRadius: 25,
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: 0.14,
+                      child: Image.asset(
+                        NightArtRegistry.cardGateBattle,
                         fit: BoxFit.cover,
-                        showFrame: true,
-                        frameColor: NightPalette.accentGold,
+                        errorBuilder: (_, _, _) =>
+                            const ColoredBox(color: Color(0xFFF3DEC0)),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 5,
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Text(
-                              '${chSpec.title} · ${chSpec.villageName}',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                color: NightPalette.jadeShield,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF233048),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '이번 수호 차례 (${nextStage.globalIndex}/${CampaignCatalog.allStages.length})',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: NightPalette.accentGold,
+                                ),
                               ),
                             ),
-                            Text(
-                              nextStage.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontFamily: 'BlackHanSans',
-                                fontSize: 18.5,
-                                color: NightPalette.accentGold,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF314260),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '빈 초소 ${nextStage.maxMountCount}곳 개방 · ${nextStage.waves.length}물결',
+                                style: const TextStyle(
+                                  fontSize: 11.2,
+                                  color: NightPalette.textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (nextStage.hasRescueReward)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF233048),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '구출 목표: ${nextStage.rescueBadgeText}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: NightPalette.accentGold,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            NightSpriteIcon(
+                              assetPath: NightArtRegistry.charFace(
+                                chSpec.bossPortraitPrefix,
+                              ),
+                              fallbackIcon: Icons.shield_rounded,
+                              size: 52,
+                              borderRadius: 26,
+                              fit: BoxFit.cover,
+                              showFrame: true,
+                              frameColor: const Color(0xFF233048),
+                            ),
+                            const SizedBox(width: 12),
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${chSpec.title} · ${chSpec.villageName}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13.0,
+                                      color: Color(0xFF394B6D),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    nextStage.title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontFamily: 'BlackHanSans',
+                                      fontSize: 21.5,
+                                      color: Color(0xFF1B2538),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      FilledButton.icon(
-                        key: const Key('home_quick_battle_btn'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: NightPalette.accentGold,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 11,
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => BattleScreen(
-                                controller: controller,
-                                stage: nextStage,
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            FilledButton.icon(
+                              key: const Key('home_quick_battle_btn'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF1F2B42),
+                                foregroundColor: NightPalette.accentGold,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 12,
+                                ),
+                              ),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => BattleScreen(
+                                      controller: controller,
+                                      stage: nextStage,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const NightSpriteIcon(
+                                assetPath: NightArtRegistry.towerGuardian,
+                                fallbackIcon: Icons.play_arrow_rounded,
+                                size: 20,
+                              ),
+                              label: const Text(
+                                '즉시 야간 수호 출정',
+                                style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ),
-                          );
-                        },
-                        icon: const NightSpriteIcon(
-                          assetPath: NightArtRegistry.towerGuardian,
-                          fallbackIcon: Icons.play_arrow_rounded,
-                          size: 20,
-                          color: Colors.black,
-                        ),
-                        label: const Text(
-                          '즉시 야간 수호 출정',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        key: const Key('home_campaign_map_btn'),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: const Color(0xAA0A1222),
-                          side: const BorderSide(color: NightPalette.jadeShield),
-                        ),
-                        onPressed: () {
-                          controller.setSelectedChapter(nextStage.chapterNumber);
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => CampaignScreen(
-                                controller: controller,
+                            OutlinedButton.icon(
+                              key: const Key('home_campaign_map_btn'),
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: const Color(0xFFE6D4B0),
+                                foregroundColor: const Color(0xFF1F2B42),
+                                side: const BorderSide(color: Color(0xFF2F3F5C)),
                               ),
+                              onPressed: () {
+                                controller.setSelectedChapter(
+                                  nextStage.chapterNumber,
+                                );
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => CampaignScreen(
+                                      controller: controller,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const NightSpriteIcon(
+                                assetPath: NightArtRegistry.iconCampaign,
+                                fallbackIcon: Icons.map_rounded,
+                                size: 18,
+                              ),
+                              label: const Text('1~10장 행군 지도'),
                             ),
-                          );
-                        },
-                        icon: const NightSpriteIcon(
-                          assetPath: NightArtRegistry.iconCampaign,
-                          fallbackIcon: Icons.map_rounded,
-                          size: 18,
-                          color: NightPalette.jadeShield,
+                          ],
                         ),
-                        label: const Text('1~10장 행군 지도'),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1143,21 +1104,14 @@ class _GameImageFacilityCard extends StatelessWidget {
         onTap: onTap,
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: accent.withValues(alpha: 0.78),
-              width: 1.4,
+              color: Colors.white.withValues(alpha: 0.14),
+              width: 1.0,
             ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x66040812),
-                blurRadius: 8,
-                offset: Offset(0, 4),
-              ),
-            ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(13.6),
+            borderRadius: BorderRadius.circular(13),
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -1169,17 +1123,17 @@ class _GameImageFacilityCard extends StatelessWidget {
                       const ColoredBox(color: NightPalette.bgPanel),
                 ),
 
-                // 2) 상단 일러스트는 선명하게 살리고 하단 명패 자리만 어둡게 받쳐주는 게임 카드 그라데이션
+                // 2) 청람 석판 톤 통일 그라데이션 (색수 억제 및 3초 덩어리 응집)
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      stops: [0.0, 0.36, 1.0],
+                      stops: [0.0, 0.42, 1.0],
                       colors: [
-                        Color(0x28060A14),
-                        Color(0x55080F1E),
-                        Color(0xEE070C18),
+                        Color(0xBE273754),
+                        Color(0xD4253551),
+                        Color(0xF522304A),
                       ],
                     ),
                   ),
@@ -1192,14 +1146,14 @@ class _GameImageFacilityCard extends StatelessWidget {
                   child: NightSpriteIcon(
                     assetPath: emblemAsset,
                     fallbackIcon: fallbackIcon,
-                    size: 28,
-                    borderRadius: 7,
+                    size: 26,
+                    borderRadius: 6,
                     showFrame: true,
-                    frameColor: accent,
+                    frameColor: Colors.white24,
                   ),
                 ),
 
-                // 4) 우상단 실시간 알림 배지
+                // 4) 우상단 실시간 알림 배지 (원색 빨강 대신 통일된 금색 배지로 색수 절제)
                 if (badge != null)
                   Positioned(
                     right: 8,
@@ -1210,19 +1164,15 @@ class _GameImageFacilityCard extends StatelessWidget {
                         vertical: 2.5,
                       ),
                       decoration: BoxDecoration(
-                        color: NightPalette.crimsonMoon,
-                        borderRadius: BorderRadius.circular(9),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          width: 0.8,
-                        ),
+                        color: NightPalette.accentGold,
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         badge!,
                         style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Color(0xFF1B2538),
                         ),
                       ),
                     ),

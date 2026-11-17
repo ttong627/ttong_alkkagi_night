@@ -137,16 +137,33 @@ class NightBattlePainter extends CustomPainter {
       );
     }
 
-    // 위쪽 심야 침공 산악 협곡(어둡고 붉은 기운) → 아래쪽 마을 본진(따뜻한 등불 기운) 깊이감 그라데이션
+    // 위쪽 심야 침공 산악 협곡(청람 달빛 석판) → 아래쪽 마을 본진(따뜻한 등불 기운) 깊이감 그라데이션
+    canvas.drawRect(arenaRect, Paint()..color = const Color(0xFF283650));
+    if (floorImg != null) {
+      final src = Rect.fromLTWH(
+        0,
+        0,
+        floorImg.width.toDouble(),
+        floorImg.height.toDouble(),
+      );
+      canvas.drawImageRect(
+        floorImg,
+        src,
+        arenaRect,
+        Paint()
+          ..filterQuality = FilterQuality.low
+          ..color = const Color.fromRGBO(255, 255, 255, 0.34),
+      );
+    }
     final skyPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         stops: [0.0, 0.62, 1.0],
         colors: [
-          Color(0xAD070914),
-          Color(0x52121B2E),
-          Color(0x9A0D1824),
+          Color(0x7825324B),
+          Color(0x482F405F),
+          Color(0x7226354F),
         ],
       ).createShader(arenaRect);
     canvas.drawRect(arenaRect, skyPaint);

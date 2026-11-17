@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 
-/// 심야 무협 수묵·적월·황금·청록 글래스모피즘 디자인 시스템.
+/// 심야 무협 수묵·청람 석판·황금·비취 정통 디자인 시스템 (디자인 하네스 명도·색수·덩어리 규격 준수).
 class NightPalette {
-  static const Color bgDeep = Color(0xFF0B0F19);
-  static const Color bgPanel = Color(0xFF141B2D);
-  static const Color bgCard = Color(0xFF1C253B);
-  static const Color borderGold = Color(0xFFD4AF37);
-  static const Color accentGold = Color(0xFFFFD166);
-  static const Color jadeShield = Color(0xFF4CC9F0);
-  static const Color jadeGreen = Color(0xFF72EFDD);
-  static const Color crimsonMoon = Color(0xFFE63946);
-  static const Color elixirPurple = Color(0xFFC77DFF);
-  static const Color textPrimary = Color(0xFFF8F9FA);
-  static const Color textMuted = Color(0xFFB8C4D9);
+  static const Color bgDeep = Color(0xFF25324B);
+  static const Color bgPanel = Color(0xFF2F3F5C);
+  static const Color bgCard = Color(0xFF394B6D);
+  static const Color borderGold = Color(0xFFD9B65C);
+  static const Color accentGold = Color(0xFFF4CC6A);
+  static const Color jadeShield = Color(0xFF6EC8E8);
+  static const Color jadeGreen = Color(0xFF7CE2D4);
+  static const Color crimsonMoon = Color(0xFFE0525E);
+  static const Color elixirPurple = Color(0xFFB38AE6);
+  static const Color textPrimary = Color(0xFFF6F8FC);
+  static const Color textMuted = Color(0xFFC8D4E6);
 
   static ThemeData buildTheme() {
     return ThemeData(
@@ -27,7 +27,7 @@ class NightPalette {
         error: crimsonMoon,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xEE0F1524),
+        backgroundColor: Color(0xF227354F),
         foregroundColor: textPrimary,
         elevation: 0,
         centerTitle: true,
@@ -36,14 +36,14 @@ class NightPalette {
           fontFamilyFallback: ['DoHyeon', 'NotoKRFallback'],
           fontSize: 20,
           color: accentGold,
-          letterSpacing: 0.6,
+          letterSpacing: 0.4,
         ),
       ),
     );
   }
 }
 
-/// 수묵 금테 카드 위젯.
+/// 수묵 청람 석판 카드 위젯 (과한 형광 테두리 대신 은은한 머리카락 선과 면 단계로 묶음 형성).
 class MurimCard extends StatelessWidget {
   const MurimCard({
     super.key,
@@ -62,17 +62,17 @@ class MurimCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: backgroundColor ?? NightPalette.bgCard.withValues(alpha: 0.92),
+        color: backgroundColor ?? NightPalette.bgCard.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: borderColor ?? NightPalette.borderGold.withValues(alpha: 0.42),
-          width: 1.2,
+          color: (borderColor ?? NightPalette.borderGold).withValues(alpha: 0.24),
+          width: 1.0,
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x55000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: Color(0x28000000),
+            blurRadius: 8,
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -89,7 +89,7 @@ class MurimCard extends StatelessWidget {
   }
 }
 
-/// 상단 재화 요약 알약 배지 (코덱스 원화 아이콘 우선 표시 + 폴백 머티리얼 아이콘).
+/// 상단 재화 요약 알약 배지 (단일 청람 면 + 미세 테두리로 시선 분산 억제).
 class ResourcePill extends StatelessWidget {
   const ResourcePill({
     super.key,
@@ -111,9 +111,9 @@ class ResourcePill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: NightPalette.bgPanel.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.65)),
+        color: NightPalette.bgCard.withValues(alpha: 0.90),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
