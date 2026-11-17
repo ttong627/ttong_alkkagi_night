@@ -631,175 +631,310 @@ class UpgradeScreen extends StatelessWidget {
       p.centralGuardianLevel,
     );
     return ListView(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       children: [
-        const Text(
-          '돌연변이가 떨어뜨린 「증표」로 중앙 보호 장치와 길목 자동 발사대를 영구 강화합니다.',
-          style: TextStyle(fontSize: 13, color: NightPalette.textMuted),
-        ),
-        const SizedBox(height: 10),
-        MurimCard(
-          borderColor: NightPalette.accentGold,
-          child: Row(
-            children: [
-              const NightSpriteIcon(
-                assetPath: NightArtRegistry.towerGuardian,
-                fallbackIcon: Icons.fort_rounded,
-                size: 54,
-                showFrame: true,
-                frameColor: NightPalette.accentGold,
+        // 1) 상단 한지 명패 + 핵심 본진 제련 통합반 (게슈탈트 제1덩어리 · 시각 주인공)
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E7CC),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: NightPalette.accentGold, width: 1.6),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '중앙 자동 보호 장치 · 기명 수호탑 (${p.centralGuardianLevel}단)',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: NightPalette.accentGold,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const NightSpriteIcon(
+                        assetPath: NightArtRegistry.towerGuardian,
+                        fallbackIcon: Icons.fort_rounded,
+                        size: 62,
+                        showFrame: true,
+                        frameColor: Color(0xFF233048),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      '외곽 기공 방어막 내구도 · 본체 내구도 · 360도 자동 연사력 동시 상승!',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: NightPalette.textMuted,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '수호 본진 중추 제련 · 무한 신기 연마',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF394B6D),
+                              ),
+                            ),
+                            Text(
+                              '중앙 자동 보호 장치 · 기명 수호탑 (${p.centralGuardianLevel}단)',
+                              style: const TextStyle(
+                                fontFamily: 'BlackHanSans',
+                                fontSize: 21,
+                                color: Color(0xFF1B2538),
+                              ),
+                            ),
+                            const Text(
+                              '외곽 기공 방어막 내구도 · 본체 내구도 · 360도 자동 연사력 동시 상승',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: Color(0xFF3B4A66),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF1F2B42),
+                          foregroundColor: NightPalette.accentGold,
+                          disabledBackgroundColor: const Color(0x241F2B42),
+                          disabledForegroundColor: const Color(0x9E1F2B42),
+                        ),
+                        onPressed: p.tokens >= centralCost
+                            ? controller.upgradeCentralGuardian
+                            : null,
+                        child: Text('증표 $centralCost 강화'),
+                      ),
+                    ],
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1, color: Color(0x331B2538)),
+                  ),
+                  Row(
+                    children: [
+                      const NightSpriteIcon(
+                        assetPath: NightArtRegistry.cardForgeSanctum,
+                        fallbackAssetPath: NightArtRegistry.fxCritical,
+                        fallbackIcon: Icons.auto_fix_high_rounded,
+                        size: 46,
+                        showFrame: true,
+                        frameColor: Color(0xFF233048),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '태초 신기 무한 연마 (${p.forgeMasteryLevel}단 · 공방 +${(p.forgeMasteryPowerBonus * 100).toStringAsFixed(1)}%)',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15.5,
+                                color: Color(0xFF1B2538),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              '남는 수호 증표를 무한 주입해 전 발사대 화력·중앙 탑·외곽 결계를 끝없이 연마',
+                              style: TextStyle(
+                                fontSize: 12.2,
+                                color: Color(0xFF3B4A66),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        key: const Key('upgrade_forge_mastery_btn'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF1F2B42),
+                          foregroundColor: NightPalette.jadeGreen,
+                          disabledBackgroundColor: const Color(0x241F2B42),
+                          disabledForegroundColor: const Color(0x9E1F2B42),
+                        ),
+                        onPressed: p.tokens >= p.forgeMasteryCost
+                            ? controller.upgradeForgeMastery
+                            : null,
+                        child: Text('증표 ${p.forgeMasteryCost}'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: p.tokens >= centralCost
-                    ? controller.upgradeCentralGuardian
-                    : null,
-                child: Text('증표 $centralCost 강화'),
-              ),
-            ],
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-        ...LauncherType.values.map((lt) {
-          final lv = p.launcherPermanentLevels[lt] ?? 1;
-          final cost = lt.permanentUpgradeCost(lv);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+        const SizedBox(height: 16),
+
+        // 2) 길목 자동 발사대 5종 통합 제련반 (게슈탈트 제2덩어리 · 같은 정보 한 상자)
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
             child: MurimCard(
-              borderColor: Color(lt.colorHex).withValues(alpha: 0.55),
-              child: Row(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  NightSpriteIcon(
-                    assetPath: NightArtRegistry.launcherAsset(lt),
-                    fallbackIcon: Icons.gps_fixed_rounded,
-                    size: 48,
-                    color: Color(lt.colorHex),
-                    showFrame: true,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${lt.name} (영구 $lv단)',
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            color: Color(lt.colorHex),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          lt.roleSummary,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: NightPalette.textMuted,
-                          ),
-                        ),
-                      ],
+                  const Text(
+                    '길목 자동 발사대 5종 영구 제련반',
+                    style: TextStyle(
+                      fontFamily: 'BlackHanSans',
+                      fontSize: 18,
+                      color: NightPalette.accentGold,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: p.tokens >= cost
-                        ? () => controller.upgradeLauncherPermanent(lt)
-                        : null,
-                    child: Text('증표 $cost'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-        const Divider(height: 24),
-        const Text(
-          '수호 알 1~13단 제련 및 신물 조각 합성',
-          style: TextStyle(fontSize: 16, color: NightPalette.jadeGreen),
-        ),
-        const SizedBox(height: 8),
-        ...StoneMaterial.values.map((s) {
-          final owned = p.unlockedStones.contains(s);
-          final shards = p.stoneShards[s] ?? 0;
-          final chapterLocked = !s.isShardStone && p.highestUnlockedChapter < s.minChapter;
-          final canCraft = p.canUnlockStone(s);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: MurimCard(
-              borderColor: owned
-                  ? Color(s.colorHex).withValues(alpha: 0.7)
-                  : NightPalette.borderGold.withValues(alpha: 0.35),
-              child: Row(
-                children: [
-                  NightSpriteIcon(
-                    assetPath: NightArtRegistry.stoneAsset(s),
-                    fallbackIcon: Icons.circle,
-                    size: 44,
-                    color: Color(s.colorHex),
-                    dimmed: !owned,
-                    showFrame: true,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${s.grade}단 ${s.name}',
-                          style: const TextStyle(fontSize: 15),
-                        ),
-                        Text(
-                          s.specialDesc,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: NightPalette.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (owned)
-                    const Chip(label: Text('보유중'))
-                  else
-                    FilledButton(
-                      onPressed:
-                          canCraft ? () => controller.unlockStone(s) : null,
-                      child: Text(
-                        s.isShardStone
-                            ? '조각 $shards/${s.shardRequired}'
-                            : chapterLocked
-                                ? '제${s.minChapter}장 개방'
-                                : '증표 ${s.unlockTokens}',
+                  const SizedBox(height: 10),
+                  for (int idx = 0; idx < LauncherType.values.length; idx++) ...[
+                    if (idx > 0)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Divider(height: 1, color: Colors.white12),
                       ),
+                    Builder(
+                      builder: (_) {
+                        final lt = LauncherType.values[idx];
+                        final lv = p.launcherPermanentLevels[lt] ?? 1;
+                        final cost = lt.permanentUpgradeCost(lv);
+                        return Row(
+                          children: [
+                            NightSpriteIcon(
+                              assetPath: NightArtRegistry.launcherAsset(lt),
+                              fallbackIcon: Icons.gps_fixed_rounded,
+                              size: 46,
+                              color: Color(lt.colorHex),
+                              showFrame: true,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${lt.name} (영구 $lv단)',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15.2,
+                                      color: Color(lt.colorHex),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    lt.roleSummary,
+                                    style: const TextStyle(
+                                      fontSize: 12.3,
+                                      color: NightPalette.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed: p.tokens >= cost
+                                  ? () => controller.upgradeLauncherPermanent(lt)
+                                  : null,
+                              child: Text('증표 $cost'),
+                            ),
+                          ],
+                        );
+                      },
                     ),
+                  ],
                 ],
               ),
             ),
-          );
-        }),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 3) 수호 알 1~13단 통합 합성반 (게슈탈트 제3덩어리 · 같은 정보 한 상자)
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: MurimCard(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '수호 알 1~13단 제련 및 신물 조각 합성',
+                    style: TextStyle(
+                      fontFamily: 'BlackHanSans',
+                      fontSize: 18,
+                      color: NightPalette.jadeGreen,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  for (int idx = 0; idx < StoneMaterial.values.length; idx++) ...[
+                    if (idx > 0)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 9),
+                        child: Divider(height: 1, color: Colors.white12),
+                      ),
+                    Builder(
+                      builder: (_) {
+                        final s = StoneMaterial.values[idx];
+                        final owned = p.unlockedStones.contains(s);
+                        final shards = p.stoneShards[s] ?? 0;
+                        final chapterLocked = p.highestUnlockedChapter < s.minChapter;
+                        final canCraft = p.canUnlockStone(s);
+                        return Row(
+                          children: [
+                            NightSpriteIcon(
+                              assetPath: NightArtRegistry.stoneAsset(s),
+                              fallbackIcon: Icons.circle,
+                              size: 42,
+                              color: Color(s.colorHex),
+                              dimmed: !owned,
+                              showFrame: true,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${s.grade}단 ${s.name}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14.8,
+                                    ),
+                                  ),
+                                  Text(
+                                    s.specialDesc,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: NightPalette.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (owned)
+                              const Chip(label: Text('보유중'))
+                            else
+                              FilledButton(
+                                onPressed: canCraft
+                                    ? () => controller.unlockStone(s)
+                                    : null,
+                                child: Text(
+                                  chapterLocked
+                                      ? (s.isShardStone
+                                          ? '제${s.minChapter}장 · 조각 $shards/${s.shardRequired}'
+                                          : '제${s.minChapter}장 개방')
+                                      : s.isShardStone
+                                          ? '조각 $shards/${s.shardRequired}'
+                                          : '증표 ${s.unlockTokens}',
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

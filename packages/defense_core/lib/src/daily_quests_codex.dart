@@ -457,27 +457,27 @@ class EndlessWaveBuilder {
     required int chapterTheme,
   }) {
     final safeTheme = chapterTheme.clamp(1, 10);
-    final totalWaves = waveCount.clamp(5, 30);
+    final totalWaves = waveCount.clamp(5, 100);
     final waves = <List<WaveSpawnGroup>>[];
 
     for (int w = 1; w <= totalWaves; w++) {
       final groups = <WaveSpawnGroup>[
         WaveSpawnGroup(
           kind: MutantKind.swarmRat,
-          count: 9 + w * 2,
-          intervalSec: (0.28 - w * 0.005).clamp(0.16, 0.28),
+          count: (9 + w * 2).clamp(9, 65),
+          intervalSec: (0.28 - w * 0.004).clamp(0.14, 0.28),
           laneIndex: w % 3,
         ),
         WaveSpawnGroup(
           kind: MutantKind.sickHound,
-          count: 5 + w * 2,
-          intervalSec: (0.34 - w * 0.005).clamp(0.18, 0.34),
+          count: (5 + w * 2).clamp(5, 55),
+          intervalSec: (0.34 - w * 0.004).clamp(0.16, 0.34),
           laneIndex: (w + 2) % 3,
         ),
         WaveSpawnGroup(
           kind: w % 2 == 0 ? MutantKind.plagueToad : MutantKind.shieldYacha,
-          count: 3 + (w ~/ 2),
-          intervalSec: 0.52,
+          count: (3 + (w ~/ 2)).clamp(3, 32),
+          intervalSec: 0.50,
           laneIndex: (w + 1) % 3,
         ),
       ];
@@ -485,13 +485,23 @@ class EndlessWaveBuilder {
         groups.add(
           WaveSpawnGroup(
             kind: w % 3 == 0 ? MutantKind.bloodCocoon : MutantKind.ironBoar,
-            count: 2 + (w ~/ 2),
-            intervalSec: 0.62,
+            count: (2 + (w ~/ 2)).clamp(2, 28),
+            intervalSec: 0.58,
             laneIndex: (w + 2) % 3,
           ),
         );
       }
-      // 3파도마다 스피드·맷집·공격력 특화 중간보스가 일반 변이체 무리와 함께 교대 동반 침략!
+      if (w >= 18) {
+        groups.add(
+          WaveSpawnGroup(
+            kind: MutantKind.ironBoar,
+            count: (3 + (w - 15) ~/ 3).clamp(3, 22),
+            intervalSec: 0.52,
+            laneIndex: w % 3,
+          ),
+        );
+      }
+      // 3파도마다 스피드·맷집·공격력 특화 중간보스가 일반 변이체 무리와 함께 교대 동반 침략! (24물결 이상은 쌍중간보스 동시 기습)
       if (w % 3 == 0) {
         final midCycle = ((w ~/ 3) - 1) % 3;
         final MutantKind midBoss;
@@ -509,8 +519,8 @@ class EndlessWaveBuilder {
         groups.add(
           WaveSpawnGroup(
             kind: midBoss,
-            count: 1,
-            intervalSec: 1.55,
+            count: w >= 24 ? 2 : 1,
+            intervalSec: 1.45,
             laneIndex: (w ~/ 3) % 3,
             customBossTitle: midTitle,
           ),
@@ -520,7 +530,7 @@ class EndlessWaveBuilder {
         groups.add(
           WaveSpawnGroup(
             kind: w >= 15 ? MutantKind.chapterOverlord : MutantKind.raiderHeukpung,
-            count: 1,
+            count: w >= 35 ? 2 : 1,
             intervalSec: 1.8,
             laneIndex: 1,
             customBossTitle: '무한 혈전 제$w물결 심야 마수',
@@ -531,6 +541,7 @@ class EndlessWaveBuilder {
       waves.add(groups);
     }
 
+    final cappedStartWave = totalWaves > 30 ? 30 : totalWaves;
     return StageSpec(
       globalIndex: 999,
       chapterNumber: safeTheme,
@@ -547,7 +558,7 @@ class EndlessWaveBuilder {
       isBossStage: true,
       maxMountCount: CampaignCatalog.chapterOf(safeTheme).mounts.length,
       waves: waves,
-      startingFieldTokens: 155 + totalWaves * 6,
+      startingFieldTokens: 155 + cappedStartWave * 6,
       clearElixirBonus: 3 + (totalWaves ~/ 5),
     );
   }

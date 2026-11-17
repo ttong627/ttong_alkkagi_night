@@ -1680,5 +1680,100 @@ void main() {
       expect(sim4x.killCount, sim1x.killCount);
       expect(sim4x.shieldHp, closeTo(sim1x.shieldHp, 1e-5));
     });
+
+    test('11~13단 신물 수호석 장별 봉인(8/9/10장)·태초 신기 무한 연마(forgeMastery)·100물결 무한 혈전·빙결 면역이 정확히 작동한다', () {
+      final p = PlayerProgress(tokens: 3000);
+      // 조각이 99개 있어도 제8/9/10장 도달 전에는 11~13단 신물 수호석 조기 합성이 차단되어야 함!
+      p.stoneShards[StoneMaterial.onok] = 99;
+      p.stoneShards[StoneMaterial.yongrin] = 99;
+      p.stoneShards[StoneMaterial.taegeuk] = 99;
+      expect(p.canUnlockStone(StoneMaterial.onok), isFalse);
+      expect(p.canUnlockStone(StoneMaterial.yongrin), isFalse);
+      expect(p.canUnlockStone(StoneMaterial.taegeuk), isFalse);
+      expect(p.unlockStoneWithTokens(StoneMaterial.taegeuk), isFalse);
+
+      // 제8장 개방 시 11단 천년온옥만 합성 가능, 12·13단은 여전히 잠김!
+      p.highestClearedGlobalStage = CampaignCatalog.stagesOfChapter(7).last.globalIndex;
+      expect(p.highestUnlockedChapter, 8);
+      expect(p.unlockStoneWithTokens(StoneMaterial.onok), isTrue);
+      expect(p.unlockStoneWithTokens(StoneMaterial.yongrin), isFalse);
+      expect(p.unlockStoneWithTokens(StoneMaterial.taegeuk), isFalse);
+
+      // 제9장 개방 시 12단 용린석, 제10장 개방 시 13단 태극석 순차 해금!
+      p.highestClearedGlobalStage = CampaignCatalog.stagesOfChapter(8).last.globalIndex;
+      expect(p.unlockStoneWithTokens(StoneMaterial.yongrin), isTrue);
+      expect(p.unlockStoneWithTokens(StoneMaterial.taegeuk), isFalse);
+      p.highestClearedGlobalStage = CampaignCatalog.stagesOfChapter(9).last.globalIndex;
+      expect(p.unlockStoneWithTokens(StoneMaterial.taegeuk), isTrue);
+
+      // 태초 신기 무한 연마 및 백업/복원 직렬화 일치 검증!
+      expect(p.forgeMasteryLevel, 0);
+      expect(p.upgradeForgeMastery(), isTrue);
+      expect(p.upgradeForgeMastery(), isTrue);
+      expect(p.forgeMasteryLevel, 2);
+      expect(p.forgeMasteryPowerBonus, closeTo(0.09, 1e-6));
+      final backup = p.encodeJson();
+      final restored = PlayerProgress.decodeJson(backup);
+      expect(restored.forgeMasteryLevel, 2);
+
+      // 심야 무한 혈전 100물결 생성 및 빙결 면역 타이머 검증!
+      final end100 = EndlessWaveBuilder.buildEndlessStage(waveCount: 100, chapterTheme: 10);
+      expect(end100.waves.length, 100);
+      final sim = DefenseBattleSim(
+        stage: end100,
+        difficulty: DefenseDifficulty.normal,
+        progress: restored,
+        allowSerendipity: false,
+      );
+      sim.mutants.clear();
+      final boss = ActiveMutant(
+        uid: 7771,
+        kind: MutantKind.ironColossusBoss,
+        laneIndex: 0,
+        waypoints: sim.chapter.smoothedLane(0),
+        pos: const Vec2(200, 260),
+        maxHp: 5000,
+        speed: 0,
+      );
+      sim.mutants.add(boss);
+      sim.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'launcher_0',
+          sourceLabel: '한빙 역장기(1거점)',
+          pos: boss.pos,
+          vel: const Vec2(0, -240),
+          material: StoneMaterial.bingbaek,
+          shape: StoneShape.round,
+          damage: 20,
+          knockback: 5,
+          critChance: 0,
+          colorHex: 0xFF90E0EF,
+          freezesOnHit: true,
+        ),
+      );
+      sim.step(1 / 60);
+      expect(boss.freezeTimer, greaterThan(0.8));
+      expect(boss.freezeImmuneTimer, greaterThan(3.5));
+      // 빙결 면역 시간 동안에는 추가 한빙탄을 맞아도 영구 빙결되지 않아야 함!
+      boss.freezeTimer = 0.0;
+      sim.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'launcher_0',
+          sourceLabel: '한빙 역장기(1거점)',
+          pos: boss.pos,
+          vel: const Vec2(0, -240),
+          material: StoneMaterial.bingbaek,
+          shape: StoneShape.round,
+          damage: 20,
+          knockback: 5,
+          critChance: 0,
+          colorHex: 0xFF90E0EF,
+          freezesOnHit: true,
+        ),
+      );
+      sim.step(1 / 60);
+      expect(boss.freezeTimer, 0.0);
+      expect(boss.slowTimer, greaterThan(2.0));
+    });
   });
 }

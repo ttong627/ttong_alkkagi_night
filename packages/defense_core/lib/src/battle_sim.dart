@@ -119,6 +119,7 @@ class ActiveMutant {
 
   Vec2 knockbackVel = const Vec2(0, 0);
   double freezeTimer = 0.0;
+  double freezeImmuneTimer = 0.0;
   double slowTimer = 0.0;
   double oilSlipTimer = 0.0;
   bool cliffChecked = false;
@@ -348,6 +349,7 @@ class DefenseBattleSim {
 
   /// 내공 게이지 (0.0 ~ 3.0칸) 및 전술 비약 버프 타이머.
   double qiBars = 0.0;
+  double _autoEogiCooldown = 0.0;
   double jeonggakHasteTimer = 0.0;
   double cheonghakBuffTimer = 0.0;
   double auroraCritTimer = 0.0;
@@ -386,12 +388,14 @@ class DefenseBattleSim {
   /// 개별 길목 초소(ActiveLauncher)의 현재 유효 사거리 (발사대 계통별 고유 사거리 + 승급 + 인접 증폭기 + 실시간 사거리업 반영).
   double effectiveLauncherRange(ActiveLauncher l) {
     double mult = liveRangeMultiplier * (1.0 + progress.corePrecisionBonus * 0.30);
-    for (final other in launchers) {
-      if (other != l &&
-          other.type == LauncherType.qiAmplifier &&
-          other.pos.distanceTo(l.pos) <= 125.0) {
-        mult += 0.12 + other.tier * 0.02;
-        break;
+    if (l.type != LauncherType.qiAmplifier) {
+      for (final other in launchers) {
+        if (other != l &&
+            other.type == LauncherType.qiAmplifier &&
+            other.pos.distanceTo(l.pos) <= 140.0) {
+          mult += 0.14 + other.tier * 0.02;
+          break;
+        }
       }
     }
     return (l.type.effectiveBaseRange(l.tier) * mult).clamp(96.0, 236.0);
@@ -501,8 +505,12 @@ class DefenseBattleSim {
       realmDefenseMult: progress.realm.defenseMult,
       meridianShieldBonus: progress.meridianShieldHpBonus,
       meridianReloadBonus: progress.meridianCentralReloadBonus,
-      coreFortitudeBonus: progress.coreFortitudeBonus + progress.codexPowerBonus,
-      coreFirepowerBonus: progress.coreFirepowerBonus + progress.codexPowerBonus,
+      coreFortitudeBonus: progress.coreFortitudeBonus +
+          progress.codexPowerBonus +
+          progress.forgeMasteryPowerBonus,
+      coreFirepowerBonus: progress.coreFirepowerBonus +
+          progress.codexPowerBonus +
+          progress.forgeMasteryPowerBonus,
     );
     shieldMaxHpDynamic = centralSpec.shieldMaxHp;
     shieldHp = shieldMaxHpDynamic;
@@ -1204,9 +1212,9 @@ class DefenseBattleSim {
     return true;
   }
 
-  /// 실시간 전군 화력 일괄 업그레이드 (+22%/단, 멈춤 없음!).
+  /// 실시간 전군 화력 일괄 업그레이드 (최대 5단 · +15%/단, 멈춤 없음!).
   bool upgradeLiveFirepower() {
-    if (isFinished || fieldTokens < liveFirepowerCost) return false;
+    if (isFinished || liveFirepowerLv >= 5 || fieldTokens < liveFirepowerCost) return false;
     fieldTokens -= liveFirepowerCost;
     liveFirepowerLv++;
     manualResonanceTimer = max(manualResonanceTimer, 8.0);
@@ -1215,16 +1223,16 @@ class DefenseBattleSim {
     callouts.add(
       FloatingCallout(
         pos: CampaignCatalog.centralTowerPos + const Vec2(0, -44),
-        text: '⚔️ 전군 화력 실시간 강화 $liveFirepowerLv단! (+${liveFirepowerLv * 22}%)',
+        text: '⚔️ 전군 화력 실시간 강화 $liveFirepowerLv단! (+${liveFirepowerLv * 15}%)',
         colorHex: 0xFFFF6B35,
       ),
     );
     return true;
   }
 
-  /// 실시간 전군 연사속도 일괄 업그레이드 (+18%/단, 멈춤 없음!).
+  /// 실시간 전군 연사속도 일괄 업그레이드 (최대 5단 · +12%/단, 멈춤 없음!).
   bool upgradeLiveReload() {
-    if (isFinished || fieldTokens < liveReloadCost) return false;
+    if (isFinished || liveReloadLv >= 5 || fieldTokens < liveReloadCost) return false;
     fieldTokens -= liveReloadCost;
     liveReloadLv++;
     manualResonanceTimer = max(manualResonanceTimer, 8.0);
@@ -1233,16 +1241,16 @@ class DefenseBattleSim {
     callouts.add(
       FloatingCallout(
         pos: CampaignCatalog.centralTowerPos + const Vec2(0, -44),
-        text: '⚡ 전군 연사 실시간 가속 $liveReloadLv단! (+${liveReloadLv * 18}%)',
+        text: '⚡ 전군 연사 실시간 가속 $liveReloadLv단! (+${liveReloadLv * 12}%)',
         colorHex: 0xFF4CC9F0,
       ),
     );
     return true;
   }
 
-  /// 실시간 방어 결계 증축 & 즉시 수복 업그레이드 (+20% 최대치 & 40% 즉시 수리, 멈춤 없음!).
+  /// 실시간 방어 결계 증축 & 즉시 수복 업그레이드 (최대 5단 · +20% 최대치 & 40% 즉시 수리, 멈춤 없음!).
   bool upgradeLiveBarrier() {
-    if (isFinished || fieldTokens < liveBarrierCost) return false;
+    if (isFinished || liveBarrierLv >= 5 || fieldTokens < liveBarrierCost) return false;
     fieldTokens -= liveBarrierCost;
     liveBarrierLv++;
     manualResonanceTimer = max(manualResonanceTimer, 8.0);
@@ -1669,7 +1677,7 @@ class DefenseBattleSim {
       qiBars = (qiBars + 0.25).clamp(0.0, 3.0);
     }
 
-    final liveDmgBoost = (1.0 + liveFirepowerLv * 0.22) * powerTarget.damageMultiplier;
+    final liveDmgBoost = (1.0 + liveFirepowerLv * 0.15) * powerTarget.damageMultiplier;
     final finalDamage =
         baseDamage * liveDmgBoost * stone.damageMultiplier * (isCritSerendipity ? 2.1 : 1.0);
     final finalKnock = 48.0 *
@@ -2422,16 +2430,16 @@ class DefenseBattleSim {
   }
 
   static const List<double> _chapterMonsterHpCurve = <double>[
-    1.00, // 1장
-    1.55, // 2장
-    2.30, // 3장
-    3.35, // 4장
-    4.75, // 5장
-    6.60, // 6장
-    9.00, // 7장
-    12.10, // 8장
-    16.00, // 9장
-    21.00, // 10장 (결전 보스 10연전)
+    1.00, // 1장 (입문 환영 구간 보존)
+    2.35, // 2장
+    14.50, // 3장 (무강화·단일병종 첫 성장 벽 형성)
+    22.50, // 4장
+    40.00, // 5장
+    56.00, // 6장
+    78.00, // 7장
+    108.00, // 8장
+    146.00, // 9장
+    195.00, // 10장 (결전 보스 10연전)
   ];
 
   /// 플레이어 영구 강화·내공 경지·수호석 성장에 비례하는 장별 변이체 체력 배율.
@@ -2439,18 +2447,27 @@ class DefenseBattleSim {
     final chIdx = (stage.chapterNumber - 1).clamp(0, _chapterMonsterHpCurve.length - 1);
     final baseCh = _chapterMonsterHpCurve[chIdx];
     if (stage.globalIndex >= 900) {
-      return baseCh * (1.0 + currentWaveIndex * 0.14);
+      final w = currentWaveIndex;
+      if (w <= 15) {
+        return baseCh * (1.0 + w * 0.14);
+      }
+      return baseCh * (1.0 + 15 * 0.14) * pow(1.19, w - 15).toDouble();
     }
-    return baseCh * (1.0 + (stage.stageNumber - 1) * 0.042);
+    return baseCh * (1.0 + (stage.stageNumber - 1) * 0.052);
   }
 
   /// 장 진행 및 난이도에 따른 변이체 방어막·수호탑 공격력 배율 (1-1 보통은 1.00 정확 유지).
   double get _mutantAttackScale {
-    final chMult = 1.0 + (stage.chapterNumber - 1) * 0.24;
+    double chMult = 1.0 +
+        (stage.chapterNumber - 1) * 0.48 +
+        (stage.chapterNumber >= 6 ? (stage.chapterNumber - 5) * 0.42 : 0.0);
+    if (stage.globalIndex >= 900 && currentWaveIndex > 15) {
+      chMult *= pow(1.16, currentWaveIndex - 15).toDouble();
+    }
     final diffMult = switch (difficulty) {
       DefenseDifficulty.easy => 0.82,
       DefenseDifficulty.normal => 1.0,
-      DefenseDifficulty.nightmare => 1.28,
+      DefenseDifficulty.nightmare => 1.45,
     };
     return chMult * diffMult;
   }
@@ -2526,6 +2543,7 @@ class DefenseBattleSim {
     for (int i = mutants.length - 1; i >= 0; i--) {
       final m = mutants[i];
       if (m.freezeTimer > 0) m.freezeTimer = max(0, m.freezeTimer - dt);
+      if (m.freezeImmuneTimer > 0) m.freezeImmuneTimer = max(0, m.freezeImmuneTimer - dt);
       if (m.slowTimer > 0) m.slowTimer = max(0, m.slowTimer - dt);
       if (m.oilSlipTimer > 0) m.oilSlipTimer = max(0, m.oilSlipTimer - dt);
       if (m.spawnPortalTimer > 0) m.spawnPortalTimer = max(0, m.spawnPortalTimer - dt);
@@ -2542,14 +2560,18 @@ class DefenseBattleSim {
         m.knockbackVel = const Vec2(0, 0);
       }
 
-      // 낭떠러지 장외 & 절벽 걸침 35% 뽀록 판정!
+      // 낭떠러지 장외 & 절벽 걸침 35% 뽀록 판정! (중갑·방패 정예는 체력 65% 이하로 약해졌을 때만 장외 추락 허용해 무강화 밀치기 꼼수 차단)
+      final canFallOffCliff = !m.kind.isBoss &&
+          (stage.chapterNumber <= 2 ||
+              (m.kind != MutantKind.ironBoar && m.kind != MutantKind.shieldYacha) ||
+              m.hp <= m.maxHp * 0.65);
       bool fellOff = false;
       for (final cliff in chapter.cliffs) {
         final dist = m.pos.distanceTo(cliff.center);
-        if (!m.kind.isBoss && dist < cliff.radius * 0.68) {
+        if (canFallOffCliff && dist < cliff.radius * 0.68) {
           fellOff = true;
           break;
-        } else if (!m.kind.isBoss && !m.cliffChecked && dist < cliff.radius) {
+        } else if (canFallOffCliff && !m.cliffChecked && dist < cliff.radius) {
           m.cliffChecked = true;
           if (rng.nextDouble() < 0.35) {
             fellOff = true;
@@ -2564,7 +2586,12 @@ class DefenseBattleSim {
           }
         }
       }
-      if (!m.kind.isBoss &&
+      if (!canFallOffCliff) {
+        m.pos = Vec2(
+          m.pos.x.clamp(14.0, CampaignCatalog.arenaWidth - 14.0),
+          max(10.0, m.pos.y),
+        );
+      } else if (!m.kind.isBoss &&
           (m.pos.x < 10 || m.pos.x > CampaignCatalog.arenaWidth - 10 || m.pos.y < 6)) {
         fellOff = true;
       }
@@ -2833,9 +2860,9 @@ class DefenseBattleSim {
           );
         }
       } else if (shieldHp <= 0 &&
-          (distToCenter <= CampaignCatalog.centralTowerRadius + m.kind.radius * 0.6 ||
+          (distToCenter <= CampaignCatalog.centralTowerRadius + 24.0 + m.kind.radius * 0.6 ||
               m.pos.distanceTo(CampaignCatalog.centralTowerPos) <=
-                  CampaignCatalog.centralTowerRadius + m.kind.radius * 0.6)) {
+                  CampaignCatalog.centralTowerRadius + 24.0 + m.kind.radius * 0.6)) {
         // 방어막이 깨진 상태에서 중앙 자동 보호 장치 직접 타격 → attackPower 비례 피해!
         towerHp = max(0, towerHp - m.kind.attackPower * 0.95 * _mutantAttackScale);
         m.attackAnimTimer = 1.0;
@@ -2860,7 +2887,7 @@ class DefenseBattleSim {
         }
 
         final pushDir = (m.pos - CampaignCatalog.villageCenter).normalized;
-        m.knockbackVel = pushDir * 115.0;
+        m.knockbackVel = pushDir * 64.0;
         pendingSounds.add(SoundCue.villageWarning);
       }
     }
@@ -2921,9 +2948,10 @@ class DefenseBattleSim {
       return;
     }
 
-    // 길목 초소가 1곳 이상 가동되어 진법이 연결되었을 때만 자동 어기어석·흡성탄지 발동!
-    if (launchers.isNotEmpty && qiBars >= 2.95) {
+    // 길목 초소가 1곳 이상 가동되어 진법이 연결되었을 때만 자동 어기어석·흡성탄지 발동! (내부 재사용 대기시간 5.2초로 무한 폭격 꼼수 차단)
+    if (launchers.isNotEmpty && qiBars >= 2.95 && _autoEogiCooldown <= 0) {
       qiBars = 0.0;
+      _autoEogiCooldown = 5.2;
       _fireAutoEogieoseok(target);
       return;
     }
@@ -2965,6 +2993,9 @@ class DefenseBattleSim {
 
   void _fireAutoEogieoseok(ActiveMutant primaryTarget) {
     final origin = CampaignCatalog.centralTowerPos;
+    final distinctTypes = launchers.map((e) => e.type).toSet().length;
+    final monoPenalty =
+        (stage.chapterNumber >= 4 && launchers.length >= 3 && distinctTypes <= 1) ? 0.46 : 1.0;
     final count = progress.realm.eogieoseokCount + 1;
     final maxEogiRange = (215.0 * liveRangeMultiplier).clamp(210.0, 290.0);
     final candidates = mutants
@@ -2991,7 +3022,7 @@ class DefenseBattleSim {
         sourceLabel: '중앙 기명 수호탑 (어기어석)',
         origin: origin + Vec2((i - count / 2) * 14, -8),
         target: tgt,
-        baseDamage: centralSpec.baseDamage * 2.15,
+        baseDamage: centralSpec.baseDamage * 2.15 * monoPenalty,
         speed: 390,
         pierceBonus: 3,
         aoeRadius: 52,
@@ -3015,10 +3046,13 @@ class DefenseBattleSim {
   }
 
   void _stepPathLaunchers(double dt) {
+    if (_autoEogiCooldown > 0) {
+      _autoEogiCooldown = max(0.0, _autoEogiCooldown - dt);
+    }
     final perkHaste = 1.0 + perkStacks(RoguePerk.rapidBarrage) * 0.30;
     final feverHaste = feverTimer > 0 ? 1.80 : 1.0;
     final rouletteHaste = rouletteHyperBarrageTimer > 0 ? 2.20 : 1.0;
-    final liveReloadMult = 1.0 + liveReloadLv * 0.18;
+    final liveReloadMult = 1.0 + liveReloadLv * 0.12;
     final hasteMult = (jeonggakHasteTimer > 0 ? 1.45 : 1.0) *
         (auroraCritTimer > 0 ? 1.50 : 1.0) *
         perkHaste *
@@ -3028,10 +3062,15 @@ class DefenseBattleSim {
 
     final links = activeSynergyLinks;
     final distinctTypes = launchers.map((e) => e.type).toSet().length;
-    final fiveElemBonus = (distinctTypes >= 3 ? 1.18 : 1.0) *
-        powerTarget.damageMultiplier *
-        (1.0 + liveFirepowerLv * 0.22);
+    final hasNonAmpTower = launchers.any((e) => e.type != LauncherType.qiAmplifier);
+    final monoOverload = stage.chapterNumber >= 4 && launchers.length >= 3 && distinctTypes <= 1;
+    final typeDiversityMult = monoOverload
+        ? 0.45
+        : (distinctTypes >= 4 ? 1.72 : (distinctTypes >= 3 ? 1.42 : 1.0));
+    // 실시간 화력업 및 과녁 배율은 _spawnStoneShot에서 일괄 곱해지므로 중복 제곱 증폭 차단!
+    final fiveElemBonus = typeDiversityMult;
 
+    int ampQiCount = 0;
     for (final l in launchers) {
       if (l.recoilAnim > 0) l.recoilAnim = max(0, l.recoilAnim - dt * 4.0);
 
@@ -3051,20 +3090,27 @@ class DefenseBattleSim {
         }
       }
 
-      for (final other in launchers) {
-        if (other != l &&
-            other.type == LauncherType.qiAmplifier &&
-            other.pos.distanceTo(l.pos) <= 125) {
-          ampReload += 0.16 + other.tier * 0.06;
-          ampDamage += 0.15 + other.tier * 0.07;
-          ampCrit += 0.05 * other.tier;
+      // 내공 증폭기는 자기 자신이나 다른 증폭기는 증폭하지 않고, 주변 다른 계통 포탑만 강력히 증폭(최대 2중첩)!
+      if (l.type != LauncherType.qiAmplifier) {
+        int ampStacks = 0;
+        for (final other in launchers) {
+          if (other != l &&
+              other.type == LauncherType.qiAmplifier &&
+              other.pos.distanceTo(l.pos) <= 145) {
+            ampReload += 0.20 + other.tier * 0.06;
+            ampDamage += 0.28 + other.tier * 0.09;
+            ampCrit += 0.05 * other.tier;
+            ampStacks++;
+            if (ampStacks >= 2) break;
+          }
         }
       }
 
-      if (l.type == LauncherType.qiAmplifier) {
-        qiBars = (qiBars + (0.09 + l.tier * 0.035) * dt).clamp(0.0, 3.0);
+      if (l.type == LauncherType.qiAmplifier && hasNonAmpTower && ampQiCount < 2) {
+        ampQiCount++;
+        qiBars = (qiBars + (0.08 + l.tier * 0.03) * dt).clamp(0.0, 3.0);
         if (l.tier >= 4 && shieldHp > 0) {
-          shieldHp = min(shieldMaxHpDynamic, shieldHp + 3.8 * dt);
+          shieldHp = min(shieldMaxHpDynamic, shieldHp + 2.8 * dt);
         }
       }
 
@@ -3094,7 +3140,7 @@ class DefenseBattleSim {
         );
       }
 
-      final permScale = 1.0 + (l.permanentLevel - 1) * 0.14;
+      final permScale = 1.0 + (l.permanentLevel - 1) * 0.16;
       final dmg = l.type.baseDamage *
           1.42 *
           l.type.tierDamageMultiplier(l.tier) *
@@ -3104,7 +3150,8 @@ class DefenseBattleSim {
           (1.0 +
               progress.meridianLauncherDmgBonus +
               progress.coreFirepowerBonus +
-              progress.codexPowerBonus);
+              progress.codexPowerBonus +
+              progress.forgeMasteryPowerBonus);
 
       final shotCount = l.type.projectilesPerShot(l.tier);
       final launcherRange = effectiveLauncherRange(l);
@@ -3114,7 +3161,6 @@ class DefenseBattleSim {
           switch (l.type) {
             LauncherType.rapid => 1 + (l.tier >= 3 ? 1 : 0),
             LauncherType.curveSpin => 2 + (l.tier >= 3 ? 2 : 0),
-            LauncherType.qiAmplifier => 2,
             _ => 0,
           };
       final launcherSplash = switch (l.type) {
@@ -3265,7 +3311,9 @@ class DefenseBattleSim {
         );
         break;
       case SpiritBeast.geumgangTurtle:
-        shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * (0.16 + lv * 0.015));
+        if (shieldHp > 0) {
+          shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * (0.16 + lv * 0.015));
+        }
         pendingSounds.add(SoundCue.shieldWave);
         for (final m in mutants) {
           if (m.pos.distanceTo(CampaignCatalog.villageCenter) < 170) {
@@ -3497,7 +3545,9 @@ class DefenseBattleSim {
         }
         break;
       case CompanionHero.sinseung:
-        shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.22);
+        if (shieldHp > 0) {
+          shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.22);
+        }
         cropsHealth = min(1.0, cropsHealth + 0.30);
         livestockHealth = min(1.0, livestockHealth + 0.30);
         pendingSounds.add(SoundCue.shieldWave);
@@ -3583,7 +3633,7 @@ class DefenseBattleSim {
       qiBars = (qiBars + 0.25).clamp(0.0, 3.0);
     }
 
-    final liveDmgBoost = (1.0 + liveFirepowerLv * 0.22) * powerTarget.damageMultiplier;
+    final liveDmgBoost = (1.0 + liveFirepowerLv * 0.15) * powerTarget.damageMultiplier;
     final finalDamage =
         baseDamage * liveDmgBoost * stone.damageMultiplier * (isCritSerendipity ? 2.1 : 1.0);
     final finalKnock = 46.0 *
@@ -4001,10 +4051,50 @@ class DefenseBattleSim {
       );
     }
 
-    // 쇄빙 파쇄진 시너지: 빙결·감속 상태 적에게 추가 피해 +40%
-    if ((m.freezeTimer > 0 || m.slowTimer > 0) &&
-        activeSynergyLinks.any((l) => l.synergyName == '쇄빙 파쇄진')) {
-      mult *= 1.40;
+    // 빙결·서리 취성 효과: 한빙 역장기 등으로 얼거나 느려진 적은 타 병종 포격에 +45% 추가 파쇄 피해!
+    if (!p.freezesOnHit && (m.freezeTimer > 0 || m.slowTimer > 0)) {
+      mult *= 1.45;
+      if (activeSynergyLinks.any((l) => l.synergyName == '쇄빙 파쇄진')) {
+        mult *= 1.22;
+      }
+    }
+
+    // 5종 발사대 정밀 상성 분화 (제3장 이상 본격 발동 — 입문 1~2장은 기본 장갑 공식 그대로 보존)
+    final isRapid = p.sourceLabel.contains('속사');
+    final isHeavy = p.sourceLabel.contains('중포');
+    final isCurve = p.sourceLabel.contains('곡사');
+    final isHeavyArmorTarget = m.kind == MutantKind.ironBoar ||
+        m.kind == MutantKind.ironColossusBoss ||
+        m.kind == MutantKind.raiderHeukpung ||
+        m.kind == MutantKind.chapterOverlord;
+    final isAgileSwarmTarget = m.kind == MutantKind.swarmRat ||
+        m.kind == MutantKind.sickHound ||
+        m.kind == MutantKind.swiftShadowBoss;
+
+    if (stage.chapterNumber >= 3) {
+      if (isRapid) {
+        if (isAgileSwarmTarget) {
+          mult *= 1.38;
+        } else if (isHeavyArmorTarget || m.kind.isBoss) {
+          mult *= 0.11;
+        } else if (m.kind == MutantKind.shieldYacha) {
+          mult *= 0.18;
+        }
+      } else if (isHeavy) {
+        if (isHeavyArmorTarget || m.kind.isBoss) {
+          mult *= 1.70;
+        } else if (isAgileSwarmTarget) {
+          mult *= 0.14;
+        }
+      } else if (isCurve) {
+        if (m.kind == MutantKind.shieldYacha ||
+            m.kind == MutantKind.bloodCocoon ||
+            m.kind == MutantKind.plagueToad) {
+          mult *= 1.58;
+        } else if (isHeavyArmorTarget || m.kind.isBoss) {
+          mult *= 0.15;
+        }
+      }
     }
 
     final armorBreakStacks = perkStacks(RoguePerk.armorBreaker);
@@ -4021,8 +4111,11 @@ class DefenseBattleSim {
     }
 
     if (p.freezesOnHit) {
-      m.freezeTimer = max(m.freezeTimer, 1.35);
-      m.slowTimer = max(m.slowTimer, 3.0);
+      if (m.freezeImmuneTimer <= 0) {
+        m.freezeTimer = max(m.freezeTimer, m.kind.isBoss ? 0.85 : 1.15);
+        m.freezeImmuneTimer = m.kind.isBoss ? 3.8 : 2.8;
+      }
+      m.slowTimer = max(m.slowTimer, 2.8);
     } else if (p.material == StoneMaterial.bingbaek) {
       m.slowTimer = max(m.slowTimer, 2.5);
     }
@@ -4032,7 +4125,7 @@ class DefenseBattleSim {
 
     if (isCrit) {
       pendingSounds.add(SoundCue.criticalShatter);
-      qiBars = (qiBars + 0.22).clamp(0.0, 3.0);
+      qiBars = (qiBars + 0.06).clamp(0.0, 3.0);
     } else if (p.material == StoneMaterial.bingbaek || p.material == StoneMaterial.hancheol) {
       pendingSounds.add(SoundCue.stoneHitIce);
     } else if (p.material == StoneMaterial.manyeonGiju) {
@@ -4042,12 +4135,12 @@ class DefenseBattleSim {
     } else {
       pendingSounds.add(SoundCue.stoneHitCheongok);
     }
-    qiBars = (qiBars + 0.08).clamp(0.0, 3.0);
+    qiBars = (qiBars + 0.025).clamp(0.0, 3.0);
 
     final hitDir = p.vel.normalized;
     final halfPen = armorBreakStacks > 0 ||
+        isHeavy ||
         p.material.density >= 1.35 ||
-        p.sourceLabel.contains('중포') ||
         isCrit;
     _applyDamageToMutant(
       m,
@@ -4058,7 +4151,7 @@ class DefenseBattleSim {
       knockForce: p.knockback,
       isCritical: isCrit,
       halfArmorPenetration: halfPen,
-      fullArmorIgnore: armorBreakStacks > 0,
+      fullArmorIgnore: armorBreakStacks > 0 || (stage.chapterNumber >= 3 && isHeavy),
     );
 
     // [비급: 쌍탄 분열비급] 첫 적 적중 시 2갈래 분열탄 생성!
@@ -4192,7 +4285,11 @@ class DefenseBattleSim {
 
     final dealt = min(m.hp, effectiveDmg);
     m.hp -= effectiveDmg;
-    m.knockbackVel = m.knockbackVel + knockDir * (knockForce / sqrt(m.kind.mass));
+    final impactScale = stage.chapterNumber <= 2
+        ? 1.0
+        : (0.22 + 0.78 * (effectiveDmg / max(1.0, m.maxHp * 0.14)).clamp(0.0, 1.0));
+    m.knockbackVel =
+        m.knockbackVel + knockDir * ((knockForce * impactScale) / sqrt(m.kind.mass));
     final isKillingBlow = m.hp <= 0;
 
     // 찰진 타격 숫자 팝업 (치명타·격살·중대형 타격 위주로 최대 38개 풀 유지!)
@@ -4277,10 +4374,11 @@ class DefenseBattleSim {
       }
 
       if (preset.primaryStone == StoneMaterial.onok && shieldHp > 0 && launchers.isNotEmpty) {
-        shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.022);
+        final healRatio = stage.globalIndex >= 900 ? 0.008 : 0.016;
+        shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * healRatio);
       }
 
-      // [비급: 홍련 폭렬파] 처치 시 화염 유폭!
+      // [비급: 홍련 폭렬파] 처치 시 화염 유폭! (무한 체력 비례 즉사 방지를 위해 실제 타격 화력 기반으로 상한 제어)
       final corpseStacks = perkStacks(RoguePerk.corpseExplosion);
       if (corpseStacks > 0 && chainDepth < 2) {
         bursts.add(
@@ -4291,11 +4389,17 @@ class DefenseBattleSim {
             isTriangleShatter: true,
           ),
         );
+        final cappedHpBlast = min(
+          m.maxHp * 0.12,
+          centralSpec.baseDamage * progress.realm.powerMult * 4.2,
+        );
+        final blastDmg =
+            (effectiveDmg * 0.42 + cappedHpBlast) * (0.75 + corpseStacks * 0.25);
         for (final near in List<ActiveMutant>.from(mutants)) {
           if (near.pos.distanceTo(m.pos) <= 62.0) {
             _applyDamageToMutant(
               near,
-              (22.0 + m.maxHp * 0.24) * corpseStacks,
+              blastDmg,
               sourceKey: sourceKey,
               sourceLabel: '홍련 폭렬파',
               knockDir: (near.pos - m.pos).normalized,

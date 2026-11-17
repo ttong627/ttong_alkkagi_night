@@ -208,6 +208,17 @@ class GameController extends ChangeNotifier {
     return ok;
   }
 
+  bool upgradeForgeMastery() {
+    final ok = _progress.upgradeForgeMastery();
+    if (ok) {
+      NightAudioController.instance.playAsset('motion_gear.wav');
+      NightHaptics.instance.heavyImpact();
+      saveToDisk();
+      notifyListeners();
+    }
+    return ok;
+  }
+
   bool unlockStone(StoneMaterial stone) {
     final ok = _progress.unlockStoneWithTokens(stone);
     if (ok) {

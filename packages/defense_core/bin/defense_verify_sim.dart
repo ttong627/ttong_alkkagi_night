@@ -24,7 +24,9 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
     p.coreStatLevels[cs] = ((ch - 1) * 1.15).round();
   }
 
-  final stoneIdx = ch >= 10 ? 12 : (ch - 1).clamp(0, 9);
+  final stoneIdx = ch >= 10
+      ? 12
+      : (ch == 9 ? 11 : (ch == 8 ? 10 : (ch - 1).clamp(0, 7)));
   final chosenStone = StoneMaterial.values[stoneIdx];
   p.unlockedStones.add(chosenStone);
 

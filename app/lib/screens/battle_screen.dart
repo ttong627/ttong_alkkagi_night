@@ -2048,60 +2048,71 @@ class _BattleScreenState extends State<BattleScreen>
                             ActionChip(
                               key: const Key('live_upg_firepower_btn'),
                               visualDensity: VisualDensity.compact,
-                              backgroundColor:
-                                  _sim.fieldTokens >= _sim.liveFirepowerCost
-                                      ? const Color(0xFF3A181C)
-                                      : NightPalette.bgDeep,
+                              backgroundColor: _sim.liveFirepowerLv < 5 &&
+                                      _sim.fieldTokens >= _sim.liveFirepowerCost
+                                  ? const Color(0xFF3A181C)
+                                  : NightPalette.bgDeep,
                               side: BorderSide(
-                                color: _sim.fieldTokens >= _sim.liveFirepowerCost
+                                color: _sim.liveFirepowerLv < 5 &&
+                                        _sim.fieldTokens >=
+                                            _sim.liveFirepowerCost
                                     ? const Color(0xFFFF6B35)
                                     : Colors.white24,
                               ),
                               label: Text(
-                                '⚔️화력업+${_sim.liveFirepowerLv}(${_sim.liveFirepowerCost}⚡)',
+                                _sim.liveFirepowerLv >= 5
+                                    ? '⚔️화력만땅'
+                                    : '⚔️화력업+${_sim.liveFirepowerLv}(${_sim.liveFirepowerCost}⚡)',
                                 style: TextStyle(
                                   fontSize: 11.0,
                                   fontWeight: FontWeight.bold,
-                                  color:
-                                      _sim.fieldTokens >= _sim.liveFirepowerCost
-                                          ? const Color(0xFFFF6B35)
-                                          : NightPalette.textMuted,
+                                  color: _sim.liveFirepowerLv < 5 &&
+                                          _sim.fieldTokens >=
+                                              _sim.liveFirepowerCost
+                                      ? const Color(0xFFFF6B35)
+                                      : NightPalette.textMuted,
                                 ),
                               ),
-                              onPressed:
-                                  _sim.fieldTokens >= _sim.liveFirepowerCost
-                                      ? () {
-                                          if (_sim.upgradeLiveFirepower()) {
-                                            NightHaptics.instance.lightTap();
-                                            setState(() {});
-                                          }
-                                        }
-                                      : null,
+                              onPressed: _sim.liveFirepowerLv < 5 &&
+                                      _sim.fieldTokens >= _sim.liveFirepowerCost
+                                  ? () {
+                                      if (_sim.upgradeLiveFirepower()) {
+                                        NightHaptics.instance.lightTap();
+                                        setState(() {});
+                                      }
+                                    }
+                                  : null,
                             ),
                             const SizedBox(width: 5),
                             ActionChip(
                               key: const Key('live_upg_reload_btn'),
                               visualDensity: VisualDensity.compact,
-                              backgroundColor:
-                                  _sim.fieldTokens >= _sim.liveReloadCost
-                                      ? const Color(0xFF122C44)
-                                      : NightPalette.bgDeep,
+                              backgroundColor: _sim.liveReloadLv < 5 &&
+                                      _sim.fieldTokens >= _sim.liveReloadCost
+                                  ? const Color(0xFF122C44)
+                                  : NightPalette.bgDeep,
                               side: BorderSide(
-                                color: _sim.fieldTokens >= _sim.liveReloadCost
+                                color: _sim.liveReloadLv < 5 &&
+                                        _sim.fieldTokens >= _sim.liveReloadCost
                                     ? const Color(0xFF4CC9F0)
                                     : Colors.white24,
                               ),
                               label: Text(
-                                '⚡연사업+${_sim.liveReloadLv}(${_sim.liveReloadCost}⚡)',
+                                _sim.liveReloadLv >= 5
+                                    ? '⚡연사만땅'
+                                    : '⚡연사업+${_sim.liveReloadLv}(${_sim.liveReloadCost}⚡)',
                                 style: TextStyle(
                                   fontSize: 11.0,
                                   fontWeight: FontWeight.bold,
-                                  color: _sim.fieldTokens >= _sim.liveReloadCost
+                                  color: _sim.liveReloadLv < 5 &&
+                                          _sim.fieldTokens >=
+                                              _sim.liveReloadCost
                                       ? const Color(0xFF4CC9F0)
                                       : NightPalette.textMuted,
                                 ),
                               ),
-                              onPressed: _sim.fieldTokens >= _sim.liveReloadCost
+                              onPressed: _sim.liveReloadLv < 5 &&
+                                      _sim.fieldTokens >= _sim.liveReloadCost
                                   ? () {
                                       if (_sim.upgradeLiveReload()) {
                                         NightHaptics.instance.lightTap();
@@ -2151,34 +2162,39 @@ class _BattleScreenState extends State<BattleScreen>
                             ActionChip(
                               key: const Key('live_upg_barrier_btn'),
                               visualDensity: VisualDensity.compact,
-                              backgroundColor:
-                                  _sim.fieldTokens >= _sim.liveBarrierCost
-                                      ? const Color(0xFF123328)
-                                      : NightPalette.bgDeep,
+                              backgroundColor: _sim.liveBarrierLv < 5 &&
+                                      _sim.fieldTokens >= _sim.liveBarrierCost
+                                  ? const Color(0xFF123328)
+                                  : NightPalette.bgDeep,
                               side: BorderSide(
-                                color: _sim.fieldTokens >= _sim.liveBarrierCost
+                                color: _sim.liveBarrierLv < 5 &&
+                                        _sim.fieldTokens >= _sim.liveBarrierCost
                                     ? const Color(0xFF80ED99)
                                     : Colors.white24,
                               ),
                               label: Text(
-                                '🛡️결계업+${_sim.liveBarrierLv}(${_sim.liveBarrierCost}⚡)',
+                                _sim.liveBarrierLv >= 5
+                                    ? '🛡️결계만땅'
+                                    : '🛡️결계업+${_sim.liveBarrierLv}(${_sim.liveBarrierCost}⚡)',
                                 style: TextStyle(
                                   fontSize: 11.0,
                                   fontWeight: FontWeight.bold,
-                                  color: _sim.fieldTokens >= _sim.liveBarrierCost
+                                  color: _sim.liveBarrierLv < 5 &&
+                                          _sim.fieldTokens >=
+                                              _sim.liveBarrierCost
                                       ? const Color(0xFF80ED99)
                                       : NightPalette.textMuted,
                                 ),
                               ),
-                              onPressed:
-                                  _sim.fieldTokens >= _sim.liveBarrierCost
-                                      ? () {
-                                          if (_sim.upgradeLiveBarrier()) {
-                                            NightHaptics.instance.lightTap();
-                                            setState(() {});
-                                          }
-                                        }
-                                      : null,
+                              onPressed: _sim.liveBarrierLv < 5 &&
+                                      _sim.fieldTokens >= _sim.liveBarrierCost
+                                  ? () {
+                                      if (_sim.upgradeLiveBarrier()) {
+                                        NightHaptics.instance.lightTap();
+                                        setState(() {});
+                                      }
+                                    }
+                                  : null,
                             ),
                             if (_sim.rouletteSpinsAvailable > 0) ...[
                               const SizedBox(width: 5),

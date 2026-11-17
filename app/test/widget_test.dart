@@ -774,4 +774,56 @@ void main() {
     expect(find.textContaining('제3장 개방'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('태초 신기 무한 연마 · 11~13단 신물 장별 봉인 · 심야 무한 혈전 100물결 선택지 작동 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final p = PlayerProgress(
+      tokens: 1200,
+      tutorialSeen: true,
+      bgmVolume: 0.0,
+      sfxVolume: 0.0,
+    );
+    p.stoneShards[StoneMaterial.taegeuk] = 99;
+    final controller = GameController(initialProgress: p);
+
+    await tester.pumpWidget(
+      MaterialApp(home: UpgradeScreen(controller: controller)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final forgeMasteryBtn = find.byKey(const Key('upgrade_forge_mastery_btn'));
+    expect(forgeMasteryBtn, findsOneWidget);
+    await tester.tap(forgeMasteryBtn);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(controller.progress.forgeMasteryLevel, 1);
+    expect(find.textContaining('태초 신기 무한 연마 (1단'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.textContaining('제10장 · 조각'),
+      340.0,
+      scrollable: find.descendant(
+        of: find.byType(ListView),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('제10장 · 조각'), findsOneWidget);
+
+    await tester.pumpWidget(
+      MaterialApp(home: EndlessSurvivalScreen(controller: controller)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('100물결 연속 수호'), findsOneWidget);
+    await tester.tap(find.text('100물결 연속 수호'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('심야 무한 혈전 (100물결) 출정!'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

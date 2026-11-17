@@ -402,6 +402,7 @@ class PlayerProgress {
     this.totalBankShotCount = 0,
     this.totalChainShatterCount = 0,
     this.bestEndlessWave = 0,
+    this.forgeMasteryLevel = 0,
     this.tutorialSeen = false,
     this.bgmVolume = 0.38,
     this.sfxVolume = 0.72,
@@ -533,6 +534,7 @@ class PlayerProgress {
   int totalBankShotCount;
   int totalChainShatterCount;
   int bestEndlessWave;
+  int forgeMasteryLevel;
   bool tutorialSeen;
   double bgmVolume;
   double sfxVolume;
@@ -759,17 +761,29 @@ class PlayerProgress {
     return true;
   }
 
+  int get forgeMasteryCost => 260 + forgeMasteryLevel * 95;
+  double get forgeMasteryPowerBonus => forgeMasteryLevel * 0.045;
+
+  bool upgradeForgeMastery() {
+    final cost = forgeMasteryCost;
+    if (tokens < cost) return false;
+    tokens -= cost;
+    forgeMasteryLevel++;
+    return true;
+  }
+
   bool canUnlockStone(StoneMaterial stone) {
     if (unlockedStones.contains(stone)) return false;
+    if (highestUnlockedChapter < stone.minChapter) return false;
     if (stone.isShardStone) {
       return (stoneShards[stone] ?? 0) >= stone.shardRequired;
     }
-    if (highestUnlockedChapter < stone.minChapter) return false;
     return tokens >= stone.unlockTokens;
   }
 
   bool unlockStoneWithTokens(StoneMaterial stone) {
     if (unlockedStones.contains(stone)) return false;
+    if (highestUnlockedChapter < stone.minChapter) return false;
     if (stone.isShardStone) {
       final have = stoneShards[stone] ?? 0;
       if (have < stone.shardRequired) return false;
@@ -777,7 +791,6 @@ class PlayerProgress {
       unlockedStones.add(stone);
       return true;
     }
-    if (highestUnlockedChapter < stone.minChapter) return false;
     if (tokens < stone.unlockTokens) return false;
     tokens -= stone.unlockTokens;
     unlockedStones.add(stone);
@@ -1366,6 +1379,7 @@ class PlayerProgress {
         'totBank': totalBankShotCount,
         'totChain': totalChainShatterCount,
         'bestEndless': bestEndlessWave,
+        'forgeMastery': forgeMasteryLevel,
         'tutSeen': tutorialSeen,
         'bgmVol': bgmVolume,
         'sfxVol': sfxVolume,
@@ -1468,6 +1482,7 @@ class PlayerProgress {
       totalBankShotCount: _safeInt(j['totBank'], 0).clamp(0, 999999999),
       totalChainShatterCount: _safeInt(j['totChain'], 0).clamp(0, 999999999),
       bestEndlessWave: _safeInt(j['bestEndless'], 0).clamp(0, 9999),
+      forgeMasteryLevel: _safeInt(j['forgeMastery'], 0).clamp(0, 9999),
       tutorialSeen: _safeBool(j['tutSeen'], false),
       bgmVolume: _safeDouble(j['bgmVol'] ?? j['bgmVolume'], 0.38).clamp(0.0, 1.0),
       sfxVolume: _safeDouble(j['sfxVol'] ?? j['sfxVolume'], 0.72).clamp(0.0, 1.0),

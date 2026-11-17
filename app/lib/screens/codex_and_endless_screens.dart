@@ -647,7 +647,7 @@ class EndlessSurvivalScreen extends StatefulWidget {
 }
 
 class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
-  int _selectedWaves = 10;
+  int _selectedWaves = 30;
   int _selectedThemeChapter = 1;
 
   @override
@@ -670,145 +670,222 @@ class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
           body: NightSceneBackdrop(
             assetPath: selectedChapter.bgAsset,
             fallbackAssetPath: NightArtRegistry.bgNightLobby,
-            overlayOpacity: 0.84,
+            overlayOpacity: 0.78,
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
               children: [
-                MurimCard(
-                  borderColor: NightPalette.crimsonMoon,
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                // 1) 상단 시네마틱 주인공 명패 + 심연 결전 원화 배너 (시각 주인공 3:1.6:1 계층 확보)
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 740),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3E7CC),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: NightPalette.accentGold,
+                          width: 1.8,
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const NightSpriteIcon(
-                            assetPath: NightArtRegistry.nightEndless,
-                            fallbackAssetPath: 'assets/images/icons/arena.webp',
-                            fallbackIcon: Icons.local_fire_department_rounded,
-                            size: 56,
-                            showFrame: true,
-                            frameColor: NightPalette.crimsonMoon,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          SizedBox(
+                            height: 210,
+                            child: Stack(
+                              fit: StackFit.expand,
                               children: [
-                                const Text(
-                                  '끝없는 심야 변이 대군을 막아라!',
-                                  style: TextStyle(
-                                    fontFamily: 'BlackHanSans',
-                                    fontSize: 20,
-                                    color: NightPalette.accentGold,
+                                Image.asset(
+                                  NightArtRegistry.cardEndlessAbyss,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => const ColoredBox(
+                                    color: Color(0xFF1F2B42),
                                   ),
                                 ),
-                                Text(
-                                  '최고 돌파 기록: ${p.bestEndlessWave}물결 · 누적 토벌: ${p.totalMutantKills}마리',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: NightPalette.jadeGreen,
+                                const DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Color(0x380D1628),
+                                        Color(0xD8141E33),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      const NightSpriteIcon(
+                                        assetPath: NightArtRegistry.nightEndless,
+                                        fallbackAssetPath:
+                                            'assets/images/icons/arena.webp',
+                                        fallbackIcon:
+                                            Icons.local_fire_department_rounded,
+                                        size: 74,
+                                        showFrame: true,
+                                        frameColor: NightPalette.accentGold,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '최고 돌파 기록: ${p.bestEndlessWave}물결 · 누적 토벌: ${p.totalMutantKills}마리',
+                                              style: const TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: NightPalette.jadeGreen,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            const Text(
+                                              '끝없는 심야 변이 대군을 막아라!',
+                                              style: TextStyle(
+                                                fontFamily: 'BlackHanSans',
+                                                fontSize: 28,
+                                                color: NightPalette.accentGold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(20, 14, 20, 16),
+                            child: Text(
+                              '3물결마다 스피드·맷집·공격력 특화 중간보스가 동반 침략하고 5물결마다 대수괴가 난입하며, '
+                              '15물결 이후부터는 체력·공격력이 기하급수 폭증하는 극한 혈전이 펼쳐집니다! 최대 100물결 한계에 도전하세요!',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                height: 1.48,
+                                color: Color(0xFF1F2B42),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        '3물결마다 스피드·맷집·공격력 특화 중간보스가 변이 무리와 동반 침략하며, 5물결마다 대수괴가 난입합니다! '
-                        '내가 조합한 자동 발사 진법과 전술 비약의 한계를 시험하고 대량의 증표·영약을 획득하세요!',
-                        style: TextStyle(fontSize: 13.5, height: 1.45),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                MurimCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '1. 도전 목표 물결 선택',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: NightPalette.accentGold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [10, 20, 30].map((w) {
-                          return ChoiceChip(
-                            selected: _selectedWaves == w,
-                            label: Text('$w물결 연속 수호'),
-                            onSelected: (_) => setState(() => _selectedWaves = w),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        '2. 전장 지형 선택 (해금된 장 기준)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: NightPalette.accentGold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<int>(
-                        isExpanded: true,
-                        initialValue: _selectedThemeChapter.clamp(1, maxCh),
-                        items: List.generate(maxCh, (idx) {
-                          final ch = CampaignCatalog.chapterOf(idx + 1);
-                          return DropdownMenuItem<int>(
-                            value: ch.number,
-                            child: Text(
-                              '제${ch.number}장 · ${ch.villageName} (${ch.title})',
-                              overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 18),
+
+                // 2) 물결 · 지형 선택 및 출정 통합 제어반
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 740),
+                    child: MurimCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '1. 도전 목표 물결 선택',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15.5,
+                              color: NightPalette.accentGold,
                             ),
-                          );
-                        }),
-                        onChanged: (v) {
-                          if (v != null) setState(() => _selectedThemeChapter = v);
-                        },
-                      ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          key: const Key('start_endless_battle_btn'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: NightPalette.accentGold,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          onPressed: () {
-                            final stage = EndlessWaveBuilder.buildEndlessStage(
-                              waveCount: _selectedWaves,
-                              chapterTheme: _selectedThemeChapter,
-                            );
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => BattleScreen(
-                                  controller: widget.controller,
-                                  stage: stage,
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [15, 30, 50, 100].map((w) {
+                              return ChoiceChip(
+                                visualDensity: VisualDensity.compact,
+                                selected: _selectedWaves == w,
+                                label: Text('$w물결 연속 수호'),
+                                onSelected: (_) =>
+                                    setState(() => _selectedWaves = w),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 18),
+                          const Text(
+                            '2. 전장 지형 선택 (해금된 장 기준)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15.5,
+                              color: NightPalette.accentGold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<int>(
+                            isExpanded: true,
+                            initialValue: _selectedThemeChapter.clamp(1, maxCh),
+                            items: List.generate(maxCh, (idx) {
+                              final ch = CampaignCatalog.chapterOf(idx + 1);
+                              return DropdownMenuItem<int>(
+                                value: ch.number,
+                                child: Text(
+                                  '제${ch.number}장 · ${ch.villageName} (${ch.title})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }),
+                            onChanged: (v) {
+                              if (v != null) {
+                                setState(() => _selectedThemeChapter = v);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              key: const Key('start_endless_battle_btn'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: NightPalette.accentGold,
+                                foregroundColor: Colors.black,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 15),
+                              ),
+                              onPressed: () {
+                                final stage =
+                                    EndlessWaveBuilder.buildEndlessStage(
+                                  waveCount: _selectedWaves,
+                                  chapterTheme: _selectedThemeChapter,
+                                );
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => BattleScreen(
+                                      controller: widget.controller,
+                                      stage: stage,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const NightSpriteIcon(
+                                assetPath: NightArtRegistry.nightEndless,
+                                fallbackIcon: Icons.bolt_rounded,
+                                size: 22,
+                              ),
+                              label: Text(
+                                '심야 무한 혈전 ($_selectedWaves물결) 출정!',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
                               ),
-                            );
-                          },
-                          icon: const NightSpriteIcon(
-                            assetPath: NightArtRegistry.nightEndless,
-                            fallbackIcon: Icons.bolt_rounded,
-                            size: 20,
+                            ),
                           ),
-                          label: Text('심야 무한 혈전 ($_selectedWaves물결) 출정!'),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],

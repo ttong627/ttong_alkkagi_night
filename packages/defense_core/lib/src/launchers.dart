@@ -3,7 +3,7 @@ enum LauncherType {
   rapid(
     id: 'rapid',
     name: '속사 탄지기',
-    roleSummary: '근·중거리(122) 굽이 안에 들어온 적에게 초고속 다연발(2~7갈래) 탄막 집중 사격',
+    roleSummary: '근·중거리(122) 초고속 다연발 탄막으로 고속 군집 학살 (중갑·방패병에겐 위력 반감)',
     tierNames: ['1형 쌍발 속사기', '2형 삼연발 연노기', '3형 사연속 폭풍기', '4형 오발 천뢰 기관진'],
     baseCooldownSec: 0.38,
     baseDamage: 18.0,
@@ -17,13 +17,13 @@ enum LauncherType {
   heavy(
     id: 'heavy',
     name: '중포 탄지기',
-    roleSummary: '장거리(162 · 코앞 34 사각) 대구경 곡사 포격으로 먼 굽이 중갑 변이 파쇄 및 절벽 추락',
+    roleSummary: '장거리(162 · 코앞 54 사각) 대구경 곡사 포격으로 중갑·보스 완전 파쇄 (소형 고속군집 취약)',
     tierNames: ['1형 강타 투석포', '2형 철심 폭렬포', '3형 파쇄 진동대포', '4형 천추 파성 거포'],
-    baseCooldownSec: 1.06,
-    baseDamage: 64.0,
+    baseCooldownSec: 1.45,
+    baseDamage: 82.0,
     projectileSpeed: 420.0,
     baseRangePx: 162.0,
-    minRangePx: 34.0,
+    minRangePx: 54.0,
     unlockChapter: 1,
     buildCostTokens: 55,
     colorHex: 0xFFF77F00,
@@ -31,10 +31,10 @@ enum LauncherType {
   curveSpin(
     id: 'curveSpin',
     name: '곡사 회전기',
-    roleSummary: '중거리(134) S자 부메랑 칼날탄으로 위·아래 두 굽이 대열과 방패병 측면을 동시에 훑음',
+    roleSummary: '중거리(134) 부메랑 칼날탄으로 전면 방패병 100% 우회 절단 (중갑 거수에겐 위력 감소)',
     tierNames: ['1형 회전 비검기', '2형 쌍류 부메랑포', '3형 갈고리 파쇄포', '4형 태극 칼날 회오리포'],
-    baseCooldownSec: 0.74,
-    baseDamage: 29.5,
+    baseCooldownSec: 0.78,
+    baseDamage: 30.0,
     projectileSpeed: 440.0,
     baseRangePx: 134.0,
     minRangePx: 0.0,
@@ -45,10 +45,10 @@ enum LauncherType {
   frostField(
     id: 'frostField',
     name: '한빙 역장기',
-    roleSummary: '초근접(108) 굽이 목지점 전용! 짧은 사거리 대신 지나가는 대군을 통째로 얼려 묶음',
+    roleSummary: '초근접(108) 굽이 빙결 제어 전용! 빙결된 적은 다른 포탑에 +45% 추가 파쇄 피해 (단독 화력 낮음)',
     tierNames: ['1형 쌍발 냉기포', '2형 서리 산탄기', '3형 삼발 빙결 족쇄포', '4형 만년 빙옥 폭풍포'],
-    baseCooldownSec: 0.86,
-    baseDamage: 21.0,
+    baseCooldownSec: 1.05,
+    baseDamage: 2.6,
     projectileSpeed: 405.0,
     baseRangePx: 108.0,
     minRangePx: 0.0,
@@ -59,10 +59,10 @@ enum LauncherType {
   qiAmplifier(
     id: 'qiAmplifier',
     name: '내공 증폭기',
-    roleSummary: '중거리(138) 관통 기공탄 + 인접(125) 초소 사거리·연사·화력 증폭 및 내공 충전',
+    roleSummary: '인접(145) 다른 계통 포탑의 화력·연사·사거리를 대폭 증폭 및 내공 충전 (자체 살상력 낮음)',
     tierNames: ['1형 기운 공명석', '2형 문파 가속 주입기', '3형 회심 폭주 진법', '4형 기명 천하 사방진'],
-    baseCooldownSec: 1.00,
-    baseDamage: 28.0,
+    baseCooldownSec: 1.25,
+    baseDamage: 2.2,
     projectileSpeed: 445.0,
     baseRangePx: 138.0,
     minRangePx: 0.0,
@@ -169,8 +169,7 @@ enum LauncherType {
         if (t >= 2) return 3;
         return 2;
       case LauncherType.frostField:
-        if (t >= 5) return 4;
-        return t >= 3 ? 3 : 2;
+        return t >= 4 ? 2 : 1;
       case LauncherType.curveSpin:
         if (t >= 5) return 3;
         return t >= 2 ? 2 : 1;
@@ -178,14 +177,13 @@ enum LauncherType {
         if (t >= 5) return 3;
         return t >= 4 ? 2 : 1;
       case LauncherType.qiAmplifier:
-        if (t >= 5) return 3;
-        return t >= 3 ? 2 : 1;
+        return 1;
     }
   }
 
   /// 대장간 영구 강화 비용 (돌연변이 처치 드롭 증표 전용).
   int permanentUpgradeCost(int currentLevel) =>
-      45 + currentLevel * 38 + (currentLevel * currentLevel * 12);
+      45 + currentLevel * 34 + (currentLevel * currentLevel * 9);
 }
 
 /// 중앙 자동 알 발사 보호 장치(기명 수호탑) & 외곽 기공 방어막 스펙 계산기.
@@ -236,5 +234,5 @@ class CentralGuardianSpec {
   }
 
   static int permanentUpgradeCost(int currentLevel) =>
-      50 + currentLevel * 42 + (currentLevel * currentLevel * 14);
+      50 + currentLevel * 38 + (currentLevel * currentLevel * 10);
 }
