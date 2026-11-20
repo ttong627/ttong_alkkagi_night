@@ -12,6 +12,26 @@ class LoadoutScreen extends StatelessWidget {
   const LoadoutScreen({super.key, required this.controller});
   final GameController controller;
 
+  static InputDecoration _darkFieldDecoration(String labelText) {
+    return InputDecoration(
+      labelText: labelText,
+      labelStyle: const TextStyle(fontSize: 12.8, color: NightPalette.textMuted),
+      filled: true,
+      fillColor: NightPalette.bgDeep.withValues(alpha: 0.78),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: NightPalette.borderGold.withValues(alpha: 0.28),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: NightPalette.accentGold, width: 1.4),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -20,531 +40,608 @@ class LoadoutScreen extends StatelessWidget {
         final p = controller.progress;
         final preset = p.activePreset;
 
-        return Scaffold(
-          appBar: AppBar(title: const Text('자동 수호 진법 편성실')),
-          body: NightSceneBackdrop(
-            child: ListView(
-              padding: const EdgeInsets.all(14),
-              children: [
-                // 1) 진법 슬롯 3칸 선택
-                MurimCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '진법 저장 슬롯 (상황에 맞춰 즉시 교체)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: NightPalette.accentGold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: List.generate(p.presets.length, (i) {
-                          return ChoiceChip(
-                            selected: p.activePresetIndex == i,
-                            label: Text(p.presets[i].name),
-                            onSelected: (_) => controller.selectPreset(i),
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 2) 주력 수호 알(1~13단 stone_*.webp) · 모양(3종) · 문파 내공(4종)
-                MurimCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          NightSpriteIcon(
-                            assetPath: NightArtRegistry.stoneAsset(
-                              preset.primaryStone,
-                            ),
-                            fallbackIcon: Icons.circle,
-                            size: 42,
-                            color: Color(preset.primaryStone.colorHex),
-                            showFrame: true,
-                          ),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              '수호 알 종류(1~13단) · 모양 · 문파 내공 장치',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: NightPalette.accentGold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<StoneMaterial>(
-                        isExpanded: true,
-                        initialValue: preset.primaryStone,
-                        decoration: const InputDecoration(
-                          labelText: '장착 수호 알 (해금된 재질)',
-                        ),
-                        items: StoneMaterial.values
-                            .where((s) => p.unlockedStones.contains(s))
-                            .map(
-                              (s) => DropdownMenuItem(
-                                value: s,
-                                child: Row(
-                                  children: [
-                                    NightSpriteIcon(
-                                      assetPath: NightArtRegistry.stoneAsset(s),
-                                      fallbackIcon: Icons.circle,
-                                      size: 24,
-                                      color: Color(s.colorHex),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        '${s.grade}단 ${s.name} — ${s.specialDesc}',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            controller.updatePreset((pr) => pr.primaryStone = v);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<StoneShape>(
-                        isExpanded: true,
-                        initialValue: preset.primaryShape,
-                        decoration: const InputDecoration(
-                          labelText: '수호 알 모양 (3종)',
-                        ),
-                        items: StoneShape.values
-                            .map(
-                              (sh) => DropdownMenuItem(
-                                value: sh,
-                                child: Text(
-                                  '${sh.name} · ${sh.summary}',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            controller.updatePreset((pr) => pr.primaryShape = v);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<SectTechnique>(
-                        isExpanded: true,
-                        initialValue: preset.sectTechnique,
-                        decoration: const InputDecoration(
-                          labelText: '문파 내공 장치 (1칸 완충 시 자동 발동)',
-                        ),
-                        items: SectTechnique.values
-                            .map(
-                              (st) => DropdownMenuItem(
-                                value: st,
-                                child: Row(
-                                  children: [
-                                    NightSpriteIcon(
-                                      assetPath: NightArtRegistry.fxQi,
-                                      fallbackIcon: Icons.auto_awesome_rounded,
-                                      size: 20,
-                                      color: Color(st.colorHex),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        '${st.sectName} [${st.skillName}]',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            controller.updatePreset(
-                              (pr) => pr.sectTechnique = v,
-                            );
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 3) 전장 빈 초소(2→10곳) 직접 배치용 수호 발사대 도감 & 배치 비용 안내
-                MurimCard(
-                  borderColor: NightPalette.jadeShield,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '길목 초소(2→10곳) 직접 배치 발사대 5종 (전투 중 터치 건설)',
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          color: NightPalette.accentGold,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        '• 전투 시작 시 길목은 비어 있으며, 맨 아래 「중앙 기명 수호탑(자동·수동 전환)」만 가동됩니다.\n'
-                        '• 관문이 진행될수록 배치 가능한 빈 초소가 2곳에서 최대 10곳까지 늘어납니다!',
-                        style: TextStyle(
-                          fontSize: 12.2,
-                          color: NightPalette.textMuted,
-                          height: 1.38,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ...LauncherType.values.map((lt) {
-                        final unlocked =
-                            lt.unlockChapter <= p.highestUnlockedChapter + 1;
-                        final permLv = p.launcherPermanentLevels[lt] ?? 1;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            children: [
-                              NightSpriteIcon(
-                                assetPath: NightArtRegistry.launcherAsset(lt),
-                                fallbackIcon: Icons.gps_fixed_rounded,
-                                size: 40,
-                                color: Color(lt.colorHex),
-                                dimmed: !unlocked,
-                                showFrame: true,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${lt.name} (영구 $permLv단 · 배치 증표 ${lt.buildCostTokens})',
-                                      style: TextStyle(
-                                        fontSize: 13.8,
-                                        fontWeight: FontWeight.bold,
-                                        color: unlocked
-                                            ? Color(lt.colorHex)
-                                            : NightPalette.textMuted,
-                                      ),
-                                    ),
-                                    Text(
-                                      unlocked
-                                          ? lt.roleSummary
-                                          : '제${lt.unlockChapter}장 진군 시 개방',
-                                      style: const TextStyle(
-                                        fontSize: 11.8,
-                                        color: NightPalette.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 구출 현황 및 다음 동료·영수 구출 목표 안내 배너
-                if (p.nextRescueStage != null) ...[
-                  MurimCard(
-                    borderColor: NightPalette.jadeGreen,
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.volunteer_activism_rounded,
-                          color: NightPalette.jadeGreen,
-                          size: 26,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            '🆘 지속 구출 현황: 동료 ${p.unlockedCompanionCount}/14인 · 영수 ${p.unlockedBeastCount}/5종\n'
-                            '다음 구출 관문: [${p.nextRescueStage!.code}] ${p.nextRescueStage!.rescueBadgeText}',
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              color: NightPalette.jadeGreen,
-                              height: 1.38,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+        return DefaultTabController(
+          length: 2,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('자동 수호 진법 편성실'),
+              bottom: const TabBar(
+                tabs: [
+                  Tab(text: '☯️ 수호 알 · 내공 · 거점 발사대'),
+                  Tab(text: '🐾 영수 · 동료 · 출두 조건'),
                 ],
-
-                // 4) 영수 동행 및 자동 발동 조건 (pet_*.webp)
-                MurimCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          NightSpriteIcon(
-                            assetPath: NightArtRegistry.beastAsset(
-                              preset.equippedBeast,
-                            ),
-                            fallbackIcon: Icons.pets_rounded,
-                            size: 44,
-                            color: Color(preset.equippedBeast.colorHex),
-                            showFrame: true,
-                          ),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              '수호 영수 동행 & 자동 발동 조건',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: NightPalette.jadeGreen,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<SpiritBeast>(
-                        isExpanded: true,
-                        initialValue: preset.equippedBeast,
-                        decoration: const InputDecoration(labelText: '출전 영수'),
-                        items: SpiritBeast.values
-                            .where((b) => (p.beastLevels[b] ?? 0) > 0)
-                            .map(
-                              (b) => DropdownMenuItem(
-                                value: b,
-                                child: Row(
-                                  children: [
-                                    NightSpriteIcon(
-                                      assetPath: NightArtRegistry.beastAsset(b),
-                                      fallbackIcon: Icons.pets_rounded,
-                                      size: 24,
-                                      borderRadius: 6,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        '${b.name} (Lv.${p.beastLevels[b]})',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            controller.updatePreset((pr) => pr.equippedBeast = v);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<AutoTriggerCondition>(
-                        isExpanded: true,
-                        initialValue: preset.beastCondition,
-                        decoration: const InputDecoration(
-                          labelText: '영수 자동 활동 조건',
-                        ),
-                        items: AutoTriggerCondition.values
-                            .map(
-                              (c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(
-                                  c.label,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            controller.updatePreset(
-                              (pr) => pr.beastCondition = v,
-                            );
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 5) 동료 최대 3인 편성 (*_face.webp & *_idle.webp 원화 표시)
-                MurimCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '방어 초소 동료 편성 (최대 3인 · 조건부 자동 발사)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: NightPalette.elixirPurple,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: CompanionHero.values
-                            .where(
-                              (h) => (p.companionLevels[h] ?? 0) > 0,
-                            )
-                            .map((hero) {
-                          final selected = preset.companions.contains(hero);
-                          return FilterChip(
-                            selected: selected,
-                            avatar: NightSpriteIcon(
-                              assetPath: NightArtRegistry.heroFaceAsset(hero),
-                              fallbackIcon: Icons.person_rounded,
-                              size: 22,
-                              borderRadius: 11,
-                              fit: BoxFit.cover,
-                            ),
-                            label: Text(
-                              '${hero.name} Lv.${p.companionLevels[hero]}',
-                            ),
-                            onSelected: (on) {
-                              controller.updatePreset((pr) {
-                                if (on) {
-                                  if (pr.companions.length >= 3) {
-                                    pr.companions.removeAt(0);
-                                  }
-                                  pr.companions.add(hero);
-                                } else if (pr.companions.length > 1) {
-                                  pr.companions.remove(hero);
-                                }
-                              });
-                            },
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 12),
-                      ...preset.companions.map((hero) {
-                        final curCond =
-                            preset.companionConditions[hero] ??
-                            hero.defaultCondition;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Row(
-                            children: [
-                              NightSpriteIcon(
-                                assetPath: NightArtRegistry.heroIdleAsset(hero),
-                                fallbackAssetPath:
-                                    NightArtRegistry.heroFaceAsset(hero),
-                                fallbackIcon: Icons.person_rounded,
-                                size: 48,
-                                borderRadius: 10,
-                                showFrame: true,
-                                frameColor: NightPalette.elixirPurple,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: DropdownButtonFormField<
-                                    AutoTriggerCondition>(
-                                  isExpanded: true,
-                                  initialValue: curCond,
-                                  decoration: InputDecoration(
-                                    labelText:
-                                        '${hero.name} 자동 개입 조건 (${hero.skillDesc})',
-                                  ),
-                                  items: AutoTriggerCondition.values
-                                      .map(
-                                        (c) => DropdownMenuItem(
-                                          value: c,
-                                          child: Text(
-                                            c.label,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (v) {
-                                    if (v != null) {
-                                      controller.updatePreset(
-                                        (pr) => pr.companionConditions[hero] = v,
-                                      );
-                                    }
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 6) 암행어사 출두 지원패 자동 발동 위기 기준
-                MurimCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const NightSpriteIcon(
-                            assetPath: NightArtRegistry.nightSupportSeal,
-                            fallbackAssetPath: NightArtRegistry.fxChuldu,
-                            fallbackIcon: Icons.campaign_rounded,
-                            size: 36,
-                            showFrame: true,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              '지원패 「무림수호단 출두야~~!!」 자동 발동 기준 (방어막 ${(preset.supportTriggerShieldRatio * 100).round()}% 이하)',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                color: NightPalette.accentGold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Slider(
-                        value: preset.supportTriggerShieldRatio,
-                        min: 0.20,
-                        max: 0.80,
-                        divisions: 6,
-                        label:
-                            '방어막 ${(preset.supportTriggerShieldRatio * 100).round()}% 이하',
-                        onChanged: (v) {
-                          controller.updatePreset(
-                            (pr) => pr.supportTriggerShieldRatio = v,
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
+            ),
+            body: NightSceneBackdrop(
+              child: TabBarView(
+                children: [
+                  _buildCoreArsenalTab(p, preset),
+                  _buildCompanionTacticsTab(p, preset),
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCoreArsenalTab(PlayerProgress p, LoadoutPreset preset) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      children: [
+        // 1) 상단 한지 명패 + 진법 저장 슬롯 3칸 통합반 (게슈탈트 제1덩어리 · 확실한 시각 주인공 강조)
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8EED5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: NightPalette.accentGold, width: 2.4),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x55000000),
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      NightSpriteIcon(
+                        assetPath: NightArtRegistry.stoneAsset(
+                          preset.primaryStone,
+                        ),
+                        fallbackIcon: Icons.circle,
+                        size: 78,
+                        color: Color(preset.primaryStone.colorHex),
+                        showFrame: true,
+                        frameColor: const Color(0xFF1B2538),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '상황별 즉시 전환 · 3대 수호 진법 저장소',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF394B6D),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${preset.name} (${preset.primaryStone.grade}단 ${preset.primaryStone.name})',
+                              style: const TextStyle(
+                                fontFamily: 'BlackHanSans',
+                                fontSize: 25,
+                                color: Color(0xFF162033),
+                              ),
+                            ),
+                            Text(
+                              '${preset.primaryShape.name} · ${preset.sectTechnique.sectName} [${preset.sectTechnique.skillName}]',
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF2E3D59),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: List.generate(p.presets.length, (i) {
+                      final sel = p.activePresetIndex == i;
+                      return ChoiceChip(
+                        selected: sel,
+                        backgroundColor: const Color(0xFFE3D4B3),
+                        selectedColor: const Color(0xFF233048),
+                        checkmarkColor: NightPalette.accentGold,
+                        side: BorderSide(
+                          color: sel
+                              ? const Color(0xFF1B2538)
+                              : const Color(0xFFB5A178),
+                        ),
+                        labelStyle: TextStyle(
+                          color: sel
+                              ? NightPalette.accentGold
+                              : const Color(0xFF233048),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                        label: Text(p.presets[i].name),
+                        onSelected: (_) => controller.selectPreset(i),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 2) 주력 수호 알 · 문파 내공 · 12굽이 천리협곡 거점 발사대 5종 통합 석판 (게슈탈트 제2덩어리)
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: MurimCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '수호 알(1~13단) · 모양 · 문파 내공 장치 설정',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: NightPalette.accentGold,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<StoneMaterial>(
+                    isExpanded: true,
+                    initialValue: preset.primaryStone,
+                    dropdownColor: NightPalette.bgPanel,
+                    decoration: _darkFieldDecoration('장착 수호 알 (해금된 재질)'),
+                    items: StoneMaterial.values
+                        .where((s) => p.unlockedStones.contains(s))
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s,
+                            child: Row(
+                              children: [
+                                NightSpriteIcon(
+                                  assetPath: NightArtRegistry.stoneAsset(s),
+                                  fallbackIcon: Icons.circle,
+                                  size: 24,
+                                  color: Color(s.colorHex),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${s.grade}단 ${s.name} — ${s.specialDesc}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        controller.updatePreset((pr) => pr.primaryStone = v);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<StoneShape>(
+                    isExpanded: true,
+                    initialValue: preset.primaryShape,
+                    dropdownColor: NightPalette.bgPanel,
+                    decoration: _darkFieldDecoration('수호 알 모양 (3종)'),
+                    items: StoneShape.values
+                        .map(
+                          (sh) => DropdownMenuItem(
+                            value: sh,
+                            child: Text(
+                              '${sh.name} · ${sh.summary}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        controller.updatePreset((pr) => pr.primaryShape = v);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<SectTechnique>(
+                    isExpanded: true,
+                    initialValue: preset.sectTechnique,
+                    dropdownColor: NightPalette.bgPanel,
+                    decoration: _darkFieldDecoration('문파 내공 장치 (완충 시 자동 발동)'),
+                    items: SectTechnique.values
+                        .map(
+                          (st) => DropdownMenuItem(
+                            value: st,
+                            child: Row(
+                              children: [
+                                NightSpriteIcon(
+                                  assetPath: NightArtRegistry.fxQi,
+                                  fallbackIcon: Icons.auto_awesome_rounded,
+                                  size: 20,
+                                  color: Color(st.colorHex),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    '${st.sectName} [${st.skillName}]',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        controller.updatePreset((pr) => pr.sectTechnique = v);
+                      }
+                    },
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Divider(height: 1),
+                  ),
+                  const Text(
+                    '12굽이 천리협곡(720×1360) 5종 지형 초소 발사대 도감',
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      color: NightPalette.jadeGreen,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '• 전방 초소(3번 이후)는 🪨마기 암석을 개척한 뒤 건설하며, 포탑 수가 늘수록 체증 군수비(+14⚡)와 2.2초 축조 시간이 적용됩니다.\n'
+                    '• 두목은 2차 재변이하며 포탑에 🕸️마기 침식을 걸고(터치 시 즉시 정화!), 3페이즈 대수괴는 회전 약점(🎯)을 정밀 다격해야 파쇄됩니다.',
+                    style: TextStyle(
+                      fontSize: 12.2,
+                      color: NightPalette.textMuted,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ...LauncherType.values.map((lt) {
+                    final unlocked =
+                        lt.unlockChapter <= p.highestUnlockedChapter + 1;
+                    final permLv = p.launcherPermanentLevels[lt] ?? 1;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          NightSpriteIcon(
+                            assetPath: NightArtRegistry.launcherAsset(lt),
+                            fallbackIcon: Icons.gps_fixed_rounded,
+                            size: 38,
+                            color: Color(lt.colorHex),
+                            dimmed: !unlocked,
+                            showFrame: true,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${lt.name} (영구 $permLv단 · 기본 ${lt.buildCostTokens}⚡ + 체증)',
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: unlocked
+                                        ? Color(lt.colorHex)
+                                        : NightPalette.textMuted,
+                                  ),
+                                ),
+                                Text(
+                                  unlocked
+                                      ? lt.roleSummary
+                                      : '제${lt.unlockChapter}장 진군 시 개방',
+                                  style: const TextStyle(
+                                    fontSize: 11.8,
+                                    color: NightPalette.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompanionTacticsTab(PlayerProgress p, LoadoutPreset preset) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      children: [
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: MurimCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (p.nextRescueStage != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: NightPalette.bgDeep.withValues(alpha: 0.72),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: NightPalette.jadeGreen.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.volunteer_activism_rounded,
+                            color: NightPalette.jadeGreen,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '🆘 구출 현황: 동료 ${p.unlockedCompanionCount}/14인 · 영수 ${p.unlockedBeastCount}/5종\n'
+                              '다음 구출 관문: [${p.nextRescueStage!.code}] ${p.nextRescueStage!.rescueBadgeText}',
+                              style: const TextStyle(
+                                fontSize: 12.4,
+                                color: NightPalette.jadeGreen,
+                                height: 1.38,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  Row(
+                    children: [
+                      NightSpriteIcon(
+                        assetPath: NightArtRegistry.beastAsset(
+                          preset.equippedBeast,
+                        ),
+                        fallbackIcon: Icons.pets_rounded,
+                        size: 42,
+                        color: Color(preset.equippedBeast.colorHex),
+                        showFrame: true,
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          '수호 영수 동행 & 자동 발동 조건',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: NightPalette.jadeGreen,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<SpiritBeast>(
+                    isExpanded: true,
+                    initialValue: preset.equippedBeast,
+                    dropdownColor: NightPalette.bgPanel,
+                    decoration: _darkFieldDecoration('출전 영수'),
+                    items: SpiritBeast.values
+                        .where((b) => (p.beastLevels[b] ?? 0) > 0)
+                        .map(
+                          (b) => DropdownMenuItem(
+                            value: b,
+                            child: Row(
+                              children: [
+                                NightSpriteIcon(
+                                  assetPath: NightArtRegistry.beastAsset(b),
+                                  fallbackIcon: Icons.pets_rounded,
+                                  size: 24,
+                                  borderRadius: 6,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${b.name} (Lv.${p.beastLevels[b]})',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        controller.updatePreset((pr) => pr.equippedBeast = v);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<AutoTriggerCondition>(
+                    isExpanded: true,
+                    initialValue: preset.beastCondition,
+                    dropdownColor: NightPalette.bgPanel,
+                    decoration: _darkFieldDecoration('영수 자동 활동 조건'),
+                    items: AutoTriggerCondition.values
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(
+                              c.label,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        controller.updatePreset((pr) => pr.beastCondition = v);
+                      }
+                    },
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Divider(height: 1),
+                  ),
+                  const Text(
+                    '방어 초소 동료 편성 (최대 3인 · 조건부 자동 개입)',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: NightPalette.elixirPurple,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: CompanionHero.values
+                        .where((h) => (p.companionLevels[h] ?? 0) > 0)
+                        .map((hero) {
+                      final selected = preset.companions.contains(hero);
+                      return FilterChip(
+                        selected: selected,
+                        backgroundColor: NightPalette.bgDeep,
+                        selectedColor: const Color(0xFF3E295E),
+                        checkmarkColor: NightPalette.accentGold,
+                        avatar: NightSpriteIcon(
+                          assetPath: NightArtRegistry.heroFaceAsset(hero),
+                          fallbackIcon: Icons.person_rounded,
+                          size: 22,
+                          borderRadius: 11,
+                          fit: BoxFit.cover,
+                        ),
+                        label: Text(
+                          '${hero.name} Lv.${p.companionLevels[hero]}',
+                        ),
+                        onSelected: (on) {
+                          controller.updatePreset((pr) {
+                            if (on) {
+                              if (pr.companions.length >= 3) {
+                                pr.companions.removeAt(0);
+                              }
+                              pr.companions.add(hero);
+                            } else if (pr.companions.length > 1) {
+                              pr.companions.remove(hero);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  ...preset.companions.map((hero) {
+                    final curCond =
+                        preset.companionConditions[hero] ??
+                        hero.defaultCondition;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          NightSpriteIcon(
+                            assetPath: NightArtRegistry.heroIdleAsset(hero),
+                            fallbackAssetPath:
+                                NightArtRegistry.heroFaceAsset(hero),
+                            fallbackIcon: Icons.person_rounded,
+                            size: 46,
+                            borderRadius: 10,
+                            showFrame: true,
+                            frameColor: NightPalette.elixirPurple,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: DropdownButtonFormField<AutoTriggerCondition>(
+                              isExpanded: true,
+                              initialValue: curCond,
+                              dropdownColor: NightPalette.bgPanel,
+                              decoration: _darkFieldDecoration(
+                                '${hero.name} 자동 개입 (${hero.skillDesc})',
+                              ),
+                              items: AutoTriggerCondition.values
+                                  .map(
+                                    (c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(
+                                        c.label,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v != null) {
+                                  controller.updatePreset(
+                                    (pr) => pr.companionConditions[hero] = v,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Divider(height: 1),
+                  ),
+                  Row(
+                    children: [
+                      const NightSpriteIcon(
+                        assetPath: NightArtRegistry.nightSupportSeal,
+                        fallbackAssetPath: NightArtRegistry.fxChuldu,
+                        fallbackIcon: Icons.campaign_rounded,
+                        size: 36,
+                        showFrame: true,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '지원패 「무림수호단 출두야~~!!」 자동 발동 기준 (방어막 ${(preset.supportTriggerShieldRatio * 100).round()}% 이하)',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: NightPalette.accentGold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: preset.supportTriggerShieldRatio,
+                    min: 0.20,
+                    max: 0.80,
+                    divisions: 6,
+                    activeColor: NightPalette.accentGold,
+                    label:
+                        '방어막 ${(preset.supportTriggerShieldRatio * 100).round()}% 이하',
+                    onChanged: (v) {
+                      controller.updatePreset(
+                        (pr) => pr.supportTriggerShieldRatio = v,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

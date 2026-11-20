@@ -249,14 +249,18 @@ class LoadoutPreset {
       mountTypes: [
         LauncherType.rapid,
         LauncherType.heavy,
-        LauncherType.rapid,
-        LauncherType.heavy,
+        LauncherType.curveSpin,
+        LauncherType.frostField,
         LauncherType.qiAmplifier,
+        LauncherType.heavy,
+        LauncherType.rapid,
         LauncherType.frostField,
         LauncherType.curveSpin,
         LauncherType.heavy,
-        LauncherType.frostField,
         LauncherType.rapid,
+        LauncherType.qiAmplifier,
+        LauncherType.frostField,
+        LauncherType.curveSpin,
       ],
       equippedBeast: SpiritBeast.nalssaendol,
       beastCondition: SpiritBeast.nalssaendol.defaultCondition,
@@ -268,7 +272,7 @@ class LoadoutPreset {
       },
       supportSlotCount: 3,
       supportTriggerShieldRatio: 0.45,
-      autoUpgradeInBattle: true,
+      autoUpgradeInBattle: false,
     );
   }
 
@@ -326,10 +330,10 @@ class LoadoutPreset {
               ))
           .toList();
       if (parsed.isNotEmpty) {
-        while (parsed.length < 10) {
+        while (parsed.length < 14) {
           parsed.add(LauncherType.values[parsed.length % LauncherType.values.length]);
         }
-        base.mountTypes = parsed.take(10).toList();
+        base.mountTypes = parsed.take(14).toList();
       }
     }
     base.equippedBeast = SpiritBeast.values.firstWhere(

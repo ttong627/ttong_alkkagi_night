@@ -73,8 +73,8 @@ enum RoguePerk {
   warChest(
     id: 'warChest',
     title: '군수 기력 대보급',
-    badge: '⚡ 즉시 +65기력',
-    description: '즉시 초소 건설 기력 +65⚡을 지급받고, 이후 변이 처치 시 기력 구슬 획득량이 +30% 증가합니다!',
+    badge: '⚡ 즉시 +42기력',
+    description: '즉시 초소 건설 기력 +42⚡을 지급받고, 이후 변이 처치 시 기력 구슬 획득량이 +25% 증가합니다!',
     rarity: RoguePerkRarity.common,
     colorHex: 0xFFFFD166,
   ),
@@ -223,8 +223,8 @@ enum DestinyRoulettePrize {
     colorHex: 0xFFFFD166,
   ),
   qiJackpot(
-    title: '💎 군수 기력 대박',
-    subtitle: '즉시 초소 건설 기력 +85⚡ 황금 구슬 폭포수 지급!',
+    title: '💎 군수 기력 보급',
+    subtitle: '즉시 초소 건설 기력 +48⚡ 황금 구슬 보급 지급!',
     colorHex: 0xFF72EFDD,
   ),
   mythicAwakening(
@@ -287,6 +287,7 @@ class TreasureGoblinEntity {
 /// 길목 빈 초소의 건설 조건 상태 (유저가 왜 지을 수 있는지/없는지 한눈에 인지).
 enum PadConditionState {
   waveLocked,
+  rubbleBlocked,
   chargingQi,
   readyLuckyOnly,
   readyFullBuild,
@@ -305,6 +306,7 @@ class PadConditionInfo {
     required this.chargeRatio,
     required this.shortBadge,
     required this.detailReason,
+    this.excavationCost = 0,
   });
 
   final int slotIndex;
@@ -313,6 +315,7 @@ class PadConditionInfo {
   final int currentQi;
   final int luckySummonCost;
   final int directBuildCost;
+  final int excavationCost;
   final double chargeRatio;
   final String shortBadge;
   final String detailReason;

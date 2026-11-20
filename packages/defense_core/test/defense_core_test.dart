@@ -1161,10 +1161,13 @@ void main() {
       );
 
       expect(sim.launchers, isEmpty);
-      expect(sim.activeMounts.length, 2);
+      expect(sim.activeMounts.length, 4);
       expect(sim.nextRecommendedSlotIndex(), 0);
-      expect(CampaignCatalog.villageCenter.y, greaterThanOrEqualTo(600.0));
-      expect(CampaignCatalog.centralTowerPos.y, greaterThanOrEqualTo(570.0));
+      expect(CampaignCatalog.arenaWidth, 720.0);
+      expect(CampaignCatalog.arenaHeight, 1360.0);
+      expect(CampaignCatalog.villageCenter.y, greaterThanOrEqualTo(1200.0));
+      expect(CampaignCatalog.centralTowerPos.y, greaterThanOrEqualTo(1150.0));
+      expect(p.activePreset.autoUpgradeInBattle, isFalse, reason: '무지성 자동 승급이 기본 켜져 있으면 안 됨!');
 
       // 180프레임 진행해도 autoBuildForSimVerify == false 이면 빈 초소에 자동 설치되지 않음!
       for (int i = 0; i < 180; i++) {
@@ -1172,16 +1175,23 @@ void main() {
       }
       expect(sim.launchers, isEmpty);
 
-      // 플레이어 직접 배치 → 승급 → 교체 → 철거 환급 검증
-      sim.fieldTokens = 250;
+      // 플레이어 직접 배치(2.2초 축조 공정) → 승급 → 교체 → 철거 환급 검증
+      sim.fieldTokens = 320;
       expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
       expect(sim.launchers.length, 1);
+      expect(sim.launcherAtSlot(0)!.isConstructing, isTrue);
       expect(sim.nextRecommendedSlotIndex(), 1);
-      expect(sim.placeLauncherInBattle(2, LauncherType.rapid), isFalse); // 1-1은 0,1번 2곳만 개방!
+      expect(sim.placeLauncherInBattle(2, LauncherType.rapid), isFalse); // 2번 칸은 2물결 + 마기 암석 봉인!
+      expect(sim.placeLauncherInBattle(4, LauncherType.rapid), isFalse); // 1-1은 0~3번 4곳만 개방!
 
+      // 축조 중에는 즉시 승급 불가 → 2.3초 경과 후 축조 완료 시 승급 가능!
+      expect(sim.upgradeLauncherAtSlot(0), isFalse);
+      sim.step(2.35);
+      expect(sim.launcherAtSlot(0)!.isConstructing, isFalse);
       expect(sim.upgradeLauncherAtSlot(0), isTrue);
       expect(sim.launcherAtSlot(0)!.tier, 2);
 
+      sim.step(1.25);
       expect(sim.replaceLauncherInBattle(0, LauncherType.heavy), isTrue);
       expect(sim.launcherAtSlot(0)!.type, LauncherType.heavy);
 
@@ -1192,7 +1202,7 @@ void main() {
       expect(sim.launchers, isEmpty);
     });
 
-    test('관문이 진행될수록 배치 가능한 초소 개수가 2곳(1-1)에서 최대 10곳(9~10장)까지 점진적으로 늘어난다', () {
+    test('관문이 진행될수록 배치 가능한 전략 지형 초소 개수가 4곳(1-1)에서 최대 14곳(9~10장)까지 점진 확장된다', () {
       final s1 = CampaignCatalog.stageAt(1, 1);
       final s1End = CampaignCatalog.stageAt(1, 10);
       final s3 = CampaignCatalog.stageAt(3, 8);
@@ -1200,20 +1210,21 @@ void main() {
       final s9 = CampaignCatalog.stageAt(9, 12);
       final s10 = CampaignCatalog.stageAt(10, 10);
 
-      expect(s1.maxMountCount, 2);
-      expect(s1End.maxMountCount, 4);
-      expect(s3.maxMountCount, 6);
-      expect(s6.maxMountCount, 8);
-      expect(s9.maxMountCount, 10);
-      expect(s10.maxMountCount, 10);
+      expect(s1.maxMountCount, 4);
+      expect(s1End.maxMountCount, 6);
+      expect(s3.maxMountCount, 8);
+      expect(s6.maxMountCount, 11);
+      expect(s9.maxMountCount, 14);
+      expect(s10.maxMountCount, 14);
 
       for (final ch in CampaignCatalog.chapters) {
-        expect(ch.mounts.length, greaterThanOrEqualTo(4));
+        expect(ch.mounts.length, greaterThanOrEqualTo(8));
+        expect(ch.mounts.map((m) => m.terrainType).toSet().length, greaterThanOrEqualTo(4));
         for (int l = 0; l < ch.lanes.length; l++) {
           final curve = ch.smoothedLane(l);
           expect(curve.length, greaterThan(40));
-          expect(curve.first.y, lessThan(40.0));
-          expect(curve.last.y, greaterThan(570.0));
+          expect(curve.first.y, lessThan(55.0));
+          expect(curve.last.y, greaterThan(1180.0));
         }
       }
     });
@@ -1334,20 +1345,24 @@ void main() {
         seed: 42,
       );
 
-      // 초기 기력 48⚡: 0번 초소는 지정 건설 가능, 3번 초소(4번째 칸)는 2물결 잠금 상태!
+      // 초기 긴축 기력 48⚡: 0번 초소는 지정 건설 가능(45⚡), 운빨 소환(50⚡)은 시작 직후 불가! 3번 초소는 2물결 잠금 상태!
       expect(sim.fieldTokens, 48);
       expect(sim.padConditionOf(0).state, PadConditionState.readyFullBuild);
       expect(sim.padConditionOf(3).state, PadConditionState.waveLocked);
+      expect(sim.summonLuckyLauncherInBattle(0), isNull, reason: '초기 48⚡으로는 도박 소환(50⚡)을 바로 지을 수 없음');
 
-      // 0번 초소에 35⚡ 운빨 무작위 소환 실행 → 남은 기력 13⚡ → 1번 초소는 기력 충전 중(13/35⚡)!
+      // 기력 +2⚡ 확보(50⚡) 후 도박 소환 실행 → 남은 기력 0⚡ → 1번 초소는 체증 비용 적용 및 기력 충전 중!
+      sim.fieldTokens = 50;
       final summoned = sim.summonLuckyLauncherInBattle(0);
       expect(summoned, isNotNull);
-      expect(sim.fieldTokens, 13);
+      expect(sim.fieldTokens, 0);
       expect(sim.padConditionOf(1).state, PadConditionState.chargingQi);
+      expect(sim.buildCostForType(LauncherType.rapid), 45 + 14); // 체증 건설비 확인!
 
-      // 기력 보충 후 같은 종류·같은 형 초소를 1번 칸에 강제 세팅해 0⚡ 합치기 진화 검증!
-      sim.fieldTokens = 100;
+      // 기력 보충 및 축조 공정 완료 후 유료 연성 합치기(24⚡) 진화 검증!
+      sim.fieldTokens = 120;
       expect(sim.placeLauncherInBattle(1, LauncherType.rapid), isTrue);
+      sim.step(2.35); // 2.2초 실시간 축조 완료!
       sim.launcherAtSlot(0)!
         ..type = LauncherType.rapid
         ..tier = 1;
@@ -1356,7 +1371,11 @@ void main() {
         ..tier = 1;
       expect(sim.findMergePartnerSlot(0), 1);
       expect(sim.activeSynergyLinks, isNotEmpty);
+      sim.fieldTokens = 10;
+      expect(sim.mergeLauncherAtSlot(0), isFalse, reason: '공짜 합치기 불가 — 연성 기력(24⚡) 필요!');
+      sim.fieldTokens = 40;
       expect(sim.mergeLauncherAtSlot(0), isTrue);
+      expect(sim.fieldTokens, 16);
       expect(sim.launcherAtSlot(0)!.tier, 2);
       expect(sim.launcherAtSlot(1), isNull); // 합쳐진 파트너 초소는 다시 빈 초소가 됨!
 
@@ -1369,7 +1388,7 @@ void main() {
       if (sim.canCallNextWaveEarly) {
         final beforeQi = sim.fieldTokens;
         expect(sim.callNextWaveEarly(), isTrue);
-        expect(sim.fieldTokens, greaterThanOrEqualTo(beforeQi + 18));
+        expect(sim.fieldTokens, greaterThanOrEqualTo(beforeQi + 14));
         expect(sim.pendingPerkChoices.length, 3);
         final chosen = sim.pendingPerkChoices.first;
         expect(sim.chooseRoguePerk(chosen), isTrue);
@@ -1410,13 +1429,14 @@ void main() {
       expect(LauncherType.rapid.baseCooldownSec, lessThan(0.45));
 
       expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
+      sim.step(2.35); // 축조 완료
       sim.mutants.add(
         ActiveMutant(
           uid: 901,
           kind: MutantKind.swarmRat,
           laneIndex: 0,
           waypoints: sim.chapter.smoothedLane(0),
-          pos: const Vec2(200, 480),
+          pos: const Vec2(360, 1015),
           maxHp: 5.0,
           speed: 20.0,
         ),
@@ -1521,11 +1541,12 @@ void main() {
       expect(sim.powerTarget.bonusPercent, 10);
       expect(sim.powerTarget.damageMultiplier, closeTo(1.10, 0.001));
 
-      // 5) 4형 + 4형 합체 → ★5형 태초 신기 진화 & 🎰 운명의 돌림판 무꽝 당첨 검증
-      sim.fieldTokens = 200;
+      // 5) 4형 + 4형 유료 연성 합체 → ★5형 태초 신기 진화 & 🎰 운명의 돌림판 무꽝 당첨 검증
+      sim.fieldTokens = 320;
       sim.launchers.clear();
       expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
       expect(sim.placeLauncherInBattle(1, LauncherType.rapid), isTrue);
+      sim.step(2.35);
       sim.launcherAtSlot(0)!.tier = 4;
       sim.launcherAtSlot(1)!.tier = 4;
       expect(sim.quickMergeAnyPair(), isTrue);
@@ -1538,8 +1559,8 @@ void main() {
       expect(sim.rouletteSpinsAvailable, 0);
     });
 
-    test('구곡양장 장거리 아홉 굽이 경로(1,250px 이상)와 제한된 전술 사거리·비거리 소멸·실시간 사거리 강화가 작동한다', () {
-      // 1) 전 10장의 침공 경로가 1,250px 이상의 긴 지그재그 아홉 굽이길로 구성되었는지 검증
+    test('720×1360 천리협곡 12굽이 장거리 경로(3,800px 이상)와 제한된 전술 사거리·비거리 소멸·실시간 사거리 강화가 작동한다', () {
+      // 1) 전 10장의 침공 경로가 3,800px 이상의 초장거리 12굽이 천리협곡으로 구성되었는지 검증
       for (final ch in CampaignCatalog.chapters) {
         for (int l = 0; l < ch.lanes.length; l++) {
           final pts = ch.smoothedLane(l);
@@ -1547,11 +1568,11 @@ void main() {
           for (int i = 1; i < pts.length; i++) {
             totalLen += pts[i].distanceTo(pts[i - 1]);
           }
-          expect(totalLen, greaterThan(1250.0), reason: '${ch.number}장 $l번 경로 길이 부족: $totalLen');
+          expect(totalLen, greaterThan(3800.0), reason: '${ch.number}장 $l번 경로 길이 부족: $totalLen');
         }
       }
 
-      // 2) 초소 사거리가 제한(108~162px)되어 남단 초소가 북단 스폰구 괴물을 절대 공격하지 못하며 비거리 한계에서 소멸함!
+      // 2) 초소 사거리가 제한(138~265px)되어 남단 초소가 북단 스폰구 괴물을 절대 공격하지 못하며 비거리 한계에서 소멸함!
       final p = PlayerProgress();
       final sim = DefenseBattleSim(
         stage: CampaignCatalog.stageAt(1, 1),
@@ -1560,18 +1581,19 @@ void main() {
         allowSerendipity: false,
       );
       sim.mutants.clear();
-      expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue); // (198, 448), 사거리 ~122px
+      expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
+      sim.step(2.35);
       final launcher0 = sim.launcherAtSlot(0)!;
-      expect(sim.effectiveLauncherRange(launcher0), lessThan(140.0));
+      expect(sim.effectiveLauncherRange(launcher0), lessThan(190.0));
 
-      // 북단 1굽이(y=90)에 있는 적은 사거리 밖이므로 절대 사격하지 않음!
+      // 북단 1굽이(y=120)에 있는 적은 사거리 밖이므로 절대 사격하지 않음!
       sim.mutants.add(
         ActiveMutant(
           uid: 7001,
           kind: MutantKind.ironBoar,
           laneIndex: 0,
           waypoints: sim.chapter.smoothedLane(0),
-          pos: const Vec2(200, 90),
+          pos: const Vec2(360, 120),
           maxHp: 300,
           speed: 0,
         ),
@@ -1581,9 +1603,10 @@ void main() {
       }
       expect(sim.projectiles, isEmpty, reason: '사거리 밖 먼 굽이 괴물을 공격하면 안 됨');
 
-      // 중포 탄지기는 최소 사거리 사각(34px) 안으로 파고든 적을 쏘지 못함!
+      // 중포 탄지기는 최소 사거리 사각(68px) 안으로 파고든 적을 쏘지 못함!
       sim.fieldTokens = 200;
       expect(sim.placeLauncherInBattle(1, LauncherType.heavy), isTrue);
+      sim.step(2.35);
       final heavyL = sim.launcherAtSlot(1)!;
       sim.mutants
         ..clear()
@@ -1593,7 +1616,7 @@ void main() {
             kind: MutantKind.swarmRat,
             laneIndex: 0,
             waypoints: sim.chapter.smoothedLane(0),
-            pos: heavyL.pos + const Vec2(10, 0), // 10px 코앞 사각지대!
+            pos: heavyL.pos + const Vec2(16, 0), // 16px 코앞 사각지대!
             maxHp: 100,
             speed: 0,
           ),
@@ -1606,14 +1629,14 @@ void main() {
         reason: '중포 최소 사거리 사각지대 안 적은 사격 불가',
       );
 
-      // 수동 탄지 조준선 및 탄알도 무제한이 아니라 수동 사거리 한계(기본 195px 내외)에서 멈추고 소멸함!
+      // 수동 탄지 조준선 및 탄알도 무제한이 아니라 수동 사거리 한계(기본 365px 내외)에서 멈추고 소멸함!
       final baseManualR = sim.effectiveCentralManualRange;
-      expect(baseManualR, lessThan(210.0));
+      expect(baseManualR, lessThan(395.0));
       sim.toggleCentralManualMode();
       sim.centralFireTimer = 0;
       expect(sim.fireCentralManualAngle(-1.5707963), isTrue);
-      for (int i = 0; i < 60; i++) {
-        sim.step(1 / 60); // 1초 경과 시 유효 비거리 초과로 자연 소멸!
+      for (int i = 0; i < 110; i++) {
+        sim.step(1 / 60); // 유효 비거리 초과로 자연 소멸!
       }
       expect(sim.projectiles, isEmpty);
 
@@ -1774,6 +1797,300 @@ void main() {
       sim.step(1 / 60);
       expect(boss.freezeTimer, 0.0);
       expect(boss.slowTimer, greaterThan(2.0));
+    });
+
+    test('5종 전략 지형 보너스·중간보스 2차 재변이·대수괴 3페이즈 외각 장갑판 및 정밀 약점 파쇄(firePrecisionStrikeAt)가 정확히 작동한다', () {
+      final p = PlayerProgress(tokens: 1000, centralGuardianLevel: 5);
+      final sim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 10),
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        allowSerendipity: false,
+      );
+      sim.mutants.clear();
+      sim.projectiles.clear();
+      sim.fieldTokens = 500;
+
+      // 1) 고지 망루(slot 1) vs 협곡 관문(slot 0)에 동일 발사대 배치 시 지형 사거리 보너스(+24%) 검증
+      expect(sim.mountSlotByIndex(0)!.terrainType, MountTerrainType.chokeGate);
+      expect(sim.mountSlotByIndex(1)!.terrainType, MountTerrainType.highWatchtower);
+      expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
+      expect(sim.placeLauncherInBattle(1, LauncherType.rapid), isTrue);
+      final rChoke = sim.effectiveLauncherRange(sim.launcherAtSlot(0)!);
+      final rWatch = sim.effectiveLauncherRange(sim.launcherAtSlot(1)!);
+      expect(rWatch, greaterThan(rChoke * 1.20));
+
+      // 2) 중간보스 2차 흉폭 재변이: 1차 체력 0 도달 시 죽지 않고 2차 변이 + 장갑판 2겹 + 호위병 소환!
+      sim.launchers.clear();
+      final midBoss = ActiveMutant(
+        uid: 9101,
+        kind: MutantKind.crimsonBreakerBoss,
+        laneIndex: 0,
+        waypoints: sim.chapter.smoothedLane(0),
+        pos: const Vec2(320, 420),
+        maxHp: 300.0,
+        speed: 0.0,
+      )..enableBossPhases(phases: 2, initialPlates: 0, phase1HpScale: 0.80);
+      sim.mutants.add(midBoss);
+
+      sim.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'test_kill_p1',
+          sourceLabel: '중포 탄지기(1거점)',
+          pos: midBoss.pos,
+          vel: const Vec2(0, -300),
+          material: StoneMaterial.hyeoncheol,
+          shape: StoneShape.round,
+          damage: 999.0,
+          knockback: 20.0,
+          critChance: 1.0,
+          colorHex: 0xFFFFD166,
+          ignoresShield: true,
+        ),
+      );
+      sim.step(1 / 60);
+
+      expect(sim.mutants.contains(midBoss), isTrue, reason: '중간보스는 1차 격파 시 죽지 않고 2차 재변이해야 함');
+      expect(midBoss.currentPhase, 2);
+      expect(midBoss.carapacePlatesLeft, 2);
+      expect(midBoss.mutationScale, greaterThan(1.15));
+      expect(sim.mutants.length, greaterThanOrEqualTo(3), reason: '2차 재변이 시 변이 호위병이 동반 소환되어야 함');
+
+      // 3) 대수괴 3페이즈 외각 장갑 감쇄 & 🎯정밀 약점 저격(firePrecisionStrikeAt) 파쇄 → 무방비 → 2·3페이즈 진화 후 최종 격파!
+      sim.mutants.clear();
+      sim.projectiles.clear();
+      final overlord = ActiveMutant(
+        uid: 9201,
+        kind: MutantKind.chapterOverlord,
+        laneIndex: 0,
+        waypoints: sim.chapter.smoothedLane(0),
+        pos: const Vec2(320, 460),
+        maxHp: 4000.0,
+        speed: 0.0,
+      )..enableBossPhases(phases: 3, initialPlates: 2, phase1HpScale: 0.70);
+      sim.mutants.add(overlord);
+      expect(sim.activeMultiPhaseBoss, overlord);
+      expect(overlord.carapacePlatesLeft, 2);
+
+      // 장갑판이 2겹 살아 있을 때 일반 비정밀 탄은 장갑 감쇄(0.34배)되어 장갑판이 깨지지 않음
+      final hpBeforeBlind = overlord.hp;
+      sim.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'blind',
+          sourceLabel: '속사 탄지기(1거점)',
+          pos: overlord.pos,
+          vel: const Vec2(0, -300),
+          material: StoneMaterial.cheongok,
+          shape: StoneShape.round,
+          damage: 100.0,
+          knockback: 5.0,
+          critChance: 0.0,
+          colorHex: 0xFF72EFDD,
+          ignoresShield: true,
+        ),
+      );
+      sim.step(1 / 60);
+      expect(overlord.carapacePlatesLeft, 2);
+      expect(hpBeforeBlind - overlord.hp, lessThan(40.0));
+
+      // 플레이어가 빛나는 약점 좌표(weakSpotWorldPos)를 정밀 터치 저격(2회) → 장갑 2겹 완전 파쇄 & 7초 무방비!
+      sim.precisionStrikeCooldown = 0.0;
+      expect(sim.firePrecisionStrikeAt(overlord.weakSpotWorldPos), isTrue);
+      for (int i = 0; i < 65; i++) {
+        sim.step(1 / 60);
+      }
+      expect(overlord.carapacePlatesLeft, 1);
+
+      sim.precisionStrikeCooldown = 0.0;
+      expect(sim.firePrecisionStrikeAt(overlord.weakSpotWorldPos), isTrue);
+      for (int i = 0; i < 65; i++) {
+        sim.step(1 / 60);
+      }
+      expect(overlord.carapacePlatesLeft, 0);
+      expect(overlord.groggyExposeTimer, greaterThan(5.0));
+      expect(sim.precisionHitCount, greaterThanOrEqualTo(2));
+
+      // 1페이즈 격파 → 2페이즈 각성(장갑 3겹) → 2페이즈 격파 → 3페이즈 진신(장갑 4겹) → 최종 격파 확인!
+      if (overlord.currentPhase == 1) {
+        sim.projectiles.add(
+          ActiveStoneProjectile(
+            sourceKey: 'p1_break',
+            sourceLabel: '중포 탄지기',
+            pos: overlord.pos,
+            vel: const Vec2(0, -300),
+            material: StoneMaterial.hyeoncheol,
+            shape: StoneShape.round,
+            damage: 5000.0,
+            knockback: 10.0,
+            critChance: 1.0,
+            colorHex: 0xFFFFD166,
+            ignoresShield: true,
+          ),
+        );
+        sim.step(1 / 60);
+      }
+      expect(overlord.currentPhase, 2);
+      expect(overlord.carapacePlatesLeft, 3);
+      for (int i = 0; i < 50; i++) {
+        sim.step(1 / 60); // 재변이 무적 연출(0.68초) 경과
+      }
+
+      // 2페이즈에서도 장갑 3겹을 깨지 않고 무지성 포격만 하면 돌파되지 않음!
+      sim.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'p2_blind_fail',
+          sourceLabel: '중포 탄지기',
+          pos: overlord.pos,
+          vel: const Vec2(0, -300),
+          material: StoneMaterial.hyeoncheol,
+          shape: StoneShape.round,
+          damage: 9000.0,
+          knockback: 10.0,
+          critChance: 1.0,
+          colorHex: 0xFFFFD166,
+          ignoresShield: true,
+        ),
+      );
+      sim.step(1 / 60);
+      expect(overlord.currentPhase, 2, reason: '약점 장갑판을 깨지 않으면 2페이즈가 무지성 화력으로 뚫리면 안 됨');
+
+      // 2페이즈 약점 3회 정밀 저격 → 장갑 3겹 완전 붕괴 후 2페이즈 돌파!
+      for (int k = 0;
+          k < 3 && overlord.currentPhase == 2 && overlord.carapacePlatesLeft > 0;
+          k++) {
+        sim.precisionStrikeCooldown = 0.0;
+        expect(sim.firePrecisionStrikeAt(overlord.weakSpotWorldPos), isTrue);
+        for (int i = 0; i < 65; i++) {
+          sim.step(1 / 60);
+        }
+      }
+      if (overlord.currentPhase == 2) {
+        expect(overlord.carapacePlatesLeft, 0);
+        sim.projectiles.add(
+          ActiveStoneProjectile(
+            sourceKey: 'p2_break',
+            sourceLabel: '중포 탄지기',
+            pos: overlord.pos,
+            vel: const Vec2(0, -300),
+            material: StoneMaterial.hyeoncheol,
+            shape: StoneShape.round,
+            damage: 9000.0,
+            knockback: 10.0,
+            critChance: 1.0,
+            colorHex: 0xFFFFD166,
+            ignoresShield: true,
+          ),
+        );
+        sim.step(1 / 60);
+      }
+      expect(overlord.currentPhase, 3);
+      expect(overlord.carapacePlatesLeft, 4);
+      expect(overlord.mutationScale, closeTo(1.32, 1e-4));
+      for (int i = 0; i < 55; i++) {
+        sim.step(1 / 60);
+      }
+
+      // 3페이즈 약점 4회 정밀 저격 → 장갑 4겹 완전 붕괴 후 최종 격파!
+      for (int k = 0;
+          k < 4 && sim.mutants.contains(overlord) && overlord.carapacePlatesLeft > 0;
+          k++) {
+        sim.precisionStrikeCooldown = 0.0;
+        expect(sim.firePrecisionStrikeAt(overlord.weakSpotWorldPos), isTrue);
+        for (int i = 0; i < 65; i++) {
+          sim.step(1 / 60);
+        }
+      }
+      if (sim.mutants.contains(overlord)) {
+        expect(overlord.carapacePlatesLeft, 0);
+        sim.projectiles.add(
+          ActiveStoneProjectile(
+            sourceKey: 'p3_kill',
+            sourceLabel: '중포 탄지기',
+            pos: overlord.pos,
+            vel: const Vec2(0, -300),
+            material: StoneMaterial.hyeoncheol,
+            shape: StoneShape.round,
+            damage: 25000.0,
+            knockback: 10.0,
+            critChance: 1.0,
+            colorHex: 0xFFFFD166,
+            ignoresShield: true,
+          ),
+        );
+        sim.step(1 / 60);
+      }
+      expect(sim.mutants.contains(overlord), isFalse, reason: '3페이즈까지 모두 깨면 비로소 완전 격파되어야 함');
+    });
+
+    test('전 관문 6~8물결 호흡 · 전방 마기 암석 개척(excavateSlotInBattle) · 체증 건설비 · 포탑 마기 침식 및 터치 정화가 작동한다', () {
+      // 1) 모든 스테이지가 최소 6물결 이상(보스 결전은 7~8물결)이며 1-1 마지막 물결에도 2단 재변이 두목이 등장!
+      for (final st in CampaignCatalog.allStages) {
+        expect(st.waves.length, inInclusiveRange(6, 8), reason: '${st.code} 물결 수 확인');
+      }
+      expect(CampaignCatalog.stageAt(1, 1).waves.length, 6);
+      expect(
+        CampaignCatalog.stageAt(1, 1).waves.last.any((g) => g.kind.isBoss),
+        isTrue,
+        reason: '1-1 마지막 물결에도 2단 변이 두목이 등장해 긴장감을 주어야 함',
+      );
+      expect(CampaignCatalog.stageAt(1, 10).waves.length, 8);
+      expect(CampaignCatalog.stageAt(10, 10).waves.length, 8);
+
+      // 2) 전방 거점(2번 이상) 마기 암석 봉인(rubbleBlocked) → excavateSlotInBattle 개척 → 체증 건설비 축조 검증!
+      final p = PlayerProgress();
+      final sim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(2, 6),
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        allowSerendipity: false,
+      );
+      sim.currentWaveIndex = 1; // 2물결 상태로 전환 (2~5번 슬롯 물결 해금!)
+      sim.fieldTokens = 260;
+
+      // 2번 거점은 물결은 열렸으나 마기 암석으로 막혀 있어 바로 건설 불가!
+      expect(sim.isSlotExcavated(2), isFalse);
+      expect(sim.padConditionOf(2).state, PadConditionState.rubbleBlocked);
+      expect(sim.placeLauncherInBattle(2, LauncherType.rapid), isFalse);
+
+      // 개척 실행(24⚡ 차감) 후 포대 건설 가능!
+      final beforeExcav = sim.fieldTokens;
+      expect(sim.excavateSlotInBattle(2), isTrue);
+      expect(sim.fieldTokens, beforeExcav - 24);
+      expect(sim.isSlotExcavated(2), isTrue);
+      expect(sim.padConditionOf(2).state, PadConditionState.readyFullBuild);
+
+      final cost1st = sim.buildCostForType(LauncherType.rapid); // 45
+      expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
+      final cost2nd = sim.buildCostForType(LauncherType.rapid); // 45 + 14 = 59
+      expect(cost2nd, cost1st + 14);
+      expect(sim.placeLauncherInBattle(2, LauncherType.rapid), isTrue);
+
+      // 3) 변이 두목의 포탑 🕸️마기 침식 투사 및 플레이어 실시간 터치 정화(cleanseLauncherAtSlot) 검증!
+      sim.step(2.4); // 포대 2.2초 축조 완료!
+      final targetL = sim.launcherAtSlot(0)!;
+      expect(targetL.isConstructing, isFalse);
+      expect(targetL.isCorrupted, isFalse);
+
+      final boss = ActiveMutant(
+        uid: 9501,
+        kind: MutantKind.ironColossusBoss,
+        laneIndex: 0,
+        waypoints: sim.chapter.smoothedLane(0),
+        pos: targetL.pos + const Vec2(40, -30),
+        maxHp: 2000.0,
+        speed: 0.0,
+      )..corruptionCastCooldown = 0.05;
+      sim.mutants
+        ..clear()
+        ..add(boss);
+      sim.step(0.10);
+      expect(targetL.isCorrupted, isTrue, reason: '인접 두목이 포탑에 마기 침식을 걸어야 함');
+      expect(sim.padConditionOf(0).shortBadge, '🕸️터치정화!');
+
+      expect(sim.cleanseLauncherAtSlot(0), isTrue);
+      expect(targetL.isCorrupted, isFalse);
+      expect(targetL.purifiedBoostTimer, greaterThan(2.5));
+      expect(sim.purifiedCorruptionCount, 1);
     });
   });
 }

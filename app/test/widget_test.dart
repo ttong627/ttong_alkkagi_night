@@ -340,7 +340,7 @@ void main() {
     await tester.tap(find.byKey(const Key('battle_toggle_central_mode_btn')));
     await tester.pump();
     expect(find.text('중앙탑: 수동탄지'), findsOneWidget);
-    expect(find.text('초소 0/2곳'), findsOneWidget);
+    expect(find.text('초소 0/4곳'), findsOneWidget);
 
     // 1-2 전장의 첫 번째 빈 초소 좌표를 동적으로 읽어 터치해 빠른 선택 띠 오픈!
     expect(find.textContaining('군수기력 ⚡'), findsOneWidget);
@@ -353,14 +353,14 @@ void main() {
     await tester.tapAt(slotTapOffset);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
-    expect(find.textContaining('빈 초소 · 발사대 직접 배치'), findsOneWidget);
+    expect(find.textContaining('⛩️협곡관문'), findsOneWidget);
     expect(find.byKey(const Key('lucky_summon_btn')), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('place_launcher_rapid')));
     await tester.tap(find.byKey(const Key('place_launcher_rapid')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
-    expect(find.text('초소 1/2곳'), findsOneWidget);
+    expect(find.text('초소 1/4곳'), findsOneWidget);
 
     // 3배속으로 전환해 제1물결 후반부까지 진행하면 ⚡조기호출(+18⚡·비급) 버튼이 활성화된다!
     await tester.tap(find.text('3배'));
@@ -667,18 +667,21 @@ void main() {
     );
     await tester.tapAt(slotTapOffset);
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.textContaining('빈 초소 · 발사대 직접 배치'), findsOneWidget);
+    expect(find.textContaining('⛩️협곡관문'), findsOneWidget);
 
     for (int i = 0; i < 105; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
-    expect(find.textContaining('빈 초소 · 발사대 직접 배치'), findsNothing);
+    expect(find.textContaining('⛩️협곡관문'), findsNothing);
 
-    // 2) 하단 실시간 원터치 「🎲즉시운빨(35⚡)」 버튼으로 화면 가림 없이 즉시 소환 검증!
-    expect(find.text('초소 0/2곳'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('quick_lucky_summon_btn')));
+    // 2) 초반 군수기력(48⚡)으로 첫 초소 지정 건설(45⚡) 또는 적 처치 후 하단 「🎲도박소환(50⚡)」 작동 검증!
+    expect(find.text('초소 0/4곳'), findsOneWidget);
+    await tester.tapAt(slotTapOffset);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.ensureVisible(find.byKey(const Key('place_launcher_rapid')));
+    await tester.tap(find.byKey(const Key('place_launcher_rapid')));
     await tester.pump(const Duration(milliseconds: 50));
-    expect(find.text('초소 1/2곳'), findsOneWidget);
+    expect(find.text('초소 1/4곳'), findsOneWidget);
 
     // 3) 기력이 모인 상태에서 실시간 「⚔️화력업+0」 및 「🔭사거리업+0」 단추 존재·작동 검증!
     final fireBtn = find.byKey(const Key('live_upg_firepower_btn'));
@@ -824,6 +827,99 @@ void main() {
     await tester.tap(find.text('100물결 연속 수호'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('심야 무한 혈전 (100물결) 출정!'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('720×1360 천리협곡 광각 전체맵 ↔ 1.4배 확대 전환 · 거점 개척 단추 · 3페이즈 보스 상태 막대 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final controller = GameController(
+      initialProgress: PlayerProgress(
+        tokens: 800,
+        centralGuardianLevel: 4,
+        highestClearedGlobalStage: 9,
+        tutorialSeen: true,
+        bgmVolume: 0.0,
+        sfxVolume: 0.0,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BattleScreen(
+          controller: controller,
+          stage: CampaignCatalog.stageAt(1, 10),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // 1) 광각 전체 보기 기본 상태 및 1.4배 확대 토글 검증
+    final zoomBtn = find.byKey(const Key('battle_toggle_zoom_view_btn'));
+    expect(zoomBtn, findsOneWidget);
+    expect(find.text('🔍1.4배확대'), findsOneWidget);
+    await tester.ensureVisible(zoomBtn);
+    await tester.tap(zoomBtn);
+    await tester.pump();
+    expect(find.text('🔍광각전체'), findsOneWidget);
+    await tester.tap(zoomBtn);
+    await tester.pump();
+    expect(find.text('🔍1.4배확대'), findsOneWidget);
+
+    // 2) 1-10(6곳 개방 · 8물결 보스전)에서 첫 초소 직접 축조 후 4배속으로 진행해 중간보스/대수괴 다단 페이즈 바 표시 및 거점 개척 단추 확인!
+    expect(find.text('초소 0/6곳'), findsOneWidget);
+    final arenaBox = tester.getRect(find.byKey(const Key('battle_arena_gesture')));
+    final firstSlotPos = CampaignCatalog.chapterOf(1).mounts.first.pos;
+    final slotTapOffset = Offset(
+      arenaBox.left + arenaBox.width * (firstSlotPos.x / CampaignCatalog.arenaWidth),
+      arenaBox.top + arenaBox.height * (firstSlotPos.y / CampaignCatalog.arenaHeight),
+    );
+    await tester.tapAt(slotTapOffset);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.ensureVisible(find.byKey(const Key('place_launcher_rapid')));
+    await tester.tap(find.byKey(const Key('place_launcher_rapid')));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('초소 1/6곳'), findsOneWidget);
+
+    await tester.tap(find.text('4배'));
+    await tester.pump();
+
+    if (find.byIcon(Icons.close_rounded).evaluate().isNotEmpty) {
+      await tester.tap(find.byIcon(Icons.close_rounded).first);
+      await tester.pump();
+    }
+
+    bool sawMultiPhaseHud = false;
+    bool sawExcavateBtn = false;
+    for (int f = 0; f < 520; f++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      final perkFinder = find.byWidgetPredicate(
+        (w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('rogue_perk_'),
+      );
+      if (perkFinder.evaluate().isNotEmpty) {
+        await tester.tap(perkFinder.first);
+        await tester.pump();
+      }
+      if (find.byKey(const Key('quick_excavate_next_btn')).evaluate().isNotEmpty) {
+        sawExcavateBtn = true;
+      }
+      if (find.textContaining('◆').evaluate().isNotEmpty) {
+        sawMultiPhaseHud = true;
+        if (sawExcavateBtn) break;
+      }
+      if (find.byKey(const Key('call_early_wave_btn')).evaluate().isNotEmpty) {
+        await tester.tap(find.byKey(const Key('call_early_wave_btn')), warnIfMissed: false);
+        await tester.pump();
+      }
+    }
+    expect(sawExcavateBtn, isTrue);
+    expect(sawMultiPhaseHud, isTrue);
     expect(tester.takeException(), isNull);
   });
 }

@@ -74,44 +74,157 @@ class CliffZone {
   final String label;
 }
 
-/// 발사대 설치 거점 좌표.
+/// 초소 거점의 5대 전략 지형 특성 (단조로운 빈 발판 대신 지형마다 고유 전술 보너스 부여!).
+enum MountTerrainType {
+  highWatchtower(
+    id: 'watchtower',
+    name: '고지 망루',
+    shortBadge: '🏔️고지망루',
+    bonusSummary: '사거리 +24% · 보스 약점 저격 보정',
+    colorHex: 0xFFFFD166,
+    rangeMult: 1.24,
+    damageMult: 1.05,
+    reloadMult: 1.00,
+    knockbackMult: 1.00,
+    pierceBonus: 0,
+    critBonus: 0.05,
+    cracksBossWeakPoint: true,
+  ),
+  chokeGate(
+    id: 'chokeGate',
+    name: '협곡 관문',
+    shortBadge: '⛩️협곡관문',
+    bonusSummary: '밀침 +35% · 관통 +1 · 폭발 반경 +20%',
+    colorHex: 0xFF72EFDD,
+    rangeMult: 1.00,
+    damageMult: 1.06,
+    reloadMult: 1.00,
+    knockbackMult: 1.35,
+    pierceBonus: 1,
+    critBonus: 0.0,
+    cracksBossWeakPoint: false,
+  ),
+  fortressBastion(
+    id: 'bastion',
+    name: '성루 포대',
+    shortBadge: '🏯성루포대',
+    bonusSummary: '화력 +22% · 회심 확률 +10%',
+    colorHex: 0xFFFF6B35,
+    rangeMult: 1.05,
+    damageMult: 1.22,
+    reloadMult: 1.00,
+    knockbackMult: 1.12,
+    pierceBonus: 0,
+    critBonus: 0.10,
+    cracksBossWeakPoint: false,
+  ),
+  spiritSpring(
+    id: 'spiritSpring',
+    name: '기맥 영천',
+    shortBadge: '☯️기맥영천',
+    bonusSummary: '연사 +24% · 내공 충전 1.8배 · 오라 확장',
+    colorHex: 0xFFC77DFF,
+    rangeMult: 1.08,
+    damageMult: 1.00,
+    reloadMult: 1.24,
+    knockbackMult: 1.00,
+    pierceBonus: 0,
+    critBonus: 0.04,
+    cracksBossWeakPoint: false,
+  ),
+  ambushRidge(
+    id: 'ambushRidge',
+    name: '측면 매복암',
+    shortBadge: '🗡️측면매복',
+    bonusSummary: '보스 장갑판 파쇄 · 관통 +1 · 화력 +14%',
+    colorHex: 0xFF80ED99,
+    rangeMult: 1.08,
+    damageMult: 1.14,
+    reloadMult: 1.08,
+    knockbackMult: 1.05,
+    pierceBonus: 1,
+    critBonus: 0.08,
+    cracksBossWeakPoint: true,
+  );
+
+  const MountTerrainType({
+    required this.id,
+    required this.name,
+    required this.shortBadge,
+    required this.bonusSummary,
+    required this.colorHex,
+    required this.rangeMult,
+    required this.damageMult,
+    required this.reloadMult,
+    required this.knockbackMult,
+    required this.pierceBonus,
+    required this.critBonus,
+    required this.cracksBossWeakPoint,
+  });
+
+  final String id;
+  final String name;
+  final String shortBadge;
+  final String bonusSummary;
+  final int colorHex;
+  final double rangeMult;
+  final double damageMult;
+  final double reloadMult;
+  final double knockbackMult;
+  final int pierceBonus;
+  final double critBonus;
+  final bool cracksBossWeakPoint;
+}
+
+/// 발사대 설치 거점 좌표 · 지형 특성 · 마기 암석 개척 비용.
 class LauncherMountSlot {
   const LauncherMountSlot({
     required this.slotIndex,
     required this.pos,
     required this.recommendedType,
+    this.terrainType = MountTerrainType.fortressBastion,
   });
 
   final int slotIndex;
   final Vec2 pos;
   final LauncherType recommendedType;
+  final MountTerrainType terrainType;
+
+  /// 최후방 기본 2개 거점(0, 1번) 외의 전방 전략 지형 거점은 마기 암석 잔해를 먼저 개척해야 포대를 축조할 수 있다!
+  int get excavationCost {
+    if (slotIndex <= 1) return 0;
+    if (slotIndex <= 3) return 24;
+    if (slotIndex <= 6) return 28;
+    if (slotIndex <= 9) return 32;
+    return 36;
+  }
 }
 
-/// 난이도 3단계.
+/// 난이도 3단계 (싱거운 프리패스를 없애고, 입문부터 긴장감 넘치는 수성 재미 제공!).
 enum DefenseDifficulty {
   easy(
     id: 'easy',
     name: '쉬움 · 마을 지킴이',
-    hpMult: 0.78,
-    speedMult: 0.90,
+    hpMult: 1.00,
+    speedMult: 0.95,
     rewardMult: 1.0,
-    summary: '여유로운 호흡으로 스토리와 자동 발사 진법을 즐기는 난이도',
+    summary: '거점 개척과 지형 포진의 기본기를 익히며 막아내는 입문 난이도',
   ),
   normal(
     id: 'normal',
     name: '보통 · 강호 수호자',
-    hpMult: 1.00,
-    speedMult: 1.00,
+    hpMult: 1.24,
+    speedMult: 1.05,
     rewardMult: 1.25,
-    summary: '길목 발사대와 알 상성을 맞추며 깨는 표준 난이도 (보상 +25%)',
+    summary: '기력 운용·거점 개척·5병종 상성·보스 약점 저격이 필수인 표준 진검 난이도 (영구 보상 +25%)',
   ),
   nightmare(
     id: 'nightmare',
     name: '악몽 · 심야 혈전',
     hpMult: 1.68,
-    speedMult: 1.16,
+    speedMult: 1.15,
     rewardMult: 1.65,
-    summary: '정교한 진법과 내공·영수 성장이 요구되는 고수용 도전 (보상 +65%)',
+    summary: '극한의 진법 설계와 내공·영수 성장이 요구되는 고수용 사투 (영구 보상 +65%)',
   );
 
   const DefenseDifficulty({
@@ -186,7 +299,7 @@ class StageSpec {
   final int clearElixirBonus;
   final bool isBossStage;
 
-  /// 이 관문에서 배치 가능한 길목 초소 발판 수 (1-1의 2곳에서 시작해 10장 결전의 10곳까지 점진적 확장!).
+  /// 이 관문에서 배치 가능한 길목 초소 발판 수 (1-1의 4곳에서 시작해 9~10장 결전의 14곳까지 점진 확장!).
   final int maxMountCount;
 
   /// 이 관문을 처음 정화했을 때 구출되어 즉시 아군에 합류하는 동료 무림인.
@@ -259,8 +372,8 @@ class ChapterSpec {
   final List<CliffZone> cliffs;
   final int stageCount;
 
-  /// 제어점 배열을 3차 카트멀-롬 스플라인(Catmull-Rom Cubic Spline)과 등간격(7px) 샘플링으로 보간하여
-  /// 돌연변이들이 꺾임 없이 물 흐르듯 부드럽게 휘돌아 내려오는 연속 곡선 경로를 생성한다.
+  /// 제어점 배열을 3차 카트멀-롬 스플라인과 등간격(8px) 샘플링으로 보간하여
+  /// 12굽이 천리협곡 전체를 부드럽고 정교하게 휘돌아 내려오는 연속 곡선 경로를 생성한다.
   List<Vec2> smoothedLane(int laneIndex) {
     final raw = lanes[laneIndex % lanes.length];
     if (raw.length < 3) return raw;
@@ -277,8 +390,8 @@ class ChapterSpec {
           ((2.0 * p1.y) +
               (-p0.y + p2.y) * t +
               (2.0 * p0.y - 5.0 * p1.y + 4.0 * p2.y - p3.y) * t2 +
-              (-p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y) * t3);
-      return Vec2(x.clamp(22.0, CampaignCatalog.arenaWidth - 22.0), y);
+              (-p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.x * 0.0 + p3.y) * t3);
+      return Vec2(x.clamp(28.0, CampaignCatalog.arenaWidth - 28.0), y);
     }
 
     final dense = <Vec2>[];
@@ -288,20 +401,19 @@ class ChapterSpec {
       final p2 = raw[i + 1];
       final p3 = (i + 2 < raw.length) ? raw[i + 2] : raw.last;
       final segLen = p1.distanceTo(p2);
-      final subSteps = math.max(6, (segLen / 6.5).ceil());
+      final subSteps = math.max(10, (segLen / 7.5).ceil());
       for (int s = 0; s < subSteps; s++) {
         dense.add(catmullRom(p0, p1, p2, p3, s / subSteps));
       }
     }
     dense.add(raw.last);
 
-    // 등간격(7.0px)으로 한 번 더 정돈하여 코너에서 속도가 빨라지거나 느려지는 현상 제거
     final uniform = <Vec2>[dense.first];
     double acc = 0.0;
     for (int i = 1; i < dense.length; i++) {
       final d = dense[i].distanceTo(uniform.last);
       acc += d;
-      if (acc >= 7.0 || i == dense.length - 1) {
+      if (acc >= 8.0 || i == dense.length - 1) {
         uniform.add(dense[i]);
         acc = 0.0;
       }
@@ -310,16 +422,94 @@ class ChapterSpec {
   }
 }
 
-/// 《수호알까기 · 탄지무림 심야기습》 1~10장(총 111단계) 전체 캠페인 생성기.
+/// 《수호알까기 · 탄지무림 심야기습》 1~10장(총 111단계) 720×1360 천리협곡 12굽이 캠페인 생성기.
 class CampaignCatalog {
-  static const double arenaWidth = 400.0;
-  static const double arenaHeight = 680.0;
-  /// 맨 아래 마을 어귀 정중앙 주 발사대(자동·수동 겸용 중앙 기명 수호탑) 좌표.
-  static const Vec2 centralTowerPos = Vec2(200.0, 580.0);
+  /// 초장거리 12굽이 천리협곡(실연장 3,800~5,100px!)을 구현하는 720×1360 광활 대장정 전장!
+  static const double arenaWidth = 720.0;
+  static const double arenaHeight = 1360.0;
+
+  /// 맨 아래 마을 어귀 정중앙 주 발사대(근접 비상 방어 · 수동 탄지 · 🎯보스 약점 정밀저격 겸용) 좌표.
+  static const Vec2 centralTowerPos = Vec2(360.0, 1196.0);
+
   /// 맨 아래 마을 본진 보호 결계 중심 (식량창고·논밭·외양간을 감싸는 남단 반구형 수호진).
-  static const Vec2 villageCenter = Vec2(200.0, 616.0);
-  static const double outerShieldRadius = 82.0;
-  static const double centralTowerRadius = 25.0;
+  static const Vec2 villageCenter = Vec2(360.0, 1262.0);
+  static const double outerShieldRadius = 114.0;
+  static const double centralTowerRadius = 30.0;
+
+  // 12굽이 초장거리 구곡양장 표준 템플릿 생성 헬퍼 (전 차선 실연장 3,900~5,100px 보장!)
+  static List<Vec2> _serpentineLeftStart({double sway = 0.0}) => [
+        Vec2(72 + sway, 42),
+        Vec2(648 - sway, 106),
+        Vec2(654 - sway, 178),
+        Vec2(68 + sway, 250),
+        Vec2(66 + sway, 324),
+        Vec2(652 - sway, 398),
+        Vec2(654 - sway, 474),
+        Vec2(70 + sway, 550),
+        Vec2(70 + sway, 628),
+        Vec2(650 - sway, 706),
+        Vec2(650 - sway, 786),
+        Vec2(74 + sway, 868),
+        Vec2(78 + sway, 952),
+        Vec2(636 - sway, 1032),
+        const Vec2(342, 1114),
+        centralTowerPos,
+        villageCenter,
+      ];
+
+  static List<Vec2> _serpentineRightStart({double sway = 0.0}) => [
+        Vec2(648 - sway, 42),
+        Vec2(72 + sway, 106),
+        Vec2(66 + sway, 178),
+        Vec2(652 - sway, 250),
+        Vec2(654 - sway, 324),
+        Vec2(68 + sway, 398),
+        Vec2(66 + sway, 474),
+        Vec2(650 - sway, 550),
+        Vec2(650 - sway, 628),
+        Vec2(70 + sway, 706),
+        Vec2(70 + sway, 786),
+        Vec2(646 - sway, 868),
+        Vec2(642 - sway, 952),
+        Vec2(84 + sway, 1032),
+        const Vec2(378, 1114),
+        centralTowerPos,
+        villageCenter,
+      ];
+
+  static List<Vec2> _serpentineCenterWeave({bool goLeftFirst = true}) => goLeftFirst
+      ? const [
+          Vec2(360, 38),
+          Vec2(68, 118),
+          Vec2(652, 214),
+          Vec2(68, 312),
+          Vec2(652, 412),
+          Vec2(70, 514),
+          Vec2(650, 618),
+          Vec2(72, 724),
+          Vec2(648, 832),
+          Vec2(78, 940),
+          Vec2(638, 1038),
+          Vec2(360, 1118),
+          centralTowerPos,
+          villageCenter,
+        ]
+      : const [
+          Vec2(360, 38),
+          Vec2(652, 118),
+          Vec2(68, 214),
+          Vec2(652, 312),
+          Vec2(68, 412),
+          Vec2(650, 514),
+          Vec2(70, 618),
+          Vec2(648, 724),
+          Vec2(72, 832),
+          Vec2(642, 940),
+          Vec2(82, 1038),
+          Vec2(360, 1118),
+          centralTowerPos,
+          villageCenter,
+        ];
 
   static final List<ChapterSpec> chapters = [
     ChapterSpec(
@@ -333,54 +523,32 @@ class CampaignCatalog {
       bossName: '독기에 미친 산군',
       bossPortraitPrefix: 'chonjang',
       storySummary:
-          '태극석 균열로 쏟아진 심야 독기 속에 돌연변이 무리가 위쪽 산비탈 굽이길을 따라 맨 아래 흙먼지 마을로 쳐들어온다! 중앙 수호탑과 길목 빈 초소 배치를 지휘해 식량·논밭·가축을 지켜내라!',
+          '태극석 균열로 쏟아진 심야 독기 속에 돌연변이 대군이 열두 굽이 천리 산비탈 잔도를 따라 남단 흙먼지 마을로 쳐들어온다! 마기 암석을 개척하고 지형 요충지에 포대를 축조해 6~8물결 공세를 버텨내라!',
       unlockNotice: '기명 심법 수련 개방 · 첫째 문양(각성) · 의용대 지원패 전수',
       surfaceFriction: 1.05,
       stageCount: 10,
-      lanes: const [
-        [
-          Vec2(56, 28),
-          Vec2(338, 72),
-          Vec2(342, 134),
-          Vec2(60, 184),
-          Vec2(58, 248),
-          Vec2(340, 300),
-          Vec2(342, 366),
-          Vec2(64, 418),
-          Vec2(72, 482),
-          Vec2(198, 532),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(344, 28),
-          Vec2(206, 74),
-          Vec2(62, 126),
-          Vec2(60, 186),
-          Vec2(338, 242),
-          Vec2(340, 304),
-          Vec2(64, 360),
-          Vec2(66, 422),
-          Vec2(328, 478),
-          Vec2(202, 532),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 0),
+        _serpentineRightStart(sway: 8),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(198, 448), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(246, 334), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(154, 274), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(246, 160), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(126, 156), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(118, 390), recommendedType: LauncherType.heavy),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 996), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(214, 828), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(506, 668), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(214, 512), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(506, 360), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(214, 214), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(506, 910), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(360, 590), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.ambushRidge),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(200, 332), radius: 15, sides: 4, rotationSpeedRad: 0.9, restitutionBoost: 1.35),
+        TerrainPillar(center: Vec2(360, 748), radius: 20, sides: 4, rotationSpeedRad: 0.9, restitutionBoost: 1.35),
+        TerrainPillar(center: Vec2(360, 436), radius: 19, sides: 5, rotationSpeedRad: -1.0, restitutionBoost: 1.38),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 275), radius: 27, label: '서쪽 산비탈 절벽'),
-        CliffZone(center: Vec2(384, 275), radius: 27, label: '동쪽 산비탈 절벽'),
+        CliffZone(center: Vec2(26, 590), radius: 38, label: '서쪽 산비탈 절벽'),
+        CliffZone(center: Vec2(694, 590), radius: 38, label: '동쪽 산비탈 절벽'),
+        CliffZone(center: Vec2(26, 910), radius: 34, label: '하단 벼랑 계곡'),
       ],
     ),
     ChapterSpec(
@@ -394,53 +562,32 @@ class CampaignCatalog {
       bossName: '탐식 거대 변이주방장',
       bossPortraitPrefix: 'tongtong',
       storySummary:
-          '피난민들이 모인 통통 객잔의 대곡식 창고를 탐식 변이 대군이 구불구불 아홉 굽이 기름 비탈길로 덮친다! 굽이섬마다 사거리를 맞춰 발사대를 세워라!',
+          '피난민들이 모인 통통 객잔의 대곡식 창고를 탐식 변이 대군이 미끄러운 열두 굽이 기름 잔도로 덮친다! 마기 바위를 깨고 고지 망루·매복암을 개척하라!',
       unlockNotice: '물자 호송 시스템 정식 개통 · 동료 반달 합류 · 곡사 회전기 개방',
       surfaceFriction: 0.72,
       stageCount: 11,
-      lanes: const [
-        [
-          Vec2(58, 28),
-          Vec2(336, 78),
-          Vec2(338, 142),
-          Vec2(64, 196),
-          Vec2(64, 262),
-          Vec2(334, 318),
-          Vec2(334, 384),
-          Vec2(70, 442),
-          Vec2(178, 526),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(342, 28),
-          Vec2(64, 78),
-          Vec2(62, 142),
-          Vec2(336, 196),
-          Vec2(336, 262),
-          Vec2(66, 318),
-          Vec2(66, 384),
-          Vec2(330, 442),
-          Vec2(222, 526),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 6),
+        _serpentineRightStart(sway: 0),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(200, 416), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(200, 290), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(120, 228), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(280, 228), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(124, 352), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(276, 112), recommendedType: LauncherType.heavy),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 992), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(506, 826), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(214, 668), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(506, 512), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(214, 360), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(506, 214), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(360, 590), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(214, 910), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.fortressBastion),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(88, 168), radius: 14, sides: 6, rotationSpeedRad: 1.2, restitutionBoost: 1.42),
-        TerrainPillar(center: Vec2(312, 168), radius: 14, sides: 6, rotationSpeedRad: -1.2, restitutionBoost: 1.42),
+        TerrainPillar(center: Vec2(162, 436), radius: 19, sides: 6, rotationSpeedRad: 1.2, restitutionBoost: 1.42),
+        TerrainPillar(center: Vec2(558, 436), radius: 19, sides: 6, rotationSpeedRad: -1.2, restitutionBoost: 1.42),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 355), radius: 27, label: '객잔 뒤편 계곡'),
-        CliffZone(center: Vec2(384, 355), radius: 27, label: '장독대 낭떠러지'),
+        CliffZone(center: Vec2(26, 746), radius: 38, label: '객잔 뒤편 계곡'),
+        CliffZone(center: Vec2(694, 746), radius: 38, label: '장독대 낭떠러지'),
+        CliffZone(center: Vec2(694, 360), radius: 34, label: '뒷산 기름 절벽'),
       ],
     ),
     ChapterSpec(
@@ -454,64 +601,34 @@ class CampaignCatalog {
       bossName: '그림자 변이 자객단주',
       bossPortraitPrefix: 'jagaek',
       storySummary:
-          '봄에 뿌릴 씨앗과 어미 가축들이 모인 거북 장터에 밤비가 내리고, 그림자 변이 무리가 길게 굽이치는 세 갈래 장터 회랑을 돌아 침투한다!',
+          '봄에 뿌릴 씨앗과 어미 가축들이 모인 거북 장터에 밤비가 내리고, 그림자 변이 무리가 세 갈래 열두 굽이 장터 회랑을 돌아 침투한다!',
       unlockNotice: '전국 호송망 확장 · 영수 영귀 금강 개방 · 한빙 역장기 개방',
       surfaceFriction: 0.92,
       stageCount: 11,
-      lanes: const [
-        [
-          Vec2(56, 28),
-          Vec2(328, 76),
-          Vec2(332, 138),
-          Vec2(62, 194),
-          Vec2(62, 260),
-          Vec2(328, 316),
-          Vec2(328, 382),
-          Vec2(76, 446),
-          Vec2(180, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(200, 26),
-          Vec2(64, 92),
-          Vec2(336, 162),
-          Vec2(64, 234),
-          Vec2(336, 306),
-          Vec2(68, 382),
-          Vec2(324, 454),
-          Vec2(200, 526),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(344, 28),
-          Vec2(72, 76),
-          Vec2(68, 138),
-          Vec2(338, 194),
-          Vec2(338, 260),
-          Vec2(72, 316),
-          Vec2(72, 382),
-          Vec2(324, 446),
-          Vec2(220, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 4),
+        _serpentineCenterWeave(goLeftFirst: true),
+        _serpentineRightStart(sway: 4),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(262, 288), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(200, 198), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(138, 288), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(200, 418), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(122, 352), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(200, 112), recommendedType: LauncherType.rapid),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 994), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(210, 826), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(510, 826), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(360, 668), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(210, 512), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(510, 512), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(360, 360), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(210, 214), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 8, pos: Vec2(510, 214), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.fortressBastion),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(200, 270), radius: 15, sides: 5, rotationSpeedRad: 1.1, restitutionBoost: 1.38),
+        TerrainPillar(center: Vec2(360, 512), radius: 20, sides: 5, rotationSpeedRad: 1.1, restitutionBoost: 1.38),
+        TerrainPillar(center: Vec2(168, 910), radius: 18, sides: 6, rotationSpeedRad: -1.2, restitutionBoost: 1.40),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 290), radius: 26, label: '장터 수로 낭떠러지'),
-        CliffZone(center: Vec2(384, 290), radius: 26, label: '성벽 아래 해자'),
+        CliffZone(center: Vec2(26, 590), radius: 36, label: '장터 수로 낭떠러지'),
+        CliffZone(center: Vec2(694, 590), radius: 36, label: '성벽 아래 해자'),
+        CliffZone(center: Vec2(26, 286), radius: 34, label: '북문 해자 구렁'),
       ],
     ),
     ChapterSpec(
@@ -525,66 +642,35 @@ class CampaignCatalog {
       bossName: '숲의 천년 역병주',
       bossPortraitPrefix: 'kubi',
       storySummary:
-          '각 마을 수호탑 보급에 필요한 천년 목재와 산길 봉화대를 되찾기 위해 쿠비 산채로 향한다. 아홉 굽이 깊은 숲길 고비마다 초소를 세워 산채 두목 쿠비를 구출하라!',
+          '각 마을 수호탑 보급에 필요한 천년 목재와 산길 봉화대를 되찾기 위해 쿠비 산채로 향한다. 열두 굽이 대삼림 협곡의 망루·매복암을 개척하라!',
       unlockNotice: '심야 탐색 시스템 정식 개통 · 둘째 문양(동행) · 동료 구르미 합류',
       surfaceFriction: 1.00,
       stageCount: 12,
-      lanes: const [
-        [
-          Vec2(56, 28),
-          Vec2(338, 74),
-          Vec2(340, 136),
-          Vec2(60, 188),
-          Vec2(60, 252),
-          Vec2(338, 308),
-          Vec2(338, 374),
-          Vec2(68, 434),
-          Vec2(182, 526),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(200, 26),
-          Vec2(62, 86),
-          Vec2(338, 152),
-          Vec2(62, 222),
-          Vec2(338, 292),
-          Vec2(64, 364),
-          Vec2(332, 438),
-          Vec2(200, 522),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(344, 28),
-          Vec2(62, 74),
-          Vec2(60, 136),
-          Vec2(340, 188),
-          Vec2(340, 252),
-          Vec2(62, 308),
-          Vec2(62, 374),
-          Vec2(332, 434),
-          Vec2(218, 526),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 0),
+        _serpentineCenterWeave(goLeftFirst: false),
+        _serpentineRightStart(sway: 0),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(280, 340), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(120, 340), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(200, 256), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(200, 404), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(122, 162), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(278, 162), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 6, pos: Vec2(200, 476), recommendedType: LauncherType.frostField),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 996), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(210, 910), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(510, 910), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(360, 746), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(210, 590), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(510, 590), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(360, 436), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(210, 286), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 8, pos: Vec2(510, 286), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 9, pos: Vec2(360, 178), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(104, 222), radius: 14, sides: 3, rotationSpeedRad: 1.4, restitutionBoost: 1.44),
-        TerrainPillar(center: Vec2(296, 222), radius: 14, sides: 3, rotationSpeedRad: -1.4, restitutionBoost: 1.44),
+        TerrainPillar(center: Vec2(182, 436), radius: 19, sides: 3, rotationSpeedRad: 1.4, restitutionBoost: 1.44),
+        TerrainPillar(center: Vec2(538, 436), radius: 19, sides: 3, rotationSpeedRad: -1.4, restitutionBoost: 1.44),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 325), radius: 27, label: '산채 천길 벼랑'),
-        CliffZone(center: Vec2(384, 325), radius: 27, label: '구름다리 절벽'),
+        CliffZone(center: Vec2(26, 668), radius: 38, label: '산채 천길 벼랑'),
+        CliffZone(center: Vec2(694, 668), radius: 38, label: '구름다리 절벽'),
+        CliffZone(center: Vec2(694, 286), radius: 34, label: '북쪽 암벽 계곡'),
       ],
     ),
     ChapterSpec(
@@ -598,69 +684,37 @@ class CampaignCatalog {
       bossName: '폭주 기관 거신병',
       bossPortraitPrefix: 'logic',
       storySummary:
-          '중갑 변이체를 뚫을 고대 기관술의 본산 로직 학당! 직각으로 아홉 번 꺾여 도는 기관 미궁 대회랑에서 내공 증폭기와 어기어석의 비전을 열어라!',
+          '중갑 변이체를 뚫을 고대 기관술의 본산 로직 학당! 열두 번 꺾여 도는 거대 기관 미궁 회랑을 개척하고 내공 증폭기와 어기어석의 비전을 열어라!',
       unlockNotice: '내공 증폭기 개방 · 셋째 문양(자동 어기어석) · 동료 정각 합류',
       surfaceFriction: 0.80,
       stageCount: 11,
-      lanes: const [
-        [
-          Vec2(56, 28),
-          Vec2(340, 68),
-          Vec2(340, 128),
-          Vec2(60, 172),
-          Vec2(60, 236),
-          Vec2(340, 282),
-          Vec2(340, 348),
-          Vec2(64, 398),
-          Vec2(68, 468),
-          Vec2(186, 530),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(200, 26),
-          Vec2(336, 94),
-          Vec2(64, 166),
-          Vec2(336, 242),
-          Vec2(64, 318),
-          Vec2(334, 396),
-          Vec2(72, 466),
-          Vec2(200, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(344, 28),
-          Vec2(60, 68),
-          Vec2(60, 128),
-          Vec2(340, 172),
-          Vec2(340, 236),
-          Vec2(60, 282),
-          Vec2(60, 348),
-          Vec2(336, 398),
-          Vec2(332, 468),
-          Vec2(214, 530),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 2),
+        _serpentineCenterWeave(goLeftFirst: true),
+        _serpentineRightStart(sway: 2),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(274, 316), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(126, 316), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(200, 206), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(200, 372), recommendedType: LauncherType.qiAmplifier),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(270, 434), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(124, 102), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 6, pos: Vec2(130, 434), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 7, pos: Vec2(276, 102), recommendedType: LauncherType.frostField),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 998), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(210, 910), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(510, 910), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(360, 826), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(506, 746), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(214, 746), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(210, 590), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(510, 590), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 8, pos: Vec2(360, 436), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 9, pos: Vec2(210, 286), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 10, pos: Vec2(510, 286), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.spiritSpring),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(106, 258), radius: 14, sides: 8, rotationSpeedRad: 1.25, restitutionBoost: 1.45),
-        TerrainPillar(center: Vec2(294, 258), radius: 14, sides: 8, rotationSpeedRad: -1.25, restitutionBoost: 1.45),
+        TerrainPillar(center: Vec2(184, 512), radius: 19, sides: 8, rotationSpeedRad: 1.25, restitutionBoost: 1.45),
+        TerrainPillar(center: Vec2(536, 512), radius: 19, sides: 8, rotationSpeedRad: -1.25, restitutionBoost: 1.45),
+        TerrainPillar(center: Vec2(360, 286), radius: 18, sides: 6, rotationSpeedRad: 1.15, restitutionBoost: 1.42),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 250), radius: 26, label: '학당 서쪽 연못 해자'),
-        CliffZone(center: Vec2(384, 250), radius: 26, label: '학당 동쪽 절벽'),
+        CliffZone(center: Vec2(26, 512), radius: 36, label: '학당 서쪽 연못 해자'),
+        CliffZone(center: Vec2(694, 512), radius: 36, label: '학당 동쪽 절벽'),
+        CliffZone(center: Vec2(26, 868), radius: 34, label: '기관 지하 수렁'),
       ],
     ),
     ChapterSpec(
@@ -674,78 +728,39 @@ class CampaignCatalog {
       bossName: '심야 흑화 마룡수',
       bossPortraitPrefix: 'maengju',
       storySummary:
-          '혹한의 밤, 네 갈래로 깊게 휘감아 내려오는 설원 계단 회랑에서 묵현(3차)을 정화 탄지로 구원하고 맹주와 함께 흑화 마룡수를 격파하라!',
+          '혹한의 밤, 네 갈래 열두 굽이 설원 계단 회랑에서 묵현(3차)을 정화 탄지로 구원하고 맹주와 함께 3페이즈 흑화 마룡수를 격파하라!',
       unlockNotice: '황금 지원패(무림수호단 출두야~~!!) 완성 · 동료 용아 및 위기 난입 묵현 합류',
       surfaceFriction: 0.76,
       stageCount: 12,
-      lanes: const [
-        [
-          Vec2(54, 28),
-          Vec2(338, 74),
-          Vec2(338, 138),
-          Vec2(60, 192),
-          Vec2(60, 258),
-          Vec2(338, 314),
-          Vec2(338, 382),
-          Vec2(68, 446),
-          Vec2(186, 530),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(150, 26),
-          Vec2(60, 92),
-          Vec2(340, 166),
-          Vec2(60, 242),
-          Vec2(340, 320),
-          Vec2(64, 398),
-          Vec2(328, 468),
-          Vec2(196, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(250, 26),
-          Vec2(340, 92),
-          Vec2(60, 166),
-          Vec2(340, 242),
-          Vec2(60, 320),
-          Vec2(336, 398),
-          Vec2(72, 468),
-          Vec2(204, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(346, 28),
-          Vec2(62, 74),
-          Vec2(62, 138),
-          Vec2(340, 192),
-          Vec2(340, 258),
-          Vec2(62, 314),
-          Vec2(62, 382),
-          Vec2(332, 446),
-          Vec2(214, 530),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 0),
+        _serpentineCenterWeave(goLeftFirst: true),
+        _serpentineCenterWeave(goLeftFirst: false),
+        _serpentineRightStart(sway: 0),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(276, 352), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(124, 352), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(200, 282), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(200, 414), recommendedType: LauncherType.qiAmplifier),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(132, 474), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(120, 164), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 6, pos: Vec2(280, 164), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 7, pos: Vec2(268, 474), recommendedType: LauncherType.heavy),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 998), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(210, 910), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(510, 910), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(360, 826), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(214, 746), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(506, 998), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(210, 590), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(510, 590), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 8, pos: Vec2(360, 436), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 9, pos: Vec2(210, 286), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 10, pos: Vec2(510, 286), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 11, pos: Vec2(360, 178), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(200, 206), radius: 15, sides: 6, rotationSpeedRad: 1.5, restitutionBoost: 1.45),
+        TerrainPillar(center: Vec2(360, 590), radius: 21, sides: 6, rotationSpeedRad: 1.5, restitutionBoost: 1.45),
+        TerrainPillar(center: Vec2(174, 828), radius: 18, sides: 6, rotationSpeedRad: -1.35, restitutionBoost: 1.42),
+        TerrainPillar(center: Vec2(546, 828), radius: 18, sides: 6, rotationSpeedRad: 1.35, restitutionBoost: 1.42),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 330), radius: 26, label: '본단 빙벽 협곡'),
-        CliffZone(center: Vec2(384, 330), radius: 26, label: '본단 화염 구렁'),
+        CliffZone(center: Vec2(26, 668), radius: 38, label: '본단 빙벽 협곡'),
+        CliffZone(center: Vec2(694, 668), radius: 38, label: '본단 화염 구렁'),
+        CliffZone(center: Vec2(26, 286), radius: 34, label: '설원 천길 절벽'),
       ],
     ),
     ChapterSpec(
@@ -759,68 +774,37 @@ class CampaignCatalog {
       bossName: '모래폭풍 사막 역병왕',
       bossPortraitPrefix: 'sawang',
       storySummary:
-          '서쪽 독기의 기둥을 쫓아 도착한 열사의 협곡! 거대한 모래언덕을 뱀처럼 길게 휘감아 내려오는 사구 협곡길 목지점마다 초소를 세워 오아시스를 지켜내라!',
+          '서쪽 독기의 기둥을 쫓아 도착한 열사의 천리 대협곡! 거대한 모래언덕을 열두 번 휘감아 내려오는 사구 회랑 거점을 개척해 오아시스를 지켜내라!',
       unlockNotice: '4형(극의) 발사대 제련 완성 · 천마 화신 영입 개방',
       surfaceFriction: 1.15,
       stageCount: 11,
-      lanes: const [
-        [
-          Vec2(56, 28),
-          Vec2(340, 74),
-          Vec2(342, 138),
-          Vec2(58, 192),
-          Vec2(58, 258),
-          Vec2(340, 314),
-          Vec2(340, 382),
-          Vec2(64, 444),
-          Vec2(186, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(200, 26),
-          Vec2(60, 88),
-          Vec2(340, 158),
-          Vec2(60, 232),
-          Vec2(340, 306),
-          Vec2(62, 380),
-          Vec2(334, 452),
-          Vec2(200, 524),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(344, 28),
-          Vec2(60, 74),
-          Vec2(58, 138),
-          Vec2(342, 192),
-          Vec2(342, 258),
-          Vec2(60, 314),
-          Vec2(60, 382),
-          Vec2(336, 444),
-          Vec2(214, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 6),
+        _serpentineCenterWeave(goLeftFirst: true),
+        _serpentineRightStart(sway: 6),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(274, 348), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(126, 348), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(200, 276), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(200, 414), recommendedType: LauncherType.qiAmplifier),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(128, 474), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(282, 112), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 6, pos: Vec2(200, 196), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 7, pos: Vec2(272, 474), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 8, pos: Vec2(118, 112), recommendedType: LauncherType.rapid),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 998), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(210, 910), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(510, 910), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(360, 826), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(214, 746), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(506, 998), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(210, 590), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(510, 590), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 8, pos: Vec2(360, 436), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 9, pos: Vec2(210, 286), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 10, pos: Vec2(510, 286), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 11, pos: Vec2(360, 178), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(106, 232), radius: 14, sides: 4, rotationSpeedRad: 1.3, restitutionBoost: 1.40),
-        TerrainPillar(center: Vec2(294, 232), radius: 14, sides: 4, rotationSpeedRad: -1.3, restitutionBoost: 1.40),
+        TerrainPillar(center: Vec2(182, 512), radius: 19, sides: 4, rotationSpeedRad: 1.3, restitutionBoost: 1.40),
+        TerrainPillar(center: Vec2(538, 512), radius: 19, sides: 4, rotationSpeedRad: -1.3, restitutionBoost: 1.40),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 305), radius: 27, label: '모래 소용돌이 구렁'),
-        CliffZone(center: Vec2(384, 305), radius: 27, label: '협곡 낭떠러지'),
+        CliffZone(center: Vec2(26, 628), radius: 38, label: '모래 소용돌이 구렁'),
+        CliffZone(center: Vec2(694, 628), radius: 38, label: '협곡 낭떠러지'),
+        CliffZone(center: Vec2(694, 286), radius: 34, label: '열사 절벽 해자'),
       ],
     ),
     ChapterSpec(
@@ -834,67 +818,39 @@ class CampaignCatalog {
       bossName: '심해 흑독 대촉수왕',
       bossPortraitPrefix: 'haejeok',
       storySummary:
-          '굶주린 바닷가 마을들에 구호 곡식을 나르는 해적왕의 함대! 선박 사이를 지그재그로 길게 잇는 연결 판자 다리마다 초소를 세워 심해 괴수 떼를 바다에 빠뜨려라!',
+          '굶주린 바닷가 마을들에 구호 곡식을 나르는 해적왕의 대함대! 연결된 대선단 갑판 열두 굽이 현측 망루를 개척해 심해 괴수 대군을 수장하라!',
       unlockNotice: '영수 천룡 금룡 개방 · 동료 검황 영입 개방',
       surfaceFriction: 0.84,
       stageCount: 11,
-      lanes: const [
-        [
-          Vec2(58, 28),
-          Vec2(338, 76),
-          Vec2(338, 140),
-          Vec2(60, 196),
-          Vec2(60, 262),
-          Vec2(338, 318),
-          Vec2(338, 384),
-          Vec2(68, 448),
-          Vec2(186, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(200, 26),
-          Vec2(338, 92),
-          Vec2(62, 164),
-          Vec2(338, 238),
-          Vec2(62, 312),
-          Vec2(338, 388),
-          Vec2(68, 458),
-          Vec2(200, 526),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(342, 28),
-          Vec2(62, 76),
-          Vec2(62, 140),
-          Vec2(340, 196),
-          Vec2(340, 262),
-          Vec2(62, 318),
-          Vec2(62, 384),
-          Vec2(332, 448),
-          Vec2(214, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 3),
+        _serpentineCenterWeave(goLeftFirst: false),
+        _serpentineRightStart(sway: 3),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(272, 474), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(276, 350), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(124, 350), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(200, 416), recommendedType: LauncherType.qiAmplifier),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(200, 278), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(280, 168), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 6, pos: Vec2(128, 474), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 7, pos: Vec2(120, 168), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 8, pos: Vec2(200, 108), recommendedType: LauncherType.curveSpin),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 998), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(510, 868), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(210, 868), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(360, 910), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(214, 998), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(360, 746), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(210, 590), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(510, 590), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 8, pos: Vec2(360, 436), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 9, pos: Vec2(210, 286), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 10, pos: Vec2(510, 286), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 11, pos: Vec2(360, 590), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 12, pos: Vec2(360, 178), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(200, 202), radius: 15, sides: 6, rotationSpeedRad: 1.5, restitutionBoost: 1.48),
+        TerrainPillar(center: Vec2(360, 360), radius: 20, sides: 6, rotationSpeedRad: 1.5, restitutionBoost: 1.48),
+        TerrainPillar(center: Vec2(172, 786), radius: 18, sides: 5, rotationSpeedRad: -1.4, restitutionBoost: 1.44),
+        TerrainPillar(center: Vec2(548, 786), radius: 18, sides: 5, rotationSpeedRad: 1.4, restitutionBoost: 1.44),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 285), radius: 27, label: '좌현 검푸른 밤바다'),
-        CliffZone(center: Vec2(384, 285), radius: 27, label: '우현 소용돌이 바다'),
+        CliffZone(center: Vec2(26, 590), radius: 38, label: '좌현 검푸른 밤바다'),
+        CliffZone(center: Vec2(694, 590), radius: 38, label: '우현 소용돌이 바다'),
+        CliffZone(center: Vec2(26, 910), radius: 34, label: '선미 심해 급류'),
       ],
     ),
     ChapterSpec(
@@ -908,81 +864,41 @@ class CampaignCatalog {
       bossName: '분화구 심연 염마왕',
       bossPortraitPrefix: 'hongryeon',
       storySummary:
-          '대지에서 독기가 치솟는 화염산 분화구! 아홉 번 크게 굽이쳐 내려오는 용암 절벽길의 변이 대군을 초소 사거리 그물망으로 가두어 천상 계단을 열어라!',
+          '대지에서 독기가 치솟는 화염산 대분화구! 열두 번 휘감아 내려오는 천리 용암 절벽길 14개 전략 거점을 개척해 천상 계단을 열어라!',
       unlockNotice: '한철·신물 수호석 제련 극대화 · 동료 무량 신승 개방 · 천상 계단 개통',
       surfaceFriction: 0.90,
       stageCount: 12,
-      lanes: const [
-        [
-          Vec2(54, 28),
-          Vec2(340, 74),
-          Vec2(340, 136),
-          Vec2(60, 190),
-          Vec2(60, 256),
-          Vec2(340, 312),
-          Vec2(340, 380),
-          Vec2(66, 444),
-          Vec2(186, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(150, 26),
-          Vec2(60, 90),
-          Vec2(340, 164),
-          Vec2(60, 238),
-          Vec2(340, 316),
-          Vec2(64, 394),
-          Vec2(332, 466),
-          Vec2(196, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(250, 26),
-          Vec2(340, 90),
-          Vec2(60, 164),
-          Vec2(340, 238),
-          Vec2(60, 316),
-          Vec2(336, 394),
-          Vec2(68, 466),
-          Vec2(204, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(346, 28),
-          Vec2(60, 74),
-          Vec2(60, 136),
-          Vec2(340, 190),
-          Vec2(340, 256),
-          Vec2(60, 312),
-          Vec2(60, 380),
-          Vec2(334, 444),
-          Vec2(214, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 0),
+        _serpentineCenterWeave(goLeftFirst: true),
+        _serpentineCenterWeave(goLeftFirst: false),
+        _serpentineRightStart(sway: 0),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(276, 348), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(124, 348), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(200, 276), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(200, 412), recommendedType: LauncherType.qiAmplifier),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(128, 474), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(282, 162), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 6, pos: Vec2(118, 162), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 7, pos: Vec2(272, 474), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 8, pos: Vec2(200, 108), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 9, pos: Vec2(200, 488), recommendedType: LauncherType.qiAmplifier),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 998), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(210, 910), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(510, 910), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(360, 826), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(214, 746), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(506, 998), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(190, 706), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(530, 706), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 8, pos: Vec2(210, 550), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 9, pos: Vec2(510, 550), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 10, pos: Vec2(360, 590), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 11, pos: Vec2(210, 324), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 12, pos: Vec2(510, 324), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 13, pos: Vec2(360, 178), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.fortressBastion),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(106, 224), radius: 14, sides: 5, rotationSpeedRad: 1.6, restitutionBoost: 1.46),
-        TerrainPillar(center: Vec2(294, 224), radius: 14, sides: 5, rotationSpeedRad: -1.6, restitutionBoost: 1.46),
+        TerrainPillar(center: Vec2(182, 436), radius: 19, sides: 5, rotationSpeedRad: 1.6, restitutionBoost: 1.46),
+        TerrainPillar(center: Vec2(538, 436), radius: 19, sides: 5, rotationSpeedRad: -1.6, restitutionBoost: 1.46),
+        TerrainPillar(center: Vec2(360, 668), radius: 18, sides: 6, rotationSpeedRad: 1.35, restitutionBoost: 1.44),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 325), radius: 27, label: '서쪽 용암 분화구'),
-        CliffZone(center: Vec2(384, 325), radius: 27, label: '동쪽 용암 절벽'),
+        CliffZone(center: Vec2(26, 668), radius: 38, label: '서쪽 용암 분화구'),
+        CliffZone(center: Vec2(694, 668), radius: 38, label: '동쪽 용암 절벽'),
+        CliffZone(center: Vec2(694, 286), radius: 34, label: '북쪽 화구 심연'),
       ],
     ),
     ChapterSpec(
@@ -996,82 +912,43 @@ class CampaignCatalog {
       bossName: '심야에 물든 태초 탄신',
       bossPortraitPrefix: 'tansin',
       storySummary:
-          '구름 위 천상 탄신전! 아홉 굽이 태극 대회랑을 길게 휘돌아 내려오는 1~9장 우두머리 환영을 9연속 정화하고, 마지막 10단계에서 태초 탄신을 구원하라!',
+          '구름 위 광활한 천상 탄신전! 열두 굽이 태극 대회랑 14개 성좌 거점을 개척·장악해 8물결 대공세와 3페이즈 다단 변이 대수괴들을 정밀 파쇄하라!',
       unlockNotice: '열 마을 완전 정화 대단원 귀향 엔딩 · 수호신 칭호 획득',
       surfaceFriction: 0.82,
       stageCount: 10,
-      lanes: const [
-        [
-          Vec2(54, 28),
-          Vec2(342, 72),
-          Vec2(342, 136),
-          Vec2(58, 190),
-          Vec2(58, 256),
-          Vec2(342, 312),
-          Vec2(342, 380),
-          Vec2(64, 444),
-          Vec2(186, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(152, 26),
-          Vec2(58, 90),
-          Vec2(342, 162),
-          Vec2(58, 238),
-          Vec2(342, 314),
-          Vec2(62, 392),
-          Vec2(334, 464),
-          Vec2(196, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(248, 26),
-          Vec2(342, 90),
-          Vec2(58, 162),
-          Vec2(342, 238),
-          Vec2(58, 314),
-          Vec2(338, 392),
-          Vec2(66, 464),
-          Vec2(204, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
-        [
-          Vec2(346, 28),
-          Vec2(58, 72),
-          Vec2(58, 136),
-          Vec2(342, 190),
-          Vec2(342, 256),
-          Vec2(58, 312),
-          Vec2(58, 380),
-          Vec2(336, 444),
-          Vec2(214, 528),
-          centralTowerPos,
-          villageCenter,
-        ],
+      lanes: [
+        _serpentineLeftStart(sway: 0),
+        _serpentineCenterWeave(goLeftFirst: true),
+        _serpentineCenterWeave(goLeftFirst: false),
+        _serpentineRightStart(sway: 0),
       ],
       mounts: const [
-        LauncherMountSlot(slotIndex: 0, pos: Vec2(276, 348), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 1, pos: Vec2(124, 348), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 2, pos: Vec2(200, 276), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 3, pos: Vec2(200, 412), recommendedType: LauncherType.qiAmplifier),
-        LauncherMountSlot(slotIndex: 4, pos: Vec2(128, 474), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 5, pos: Vec2(282, 160), recommendedType: LauncherType.heavy),
-        LauncherMountSlot(slotIndex: 6, pos: Vec2(118, 160), recommendedType: LauncherType.frostField),
-        LauncherMountSlot(slotIndex: 7, pos: Vec2(272, 474), recommendedType: LauncherType.curveSpin),
-        LauncherMountSlot(slotIndex: 8, pos: Vec2(200, 104), recommendedType: LauncherType.rapid),
-        LauncherMountSlot(slotIndex: 9, pos: Vec2(200, 488), recommendedType: LauncherType.qiAmplifier),
+        LauncherMountSlot(slotIndex: 0, pos: Vec2(360, 998), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 1, pos: Vec2(210, 910), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 2, pos: Vec2(510, 910), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 3, pos: Vec2(360, 826), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 4, pos: Vec2(214, 746), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 5, pos: Vec2(506, 998), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 6, pos: Vec2(190, 706), recommendedType: LauncherType.curveSpin, terrainType: MountTerrainType.fortressBastion),
+        LauncherMountSlot(slotIndex: 7, pos: Vec2(530, 706), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 8, pos: Vec2(210, 550), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 9, pos: Vec2(510, 550), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.ambushRidge),
+        LauncherMountSlot(slotIndex: 10, pos: Vec2(360, 590), recommendedType: LauncherType.qiAmplifier, terrainType: MountTerrainType.spiritSpring),
+        LauncherMountSlot(slotIndex: 11, pos: Vec2(210, 324), recommendedType: LauncherType.frostField, terrainType: MountTerrainType.chokeGate),
+        LauncherMountSlot(slotIndex: 12, pos: Vec2(510, 324), recommendedType: LauncherType.heavy, terrainType: MountTerrainType.highWatchtower),
+        LauncherMountSlot(slotIndex: 13, pos: Vec2(360, 178), recommendedType: LauncherType.rapid, terrainType: MountTerrainType.fortressBastion),
       ],
       pillars: const [
-        TerrainPillar(center: Vec2(200, 200), radius: 15, sides: 8, rotationSpeedRad: 1.7, restitutionBoost: 1.50),
-        TerrainPillar(center: Vec2(106, 228), radius: 14, sides: 6, rotationSpeedRad: -1.4, restitutionBoost: 1.45),
-        TerrainPillar(center: Vec2(294, 228), radius: 14, sides: 6, rotationSpeedRad: 1.4, restitutionBoost: 1.45),
+        TerrainPillar(center: Vec2(360, 398), radius: 22, sides: 8, rotationSpeedRad: 1.7, restitutionBoost: 1.50),
+        TerrainPillar(center: Vec2(182, 474), radius: 19, sides: 6, rotationSpeedRad: -1.4, restitutionBoost: 1.45),
+        TerrainPillar(center: Vec2(538, 474), radius: 19, sides: 6, rotationSpeedRad: 1.4, restitutionBoost: 1.45),
+        TerrainPillar(center: Vec2(360, 668), radius: 19, sides: 8, rotationSpeedRad: -1.5, restitutionBoost: 1.48),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(16, 308), radius: 27, label: '천상 운해 낭떠러지'),
-        CliffZone(center: Vec2(384, 308), radius: 27, label: '은하 절벽'),
+        CliffZone(center: Vec2(26, 628), radius: 38, label: '천상 운해 낭떠러지'),
+        CliffZone(center: Vec2(694, 628), radius: 38, label: '은하 절벽'),
+        CliffZone(center: Vec2(26, 286), radius: 34, label: '성좌 허공 해자'),
+        CliffZone(center: Vec2(694, 910), radius: 34, label: '천상 남단 심연'),
       ],
     ),
   ];
@@ -1100,31 +977,31 @@ class CampaignCatalog {
     return null;
   }
 
-  /// 관문이 진행될수록 배치 가능한 길목 초소 장소가 2곳에서 10곳까지 점진적으로 늘어난다!
+  /// 관문이 진행될수록 배치 가능한 광역 지형 초소 장소가 4곳(1-1)에서 최대 14곳(9~10장)까지 점진적으로 늘어난다!
   static int _maxMountCountFor(int ch, int st) {
     switch (ch) {
       case 1:
-        if (st <= 3) return 2;
-        if (st <= 7) return 3;
-        return 4;
+        if (st <= 3) return 4;
+        if (st <= 7) return 5;
+        return 6;
       case 2:
-        return st <= 5 ? 4 : 5;
+        return st <= 5 ? 6 : 7;
       case 3:
-        return st <= 5 ? 5 : 6;
-      case 4:
-        return st <= 6 ? 6 : 7;
-      case 5:
         return st <= 5 ? 7 : 8;
+      case 4:
+        return st <= 6 ? 8 : 9;
+      case 5:
+        return st <= 5 ? 9 : 10;
       case 6:
-        return st <= 6 ? 7 : 8;
+        return st <= 6 ? 10 : 11;
       case 7:
-        return st <= 5 ? 8 : 9;
+        return st <= 5 ? 11 : 12;
       case 8:
-        return st <= 5 ? 8 : 9;
+        return st <= 5 ? 12 : 13;
       case 9:
-        return st <= 6 ? 9 : 10;
+        return st <= 6 ? 13 : 14;
       default:
-        return st <= 4 ? 9 : 10;
+        return st <= 4 ? 13 : 14;
     }
   }
 
@@ -1160,7 +1037,6 @@ class CampaignCatalog {
     for (final ch in chapters) {
       final laneCount = ch.lanes.length;
       if (ch.number == 10) {
-        // 10장은 원작과 동일한 보스 10연전(1~9장 심야 환영 보스 + 10단계 태초 탄신)!
         for (int st = 1; st <= 10; st++) {
           globalIdx++;
           final isFinalGod = st == 10;
@@ -1175,11 +1051,11 @@ class CampaignCatalog {
                   ? '최종 관문 · 오염된 태초 탄신 구원'
                   : '천상 $st관문 · ${refChapter.bossName} 심야 환영',
               subtitle: isFinalGod
-                  ? '태극석의 균열을 메워 열 마을의 논밭과 생명을 되살려라! (초소 $mountCap곳 총동원)'
-                  : '${refChapter.villageName} 우두머리의 심야 환영 결전 · 배치 초소 $mountCap곳 개방',
+                  ? '태극석의 균열을 메워 열 마을의 논밭과 생명을 되살려라! (8물결 · 초소 $mountCap곳)'
+                  : '${refChapter.villageName} 우두머리의 심야 환영 8물결 혈전 · 초소 $mountCap곳 개방',
               tacticalHint: isFinalGod
-                  ? '열 곳의 초소 발판에 내공 증폭기 + 중포·한빙·곡사·속사를 촘촘히 세워 최후의 대군단을 정화하세요!'
-                  : '네 갈래 천상 회랑의 굽이마다 초소를 확장 배치하고 우두머리를 집중 타격하세요!',
+                  ? '14곳 성좌 지형 거점의 마기 암석을 개척하고, 3페이즈 다단 각성하는 태초 탄신의 🎯약점 핵을 정밀 저격해 외각 장갑을 파쇄하세요!'
+                  : '네 갈래 천상 12굽이 회랑의 망루·매복암을 개척하고 3페이즈 우두머리의 🎯노출 약점을 집중 타격하세요!',
               recommendedStone: StoneMaterial.values[(st + 2).clamp(0, 12)],
               recommendedLaunchers: const [
                 LauncherType.qiAmplifier,
@@ -1188,7 +1064,7 @@ class CampaignCatalog {
                 LauncherType.curveSpin,
                 LauncherType.rapid,
               ],
-              startingFieldTokens: 105 + st * 5,
+              startingFieldTokens: 92 + st * 5,
               clearElixirBonus: isFinalGod ? 10 : 4,
               isBossStage: true,
               maxMountCount: mountCap,
@@ -1198,12 +1074,12 @@ class CampaignCatalog {
                       StoryLine(
                         speaker: '무림맹주',
                         portraitPrefix: 'maengju',
-                        text: '여기가 구름 위 천상 탄신전이다! 심야의 독기가 지금까지의 우두머리 환영 아홉을 세워 길을 막고 있구나!',
+                        text: '여기가 구름 위 천상 탄신전이다! 심야의 독기가 열두 굽이 천상 회랑마다 마기 암석과 우두머리 환영을 세워 막고 있구나!',
                       ),
                       StoryLine(
                         speaker: '묵현',
                         portraitPrefix: 'mukhyeon',
-                        text: '아홉에서 열 곳까지 열린 천상 초소들을 빠짐없이 장악하면 반드시 뚫을 수 있다. 가자!',
+                        text: '기력을 아껴 전략 요충지부터 개척하고 약점을 직접 저격해야 뚫을 수 있다. 가자!',
                       ),
                     ]
                   : isFinalGod
@@ -1216,7 +1092,7 @@ class CampaignCatalog {
                           StoryLine(
                             speaker: '촌장',
                             portraitPrefix: 'chonjang',
-                            text: '열 마을 백성들의 염원이 모두 네 수호탑에 모여 있다! 마지막 밤을 밝혀라!',
+                            text: '열 마을 백성들의 염원이 모두 네 수호탑에 모여 있다! 마지막 여덟 물결을 버텨 새벽을 밝혀라!',
                           ),
                         ]
                       : const [],
@@ -1227,7 +1103,7 @@ class CampaignCatalog {
         continue;
       }
 
-      // 1~9장 각 10~12단계 생성
+      // 1~9장 각 10~12단계 생성 (6~8물결 심야 대장정!)
       for (int st = 1; st <= ch.stageCount; st++) {
         globalIdx++;
         final isChapterBoss = st == ch.stageCount;
@@ -1238,33 +1114,40 @@ class CampaignCatalog {
         final rescuePet = _rescueBeastFor(ch.number, st);
         final rescuesMukhyeon = ch.number == 6 && st == 12;
 
+        final waves = _buildNormalChapterWaves(
+          chapter: ch,
+          stage: st,
+          laneCount: laneCount,
+          isChapterBoss: isChapterBoss,
+          isHeukpung: isHeukpungStage,
+          isMukhyeon: isMukhyeonStage,
+          hasRescue: rescueHero != null || rescuePet != null,
+        );
+        final wCnt = waves.length;
+
         String stageTitle;
         String sub;
         if (isChapterBoss) {
           stageTitle = '${ch.number}-$st 결전 · ${ch.bossName}';
-          sub = '${ch.villageName} 최종 심야 방어전 (초소 $mountCap곳)';
+          sub = '${ch.villageName} 최종 $wCnt물결 심야 결전 (초소 $mountCap곳)';
         } else if (isHeukpungStage) {
           stageTitle = '${ch.number}-$st 약탈 저지 · 부두목 흑풍';
-          sub = '식량 수레를 노리는 약탈 선봉장 흑풍 격퇴 (초소 $mountCap곳)';
+          sub = '식량 수레를 노리는 약탈 선봉장 흑풍 $wCnt물결 격퇴 (초소 $mountCap곳)';
         } else if (isMukhyeonStage) {
           stageTitle = '${ch.number}-$st 숙적 조우 · 사형 묵현';
           sub = ch.number == 6
-              ? '독기에 삼켜진 묵현을 정화 탄지로 구원하라! (초소 $mountCap곳)'
-              : '폭주하는 사형 묵현의 야간 기습! (초소 $mountCap곳)';
+              ? '독기에 삼켜진 묵현을 $wCnt물결 정화 탄지로 구원하라! (초소 $mountCap곳)'
+              : '폭주하는 사형 묵현의 $wCnt물결 야간 기습! (초소 $mountCap곳)';
         } else if (rescueHero != null) {
           stageTitle = '${ch.number}-$st 구출 작전 · 동료 ${rescueHero.name}';
-          sub = '고립된 ${rescueHero.title} [${rescueHero.name}] 구출 및 길목 사수! (초소 $mountCap곳)';
+          sub = '고립된 ${rescueHero.title} [${rescueHero.name}] $wCnt물결 구출전! (초소 $mountCap곳)';
         } else if (rescuePet != null) {
           stageTitle = '${ch.number}-$st 영수 구출 · ${rescuePet.name}';
-          sub = '독기 포위망에 갇힌 신비 영수 [${rescuePet.name}] 구원 작전! (초소 $mountCap곳)';
+          sub = '독기 포위망에 갇힌 영수 [${rescuePet.name}] $wCnt물결 구원 작전! (초소 $mountCap곳)';
         } else {
           stageTitle = '${ch.number}-$st 야간 길목 수호 ($st차 밤)';
-          if (st >= 2) {
-            final midKind = _midBossKindFor(ch.number, st);
-            sub = '${ch.villageName} 방어 (초소 $mountCap곳) · 중간보스 [${midKind.name}] 동반 침략!';
-          } else {
-            sub = '${ch.villageName} 산비탈 굽이길 방어 · 배치 초소 $mountCap곳 개방';
-          }
+          final midKind = _midBossKindFor(ch.number, st);
+          sub = '${ch.villageName} 12굽이 $wCnt물결 방어 (초소 $mountCap곳) · 두목 [${midKind.name}] 침략!';
         }
 
         if ((isChapterBoss || isHeukpungStage || isMukhyeonStage) &&
@@ -1288,7 +1171,8 @@ class CampaignCatalog {
             tacticalHint: _hintForStage(ch.number, st, isChapterBoss, isHeukpungStage),
             recommendedStone: recStone,
             recommendedLaunchers: ch.mounts.take(mountCap).map((m) => m.recommendedType).toList(),
-            startingFieldTokens: 48 + (ch.number - 1) * 5,
+            // 초기 군수 기력 긴축 (1장 48⚡: 시작 시 오직 첫 탑 1기만 건설 가능! 이후 적 격살·개척으로 확장!)
+            startingFieldTokens: 48 + (ch.number - 1) * 6,
             clearElixirBonus: isChapterBoss
                 ? 5
                 : ((isHeukpungStage || isMukhyeonStage || rescueHero != null || rescuePet != null) ? 3 : 1),
@@ -1297,14 +1181,7 @@ class CampaignCatalog {
             rescueCompanion: rescueHero,
             rescueBeast: rescuePet,
             alsoRescuesMukhyeon: rescuesMukhyeon,
-            waves: _buildNormalChapterWaves(
-              chapter: ch,
-              stage: st,
-              laneCount: laneCount,
-              isChapterBoss: isChapterBoss,
-              isHeukpung: isHeukpungStage,
-              isMukhyeon: isMukhyeonStage,
-            ),
+            waves: waves,
             introDialogue: _introDialogueFor(ch, st, isChapterBoss, isMukhyeonStage),
             outroDialogue: _outroDialogueFor(ch, st, isChapterBoss, isMukhyeonStage),
           ),
@@ -1377,24 +1254,22 @@ class CampaignCatalog {
 
   static String _hintForStage(int ch, int st, bool boss, bool heukpung) {
     if (boss) {
-      return '제2물결 특화 중간보스에 이어 최종 우두머리가 강림합니다! 내공·한빙 보조와 중포 승급으로 돌파하세요!';
+      return '8물결 최종 결전! 마기 암석을 개척해 요충지를 장악하고, 3페이즈 대수괴의 빛나는 🎯약점 핵을 직접 터치(정밀 저격)해 장갑을 깨뜨리세요!';
     }
     if (heukpung) {
-      return '중간보스 기습 뒤 약탈 선봉 흑풍이 돌격합니다. 중포 탄지기와 석두·영수 방어 조건을 활용하세요!';
+      return '약탈 선봉 흑풍이 7물결 대군과 함께 3페이즈 폭주를 일으킵니다! 전방 매복암을 개척하고 🎯약점을 정밀 타격하세요!';
     }
-    if (st >= 2) {
-      final mid = _midBossKindFor(ch, st);
-      if (mid == MutantKind.swiftShadowBoss) {
-        return '초고속 기습 중간보스 [혈영 질풍귀]가 고속 무리와 동반 침략합니다! 한빙 역장기와 속사 탄지기로 기동력을 꺾으세요!';
-      } else if (mid == MutantKind.ironColossusBoss) {
-        return '난공불락 맷집 중간보스 [현철 중갑거수]가 중갑 무리와 함께 진격합니다! 중포 탄지기와 무거운 수호석으로 장갑을 반관통하세요!';
-      } else {
-        return '파성 강타 중간보스 [적염 파성귀]가 방어막을 노리고 강습합니다! 방어막 접근 전 내공탄과 어기어석으로 집중 타격하세요!';
-      }
+    final mid = _midBossKindFor(ch, st);
+    if (mid == MutantKind.swiftShadowBoss) {
+      return '포탑이 늘어날수록 건설비가 증가합니다! 거점 마기 암석을 신중히 개척하고 2차 재변이 [혈영 질풍귀]의 🎯약점을 저격하세요!';
+    } else if (mid == MutantKind.ironColossusBoss) {
+      return '중간보스 [현철 중갑거수]는 마기 침식과 2차 철갑 재변이를 일으킵니다! 오염된 포탑을 터치해 정화하고 고지 망루 중포로 파쇄하세요!';
+    } else {
+      return '중간보스 [적염 파성귀]의 2차 광폭화 돌파를 막으려면 12굽이 상단 거점을 미리 개척하고 🎯약점 핵을 정밀 연타하세요!';
     }
-    return '속사 탄지기로 독쥐·들개 무리를 빠르게 정리해 현장 증표를 모으고 발사대 버전을 올리세요!';
   }
 
+  /// 6물결(일반) ~ 7물결(구출·중견보스) ~ 8물결(장 보스 대결전)의 진득한 디펜스 공방전 구성!
   static List<List<WaveSpawnGroup>> _buildNormalChapterWaves({
     required ChapterSpec chapter,
     required int stage,
@@ -1402,220 +1277,242 @@ class CampaignCatalog {
     required bool isChapterBoss,
     required bool isHeukpung,
     required bool isMukhyeon,
+    required bool hasRescue,
   }) {
     final ch = chapter.number;
-    final swarmCount = 22 + ch * 3 + stage * 2;
-    final mediumCount = (5 + ch ~/ 2 + stage ~/ 2).clamp(5, 18);
+    final swarmCount = 24 + ch * 4 + stage * 2;
+    final mediumCount = (6 + ch ~/ 2 + stage ~/ 2).clamp(6, 20);
+    final midKind = _midBossKindFor(ch, stage);
+    final midTitle = _midBossCustomTitle(ch, midKind);
+    final secondMidKind = _midBossKindFor(ch + 1, stage + 1);
+    final secondMidTitle = _midBossCustomTitle(ch, secondMidKind);
     final waves = <List<WaveSpawnGroup>>[];
 
-    // 1웨이브: 심야 선봉 대군 쇄도 (약 9.5~11초간 사방 균열문에서 변이 무리가 까맣게 쏟아져 긴장감 형성!)
+    // [1물결] 심야 선봉 강습대 (첫 포탑 1기 축조 판단 및 초기 기력 수급 구간)
     waves.add([
       WaveSpawnGroup(
         kind: MutantKind.swarmRat,
         count: swarmCount,
         laneIndex: 0,
-        intervalSec: (0.40 - ch * 0.010).clamp(0.24, 0.40),
+        intervalSec: (0.42 - ch * 0.010).clamp(0.26, 0.42),
       ),
       WaveSpawnGroup(
         kind: MutantKind.sickHound,
-        count: (swarmCount * 0.62).round().clamp(12, 34),
+        count: (swarmCount * 0.55).round().clamp(11, 30),
         laneIndex: 1 % laneCount,
-        intervalSec: (0.50 - ch * 0.012).clamp(0.32, 0.50),
+        intervalSec: (0.52 - ch * 0.012).clamp(0.34, 0.52),
       ),
       WaveSpawnGroup(
         kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.bloodCocoon,
-        count: (mediumCount - 1).clamp(4, 14),
+        count: (mediumCount - 2).clamp(4, 12),
         laneIndex: 2 % laneCount,
-        intervalSec: 0.96,
+        intervalSec: 0.98,
       ),
     ]);
 
-    // 2웨이브: 중견 대군 기습 — 2단계 이상 모든 스테이지에서 스피드·맷집·공격력 특화 중간보스가 대규모 변이 군단과 동반 침략!
-    if (stage >= 2) {
-      final midKind = _midBossKindFor(ch, stage);
-      final midTitle = _midBossCustomTitle(ch, midKind);
-      final bossLane = (stage + 1) % laneCount;
-
-      if (midKind == MutantKind.swiftShadowBoss) {
-        waves.add([
-          WaveSpawnGroup(
-            kind: MutantKind.sickHound,
-            count: (15 + ch * 2 + stage).clamp(15, 38),
-            laneIndex: stage % laneCount,
-            intervalSec: 0.36,
-          ),
-          WaveSpawnGroup(
-            kind: MutantKind.swarmRat,
-            count: (swarmCount + 6).clamp(24, 52),
-            laneIndex: (stage + 2) % laneCount,
-            intervalSec: 0.28,
-          ),
-          WaveSpawnGroup(
-            kind: ch >= 2 ? MutantKind.ironBoar : MutantKind.bloodCocoon,
-            count: (4 + ch ~/ 2).clamp(4, 12),
-            laneIndex: (stage + 1) % laneCount,
-            intervalSec: 1.05,
-          ),
-          WaveSpawnGroup(
-            kind: MutantKind.swiftShadowBoss,
-            count: 1,
-            laneIndex: bossLane,
-            intervalSec: 1.60,
-            customBossTitle: midTitle,
-          ),
-        ]);
-      } else if (midKind == MutantKind.ironColossusBoss) {
-        waves.add([
-          WaveSpawnGroup(
-            kind: MutantKind.swarmRat,
-            count: (swarmCount + 4).clamp(22, 48),
-            laneIndex: (stage + 1) % laneCount,
-            intervalSec: 0.30,
-          ),
-          WaveSpawnGroup(
-            kind: ch >= 2 ? MutantKind.ironBoar : MutantKind.sickHound,
-            count: (6 + ch ~/ 2 + stage ~/ 3).clamp(6, 16),
-            laneIndex: stage % laneCount,
-            intervalSec: 0.88,
-          ),
-          WaveSpawnGroup(
-            kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.bloodCocoon,
-            count: (7 + ch ~/ 2).clamp(7, 16),
-            laneIndex: (stage + 2) % laneCount,
-            intervalSec: 0.84,
-          ),
-          WaveSpawnGroup(
-            kind: MutantKind.ironColossusBoss,
-            count: 1,
-            laneIndex: bossLane,
-            intervalSec: 1.75,
-            customBossTitle: midTitle,
-          ),
-        ]);
-      } else {
-        waves.add([
-          WaveSpawnGroup(
-            kind: MutantKind.swarmRat,
-            count: (swarmCount + 4).clamp(22, 48),
-            laneIndex: (stage + 1) % laneCount,
-            intervalSec: 0.30,
-          ),
-          WaveSpawnGroup(
-            kind: ch >= 3 ? MutantKind.bloodCocoon : MutantKind.sickHound,
-            count: (10 + ch + stage ~/ 3).clamp(10, 24),
-            laneIndex: stage % laneCount,
-            intervalSec: 0.62,
-          ),
-          WaveSpawnGroup(
-            kind: ch >= 2 ? MutantKind.plagueToad : MutantKind.ironBoar,
-            count: (5 + ch ~/ 2).clamp(5, 14),
-            laneIndex: (stage + 2) % laneCount,
-            intervalSec: 0.94,
-          ),
-          WaveSpawnGroup(
-            kind: MutantKind.crimsonBreakerBoss,
-            count: 1,
-            laneIndex: bossLane,
-            intervalSec: 1.65,
-            customBossTitle: midTitle,
-          ),
-        ]);
-      }
-    } else {
-      waves.add([
-        WaveSpawnGroup(
-          kind: MutantKind.swarmRat,
-          count: swarmCount + 6,
-          laneIndex: ((stage + 1) % laneCount),
-          intervalSec: 0.32,
-        ),
-        WaveSpawnGroup(
-          kind: MutantKind.sickHound,
-          count: (14 + ch * 2).clamp(14, 32),
-          laneIndex: (stage % laneCount),
-          intervalSec: 0.46,
-        ),
-        WaveSpawnGroup(
-          kind: MutantKind.ironBoar,
-          count: (4 + ch ~/ 3).clamp(4, 9),
-          laneIndex: 1 % laneCount,
-          intervalSec: 1.18,
-        ),
-      ]);
-    }
-
-    // 3웨이브: 다방면 포위 압박 총쇄도!
-    final thirdWave = <WaveSpawnGroup>[
+    // [2물결] 기동 양동 돌격대 + (2단계 이상) 1차 2단 변이 중간보스 조기 침략! (초반부터 팽팽한 긴장감 부여!)
+    waves.add([
       WaveSpawnGroup(
         kind: MutantKind.swarmRat,
-        count: (swarmCount + 8).clamp(26, 56),
-        laneIndex: ((stage + 2) % laneCount),
-        intervalSec: (0.30 - ch * 0.008).clamp(0.20, 0.30),
+        count: (swarmCount + 4).clamp(24, 48),
+        laneIndex: (stage + 1) % laneCount,
+        intervalSec: (0.36 - ch * 0.009).clamp(0.22, 0.36),
       ),
       WaveSpawnGroup(
         kind: MutantKind.sickHound,
-        count: (13 + ch * 2 + stage ~/ 2).clamp(14, 36),
-        laneIndex: ((stage + 1) % laneCount),
-        intervalSec: 0.42,
-      ),
-      WaveSpawnGroup(
-        kind: ch >= 3 ? MutantKind.plagueToad : MutantKind.bloodCocoon,
-        count: (5 + ch ~/ 2).clamp(5, 14),
-        laneIndex: (stage % laneCount),
-        intervalSec: 0.92,
-      ),
-      if (ch >= 2)
-        WaveSpawnGroup(
-          kind: MutantKind.shieldYacha,
-          count: (5 + ch ~/ 2).clamp(5, 14),
-          laneIndex: (laneCount - 1),
-          intervalSec: 0.88,
-        ),
-    ];
-    if (ch >= 6 && stage >= 4) {
-      final secondMid = _midBossKindFor(ch + 1, stage + 1);
-      thirdWave.add(
-        WaveSpawnGroup(
-          kind: secondMid,
-          count: 1,
-          laneIndex: (stage + 2) % laneCount,
-          intervalSec: 1.70,
-          customBossTitle: _midBossCustomTitle(ch, secondMid),
-        ),
-      );
-    }
-    waves.add(thirdWave);
-
-    // 4웨이브: 심야 대군 클라이맥스 총공세 + 최종 우두머리 강림!
-    final fourthWave = <WaveSpawnGroup>[
-      WaveSpawnGroup(
-        kind: MutantKind.swarmRat,
-        count: (swarmCount + 12).clamp(30, 64),
-        laneIndex: (stage % laneCount),
-        intervalSec: (0.28 - ch * 0.008).clamp(0.18, 0.28),
-      ),
-      WaveSpawnGroup(
-        kind: ch >= 4 ? MutantKind.bloodCocoon : MutantKind.sickHound,
-        count: (13 + ch * 2).clamp(14, 32),
-        laneIndex: 1 % laneCount,
-        intervalSec: 0.46,
+        count: (14 + ch * 2).clamp(14, 34),
+        laneIndex: stage % laneCount,
+        intervalSec: 0.44,
       ),
       WaveSpawnGroup(
         kind: MutantKind.ironBoar,
-        count: (4 + ch ~/ 2 + stage ~/ 4).clamp(4, 14),
-        laneIndex: 0,
-        intervalSec: 0.98,
+        count: (4 + ch ~/ 2).clamp(4, 11),
+        laneIndex: (stage + 2) % laneCount,
+        intervalSec: 1.05,
+      ),
+      if (stage >= 2)
+        WaveSpawnGroup(
+          kind: midKind,
+          count: 1,
+          laneIndex: (stage + 1) % laneCount,
+          intervalSec: 1.65,
+          customBossTitle: midTitle,
+        ),
+    ]);
+
+    // [3물결] 중견 돌파군 (전방 마기 암석 거점 개척 필수 구간)
+    waves.add([
+      WaveSpawnGroup(
+        kind: MutantKind.swarmRat,
+        count: (swarmCount + 6).clamp(26, 52),
+        laneIndex: stage % laneCount,
+        intervalSec: 0.31,
       ),
       WaveSpawnGroup(
-        kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.plagueToad,
+        kind: ch >= 3 ? MutantKind.plagueToad : MutantKind.bloodCocoon,
+        count: (7 + ch + stage ~/ 3).clamp(7, 18),
+        laneIndex: (stage + 1) % laneCount,
+        intervalSec: 0.78,
+      ),
+      WaveSpawnGroup(
+        kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.ironBoar,
         count: (5 + ch ~/ 2).clamp(5, 14),
         laneIndex: (laneCount - 1),
         intervalSec: 0.88,
       ),
+    ]);
+
+    // [4물결] 다차선 중갑·자폭 포위 압박군
+    waves.add([
+      WaveSpawnGroup(
+        kind: MutantKind.sickHound,
+        count: (16 + ch * 2 + stage ~/ 2).clamp(16, 38),
+        laneIndex: (stage + 2) % laneCount,
+        intervalSec: 0.38,
+      ),
+      WaveSpawnGroup(
+        kind: MutantKind.bloodCocoon,
+        count: (8 + ch + stage ~/ 2).clamp(8, 22),
+        laneIndex: 0,
+        intervalSec: 0.72,
+      ),
+      WaveSpawnGroup(
+        kind: MutantKind.ironBoar,
+        count: (5 + ch ~/ 2 + stage ~/ 3).clamp(5, 14),
+        laneIndex: 1 % laneCount,
+        intervalSec: 0.94,
+      ),
+      if (ch >= 2)
+        WaveSpawnGroup(
+          kind: MutantKind.plagueToad,
+          count: (4 + ch ~/ 2).clamp(4, 12),
+          laneIndex: (laneCount - 1),
+          intervalSec: 0.96,
+        ),
+    ]);
+
+    // [5물결] 심야 정예 파성 군단 (고단계 포탑 승급 및 진법 시너지 시험대)
+    waves.add([
+      WaveSpawnGroup(
+        kind: MutantKind.swarmRat,
+        count: (swarmCount + 10).clamp(30, 58),
+        laneIndex: (stage + 1) % laneCount,
+        intervalSec: (0.28 - ch * 0.008).clamp(0.19, 0.28),
+      ),
+      WaveSpawnGroup(
+        kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.sickHound,
+        count: (8 + ch + stage ~/ 3).clamp(8, 20),
+        laneIndex: stage % laneCount,
+        intervalSec: 0.76,
+      ),
+      WaveSpawnGroup(
+        kind: MutantKind.ironBoar,
+        count: (6 + ch ~/ 2).clamp(6, 15),
+        laneIndex: (stage + 2) % laneCount,
+        intervalSec: 0.90,
+      ),
+      if (ch >= 4 && stage >= 3)
+        WaveSpawnGroup(
+          kind: secondMidKind,
+          count: 1,
+          laneIndex: stage % laneCount,
+          intervalSec: 1.70,
+          customBossTitle: secondMidTitle,
+        ),
+    ]);
+
+    // 구출전·중견보스전·장 결전은 7~8물결까지 이어지는 대혈전으로 확장!
+    if (hasRescue || isHeukpung || isMukhyeon || isChapterBoss) {
+      waves.add([
+        WaveSpawnGroup(
+          kind: MutantKind.swarmRat,
+          count: (swarmCount + 12).clamp(32, 62),
+          laneIndex: 0,
+          intervalSec: 0.24,
+        ),
+        WaveSpawnGroup(
+          kind: MutantKind.plagueToad,
+          count: (6 + ch ~/ 2).clamp(6, 15),
+          laneIndex: 1 % laneCount,
+          intervalSec: 0.84,
+        ),
+        WaveSpawnGroup(
+          kind: MutantKind.bloodCocoon,
+          count: (9 + ch).clamp(9, 22),
+          laneIndex: (laneCount - 1),
+          intervalSec: 0.68,
+        ),
+        WaveSpawnGroup(
+          kind: secondMidKind,
+          count: 1,
+          laneIndex: (stage + 2) % laneCount,
+          intervalSec: 1.65,
+          customBossTitle: secondMidTitle,
+        ),
+      ]);
+    }
+
+    if (isChapterBoss) {
+      // 장 최종 보스전 전용 [7물결] 친위 호위군 총돌격!
+      waves.add([
+        WaveSpawnGroup(
+          kind: MutantKind.sickHound,
+          count: (20 + ch * 2).clamp(22, 42),
+          laneIndex: 1 % laneCount,
+          intervalSec: 0.32,
+        ),
+        WaveSpawnGroup(
+          kind: MutantKind.shieldYacha,
+          count: (8 + ch ~/ 2).clamp(8, 16),
+          laneIndex: 0,
+          intervalSec: 0.78,
+        ),
+        WaveSpawnGroup(
+          kind: MutantKind.ironBoar,
+          count: (7 + ch ~/ 2).clamp(7, 15),
+          laneIndex: (laneCount - 1),
+          intervalSec: 0.86,
+        ),
+        WaveSpawnGroup(
+          kind: midKind,
+          count: 1,
+          laneIndex: laneCount ~/ 2,
+          intervalSec: 1.60,
+          customBossTitle: midTitle,
+        ),
+      ]);
+    }
+
+    // [최종 클라이맥스 물결 (6 / 7 / 8물결)]: 심야 총공세 + 우두머리(또는 1-1 포함 2단 재변이 선봉 두목) 강림!
+    final finaleWave = <WaveSpawnGroup>[
+      WaveSpawnGroup(
+        kind: MutantKind.swarmRat,
+        count: (swarmCount + 14).clamp(32, 66),
+        laneIndex: (stage % laneCount),
+        intervalSec: (0.26 - ch * 0.008).clamp(0.17, 0.26),
+      ),
+      WaveSpawnGroup(
+        kind: ch >= 4 ? MutantKind.bloodCocoon : MutantKind.sickHound,
+        count: (14 + ch * 2).clamp(15, 34),
+        laneIndex: 1 % laneCount,
+        intervalSec: 0.44,
+      ),
+      WaveSpawnGroup(
+        kind: MutantKind.ironBoar,
+        count: (5 + ch ~/ 2 + stage ~/ 4).clamp(5, 15),
+        laneIndex: 0,
+        intervalSec: 0.94,
+      ),
+      WaveSpawnGroup(
+        kind: ch >= 2 ? MutantKind.shieldYacha : MutantKind.plagueToad,
+        count: (5 + ch ~/ 2).clamp(5, 15),
+        laneIndex: (laneCount - 1),
+        intervalSec: 0.86,
+      ),
     ];
 
     if (isHeukpung) {
-      fourthWave.add(
+      finaleWave.add(
         WaveSpawnGroup(
           kind: MutantKind.raiderHeukpung,
           count: 1,
@@ -1626,7 +1523,7 @@ class CampaignCatalog {
         ),
       );
     } else if (isMukhyeon) {
-      fourthWave.add(
+      finaleWave.add(
         WaveSpawnGroup(
           kind: MutantKind.rivalMukhyeon,
           count: 1,
@@ -1637,7 +1534,7 @@ class CampaignCatalog {
         ),
       );
     } else if (isChapterBoss) {
-      fourthWave.add(
+      finaleWave.add(
         WaveSpawnGroup(
           kind: MutantKind.chapterOverlord,
           count: 1,
@@ -1647,12 +1544,27 @@ class CampaignCatalog {
           customPortrait: chapter.bossPortraitPrefix,
         ),
       );
+    } else {
+      // 일반 관문(1-1 포함!)의 마지막 물결에도 반드시 2단 재변이 특화 두목이 지휘관으로 출전해 쫄깃한 마무리 승부 선사!
+      finaleWave.add(
+        WaveSpawnGroup(
+          kind: stage == 1 ? MutantKind.swiftShadowBoss : secondMidKind,
+          count: 1,
+          laneIndex: laneCount ~/ 2,
+          intervalSec: 1.75,
+          customBossTitle: _midBossCustomTitle(
+            ch,
+            stage == 1 ? MutantKind.swiftShadowBoss : secondMidKind,
+          ),
+        ),
+      );
     }
 
-    waves.add(fourthWave);
+    waves.add(finaleWave);
     return waves;
   }
 
+  /// 제10장 보스 10연전 — 전 관문 8물결 천상 총결전!
   static List<List<WaveSpawnGroup>> _buildChapter10BossWaves(
     int stage,
     int laneCount,
@@ -1661,101 +1573,65 @@ class CampaignCatalog {
     final isFinal = stage == 10;
     final vanguardMidBoss = _midBossKindFor(10, stage);
     final secondMidBoss = _midBossKindFor(10, stage + 1);
+    final thirdMidBoss = _midBossKindFor(10, stage + 2);
     return [
       [
-        WaveSpawnGroup(
-          kind: MutantKind.swarmRat,
-          count: 38 + stage * 2,
-          laneIndex: (stage + 1) % laneCount,
-          intervalSec: 0.28,
-        ),
-        WaveSpawnGroup(
-          kind: MutantKind.sickHound,
-          count: 22 + stage,
-          laneIndex: 0,
-          intervalSec: 0.38,
-        ),
-        WaveSpawnGroup(
-          kind: MutantKind.shieldYacha,
-          count: 9 + stage ~/ 2,
-          laneIndex: laneCount - 1,
-          intervalSec: 0.85,
-        ),
-        if (stage >= 2)
-          WaveSpawnGroup(
-            kind: vanguardMidBoss,
-            count: 1,
-            laneIndex: stage % laneCount,
-            intervalSec: 1.60,
-            customBossTitle: _midBossCustomTitle(10, vanguardMidBoss),
-          ),
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 36 + stage * 2, laneIndex: 0, intervalSec: 0.28),
+        WaveSpawnGroup(kind: MutantKind.sickHound, count: 20 + stage, laneIndex: 1 % laneCount, intervalSec: 0.38),
+        WaveSpawnGroup(kind: MutantKind.shieldYacha, count: 8 + stage ~/ 2, laneIndex: laneCount - 1, intervalSec: 0.86),
       ],
       [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 40 + stage * 2, laneIndex: (stage + 1) % laneCount, intervalSec: 0.26),
+        WaveSpawnGroup(kind: MutantKind.ironBoar, count: 8 + stage ~/ 2, laneIndex: 2 % laneCount, intervalSec: 0.94),
         WaveSpawnGroup(
-          kind: MutantKind.swarmRat,
-          count: 42 + stage * 2,
+          kind: vanguardMidBoss,
+          count: 1,
           laneIndex: stage % laneCount,
-          intervalSec: 0.26,
+          intervalSec: 1.60,
+          customBossTitle: _midBossCustomTitle(10, vanguardMidBoss),
         ),
-        WaveSpawnGroup(
-          kind: MutantKind.bloodCocoon,
-          count: 13 + stage ~/ 2,
-          laneIndex: 3 % laneCount,
-          intervalSec: 0.72,
-        ),
-        WaveSpawnGroup(
-          kind: MutantKind.ironBoar,
-          count: 8 + stage ~/ 2,
-          laneIndex: 1 % laneCount,
-          intervalSec: 0.96,
-        ),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.sickHound, count: 24 + stage, laneIndex: 0, intervalSec: 0.36),
+        WaveSpawnGroup(kind: MutantKind.bloodCocoon, count: 12 + stage ~/ 2, laneIndex: 3 % laneCount, intervalSec: 0.72),
+        WaveSpawnGroup(kind: MutantKind.plagueToad, count: 8 + stage ~/ 2, laneIndex: 1 % laneCount, intervalSec: 0.90),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 44 + stage * 2, laneIndex: stage % laneCount, intervalSec: 0.24),
+        WaveSpawnGroup(kind: MutantKind.shieldYacha, count: 10 + stage ~/ 2, laneIndex: 2 % laneCount, intervalSec: 0.82),
         WaveSpawnGroup(
           kind: secondMidBoss,
           count: 1,
           laneIndex: (stage + 2) % laneCount,
-          intervalSec: 1.70,
+          intervalSec: 1.65,
           customBossTitle: _midBossCustomTitle(10, secondMidBoss),
         ),
       ],
       [
+        WaveSpawnGroup(kind: MutantKind.sickHound, count: 26 + stage, laneIndex: (stage + 1) % laneCount, intervalSec: 0.34),
+        WaveSpawnGroup(kind: MutantKind.ironBoar, count: 9 + stage ~/ 2, laneIndex: 0, intervalSec: 0.88),
+        WaveSpawnGroup(kind: MutantKind.bloodCocoon, count: 13 + stage ~/ 2, laneIndex: laneCount - 1, intervalSec: 0.68),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 46 + stage * 2, laneIndex: 3 % laneCount, intervalSec: 0.23),
+        WaveSpawnGroup(kind: MutantKind.plagueToad, count: 9 + stage ~/ 2, laneIndex: 1 % laneCount, intervalSec: 0.86),
         WaveSpawnGroup(
-          kind: MutantKind.swarmRat,
-          count: 44 + stage * 2,
-          laneIndex: (stage + 3) % laneCount,
-          intervalSec: 0.24,
-        ),
-        WaveSpawnGroup(
-          kind: MutantKind.sickHound,
-          count: 22 + stage,
-          laneIndex: 2 % laneCount,
-          intervalSec: 0.38,
-        ),
-        WaveSpawnGroup(
-          kind: MutantKind.shieldYacha,
-          count: 9 + stage ~/ 2,
-          laneIndex: 0,
-          intervalSec: 0.82,
+          kind: thirdMidBoss,
+          count: 1,
+          laneIndex: (stage + 1) % laneCount,
+          intervalSec: 1.60,
+          customBossTitle: _midBossCustomTitle(10, thirdMidBoss),
         ),
       ],
       [
-        WaveSpawnGroup(
-          kind: MutantKind.swarmRat,
-          count: 48 + stage * 2,
-          laneIndex: (stage + 2) % laneCount,
-          intervalSec: 0.22,
-        ),
-        WaveSpawnGroup(
-          kind: MutantKind.ironBoar,
-          count: 9 + stage ~/ 2,
-          laneIndex: 1 % laneCount,
-          intervalSec: 0.92,
-        ),
-        WaveSpawnGroup(
-          kind: MutantKind.plagueToad,
-          count: 8 + stage ~/ 2,
-          laneIndex: 2 % laneCount,
-          intervalSec: 0.96,
-        ),
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 48 + stage * 2, laneIndex: 0, intervalSec: 0.22),
+        WaveSpawnGroup(kind: MutantKind.shieldYacha, count: 11 + stage ~/ 2, laneIndex: 1 % laneCount, intervalSec: 0.78),
+        WaveSpawnGroup(kind: MutantKind.ironBoar, count: 10 + stage ~/ 2, laneIndex: 2 % laneCount, intervalSec: 0.84),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 52 + stage * 2, laneIndex: (stage + 2) % laneCount, intervalSec: 0.20),
+        WaveSpawnGroup(kind: MutantKind.ironBoar, count: 10 + stage ~/ 2, laneIndex: 1 % laneCount, intervalSec: 0.88),
+        WaveSpawnGroup(kind: MutantKind.plagueToad, count: 9 + stage ~/ 2, laneIndex: 2 % laneCount, intervalSec: 0.92),
         WaveSpawnGroup(
           kind: MutantKind.chapterOverlord,
           count: 1,
@@ -1779,17 +1655,12 @@ class CampaignCatalog {
         StoryLine(
           speaker: '촌장',
           portraitPrefix: 'chonjang',
-          text: '큰일이구나! 하늘의 태극석에 금이 가면서 산짐승들이 심야 돌연변이가 되어 마을로 몰려오고 있다!',
-        ),
-        StoryLine(
-          speaker: '촌장',
-          portraitPrefix: 'chonjang',
-          text: '점령당한 이웃 마을은 식량이 썩고 농작물도 못 자라며 가축마저 병들어 결국 다들 고향을 떠났단다….',
+          text: '큰일이구나! 하늘의 태극석에 금이 가면서 산짐승들이 심야 돌연변이가 되어 열두 굽이 산비탈로 몰려오고 있다!',
         ),
         StoryLine(
           speaker: '석두',
           portraitPrefix: 'seokdu',
-          text: '본진 수호탑만으로는 밀려오는 대군을 절대 막을 수 없습니다! 초기 군수 기력(⚡)으로 먼저 첫 초소를 세우고, 변이를 잡아 모은 기력 구슬과 돌파 비급으로 방어선을 확장합시다!',
+          text: '초기 군수 기력(48⚡)으로는 단 1기의 초소만 먼저 세울 수 있습니다! 포탑이 늘수록 보급비가 오르고 전방 거점은 마기 암석을 개척해야 하니 신중히 지휘하십시오!',
         ),
       ];
     }
@@ -1816,7 +1687,7 @@ class CampaignCatalog {
         StoryLine(
           speaker: '연비',
           portraitPrefix: 'yeonbi',
-          text: '밤안개가 가장 짙어졌어요! ${ch.bossName}의 거대한 독기가 길목 끝에서 다가옵니다!',
+          text: '밤안개가 가장 짙어졌어요! ${ch.bossName}의 8물결 본대가 열두 굽이 끝에서 다가옵니다!',
         ),
       ];
     }

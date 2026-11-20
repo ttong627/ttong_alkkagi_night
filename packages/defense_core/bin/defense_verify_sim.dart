@@ -49,7 +49,7 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
     preset.primaryShape = ch >= 4 ? StoneShape.sphere : StoneShape.round;
     preset.sectTechnique = ch % 2 == 0 ? SectTechnique.ironFist : SectTechnique.swordQi;
     preset.mountTypes = chapterSpec.mounts.map((m) => m.recommendedType).toList();
-    while (preset.mountTypes.length < 10) {
+    while (preset.mountTypes.length < 14) {
       preset.mountTypes.add(LauncherType.rapid);
     }
     preset.equippedBeast = beast;
@@ -82,7 +82,7 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
       p.coreStatLevels[cs] = 0;
     }
     preset.primaryStone = StoneMaterial.cheongok;
-    preset.mountTypes = List.filled(10, LauncherType.frostField);
+    preset.mountTypes = List.filled(14, LauncherType.frostField);
     preset.companions = [CompanionHero.seokdu];
     p.companionLevels[CompanionHero.seokdu] = 1;
     preset.autoUpgradeInBattle = false;
@@ -97,6 +97,7 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
   required PlayerProgress progress,
   required int seed,
   bool autoBuildPads = true,
+  bool autoPrecision = true,
 }) {
   final sim = DefenseBattleSim(
     stage: stage,
@@ -107,10 +108,10 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
     allowSupportTokens: false,
     allowSerendipity: false,
     autoBuildForSimVerify: autoBuildPads,
-  );
+  )..autoPrecisionForVerify = autoPrecision;
 
-  const dt = 1.0 / 30.0; // 헤드리스 고속 물리 스텝 (최대 240초 전장)
-  final maxSteps = (240.0 / dt).round();
+  const dt = 1.0 / 30.0; // 헤드리스 고속 물리 스텝 (720×1360 12굽이 6~8물결 대장정 최대 420초)
+  final maxSteps = (420.0 / dt).round();
   for (int i = 0; i < maxSteps && !sim.isFinished; i++) {
     sim.step(dt);
   }
@@ -122,11 +123,11 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
 }
 
 void main(List<String> args) {
-  final trialsPerStage = args.contains('--full200') ? 200 : 30;
+  final trialsPerStage = args.contains('--full200') ? 200 : 20;
   final buf = StringBuffer();
   buf.writeln('====================================================================');
-  buf.writeln('《수호알까기 · 탄지무림 심야기습》 전 10장(111단계) 순차 배치·지속시간·밸런스 검증 성적표');
-  buf.writeln('조건: 초기 길목 무배치(0기) → 빈 초소(2~10곳) 순차 건설 · 지원패 0회 · 기연 0% · 단계당 $trialsPerStage판');
+  buf.writeln('《수호알까기 · 탄지무림 심야기습》 전 10장(111단계) 12굽이 천리협곡 · 거점개척 · 6~8물결 진검 검증 성적표');
+  buf.writeln('조건: 720×1360 12굽이(3,900px+) · 마기암석 개척 & 체증건설비 · 6~8물결 · 두목 2단 & 대수괴 3페이즈 · 지원패 0회 · 기연 0% · 단계당 $trialsPerStage판');
   buf.writeln('====================================================================');
 
   int passedStages = 0;
@@ -215,8 +216,8 @@ void main(List<String> args) {
       chNightmareSum += nightmareRate;
       chDurationSum += stAvgElapsed / trialsPerStage;
 
-      final durationOk = stMinElapsed >= 32.0;
-      final ok = easyRate >= 85.0 && normalRate >= 65.0 && durationOk;
+      final durationOk = stMinElapsed >= 70.0;
+      final ok = easyRate >= 80.0 && normalRate >= 60.0 && durationOk;
       if (ok) {
         passedStages++;
       } else {
@@ -291,6 +292,26 @@ void main(List<String> args) {
   final goodRate = goodWins / trialsPerStage * 100.0;
   final delta = goodRate - badRate;
 
+  // 2-B) 초반 1-1(보통) 대충 플레이(포탑 1기만 세우고 추가 개척·승급 방치) 대조군 검증!
+  int lazyOneTowerWins = 0;
+  for (int t = 0; t < trialsPerStage; t++) {
+    final lazySim = DefenseBattleSim(
+      stage: CampaignCatalog.stageAt(1, 1),
+      difficulty: DefenseDifficulty.normal,
+      progress: PlayerProgress(),
+      seed: 5500 + t,
+      allowSupportTokens: false,
+      allowSerendipity: false,
+    )..autoPrecisionForVerify = false;
+    lazySim.placeLauncherInBattle(0, LauncherType.rapid);
+    const dt = 1.0 / 30.0;
+    for (int i = 0; i < (420.0 / dt).round() && !lazySim.isFinished; i++) {
+      lazySim.step(dt);
+    }
+    if (lazySim.isVictory) lazyOneTowerWins++;
+  }
+  final lazyOneTowerRate = lazyOneTowerWins / trialsPerStage * 100.0;
+
   buf.writeln('--------------------------------------------------------------------');
   buf.writeln(
     '무개입 방치 클리어 차단 검증(1-1 쉬움 포함 전 111단계 초소 0개 방치 시): '
@@ -298,7 +319,11 @@ void main(List<String> args) {
     '(${idleAccidentalWins == 0 ? "무개입 시 0.0% 전패 완벽 입증!" : "방치 클리어 발생: ${idleWinStages.join(", ")}"})',
   );
   buf.writeln(
-    '최단 전투 지속시간(쉬운 1-1 포함 전 구간 30초 이상 보장 검증): '
+    '초반 1-1(보통) 포탑 1기만 짓고 방치 시 승률(싱거운 프리패스 차단 검증): '
+    '${lazyOneTowerRate.toStringAsFixed(1)}% (${lazyOneTowerRate <= 15.0 ? "대충 1기만 지으면 함락됨 입증!" : "난이도 추가 상향 필요"})',
+  );
+  buf.writeln(
+    '최단 전투 지속시간(전 구간 70초 이상 진득한 6~8물결 호흡 검증): '
     '${minWinDurationSec.toStringAsFixed(1)}초 [$minWinDurationCode]',
   );
   buf.writeln(
