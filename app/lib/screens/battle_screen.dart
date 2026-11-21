@@ -49,7 +49,8 @@ class _BattleScreenState extends State<BattleScreen>
   double _livePadMenuTimer = 0.0;
   static const double _livePadMenuDuration = 4.8;
 
-  /// 전장을 멈추지 않는 상단 실시간 전령 대사 토스트 (4.5초 뒤 자동 소멸!).
+  /// 전장을 멈추지 않는 상단 실시간 전령·동료·보스 순차 대사 큐 (한 줄당 3.9초 뒤 자동 전환!).
+  final List<StoryLine> _storyQueue = [];
   StoryLine? _liveStoryLine;
   double _liveStoryTimer = 0.0;
 
@@ -97,9 +98,11 @@ class _BattleScreenState extends State<BattleScreen>
     _panStartArenaPos = null;
     _selectedSlotIndex = null;
     _livePadMenuTimer = 0.0;
+    _storyQueue.clear();
     if (showIntroToast && widget.stage.introDialogue.isNotEmpty) {
-      _liveStoryLine = widget.stage.introDialogue.last;
-      _liveStoryTimer = 4.8;
+      _storyQueue.addAll(widget.stage.introDialogue);
+      _liveStoryLine = _storyQueue.removeAt(0);
+      _liveStoryTimer = 3.9;
     } else {
       _liveStoryLine = null;
       _liveStoryTimer = 0.0;
@@ -122,11 +125,19 @@ class _BattleScreenState extends State<BattleScreen>
         _selectedSlotIndex = null;
       }
     }
+    if (_sim.pendingStoryLines.isNotEmpty) {
+      _storyQueue.addAll(_sim.pendingStoryLines);
+      _sim.pendingStoryLines.clear();
+    }
     if (_liveStoryTimer > 0) {
       _liveStoryTimer = max(0.0, _liveStoryTimer - rawDt);
       if (_liveStoryTimer <= 0) {
         _liveStoryLine = null;
       }
+    }
+    if (_liveStoryLine == null && _storyQueue.isNotEmpty && !_sim.isFinished) {
+      _liveStoryLine = _storyQueue.removeAt(0);
+      _liveStoryTimer = 3.9;
     }
 
     // 수동 탄지 모드에서 손가락을 누르고 조준 중이면 장전될 때마다 자동 연속 산탄 발사!
@@ -318,6 +329,50 @@ class _BattleScreenState extends State<BattleScreen>
                         ),
                       ),
                     ),
+                  if (summary.victory &&
+                      widget.stage.chapterNumber == 10 &&
+                      widget.stage.stageNumber == 10) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF3D2706), Color(0xFF1A3A34)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: NightPalette.accentGold,
+                          width: 2.0,
+                        ),
+                      ),
+                      child: const Column(
+                        children: [
+                          Text(
+                            '🏆 열 마을 완전 정화 · 태극석 귀향 대단원 달성!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'BlackHanSans',
+                              fontSize: 16.5,
+                              color: NightPalette.accentGold,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            '오염된 태초 탄신의 삼중 마갑을 깨뜨리고 강호 열 마을의 평화를 되찾았습니다! 이제 100물결 무한 혈전에서 진법의 극한에 도전해보세요.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: NightPalette.textPrimary,
+                              height: 1.38,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (summary.victory && rescueBanner != null) ...[
                     const SizedBox(height: 10),
                     MurimCard(
@@ -360,6 +415,90 @@ class _BattleScreenState extends State<BattleScreen>
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (summary.victory &&
+                      widget.stage.outroDialogue.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      key: const Key('victory_outro_story_card'),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF6EBD2),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: NightPalette.accentGold,
+                          width: 1.6,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '📜 새벽 정화 무림 서사록',
+                            style: TextStyle(
+                              fontFamily: 'BlackHanSans',
+                              fontSize: 15.5,
+                              color: Color(0xFF1B2538),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          for (int sIdx = 0;
+                              sIdx < widget.stage.outroDialogue.length;
+                              sIdx++) ...[
+                            if (sIdx > 0)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 6),
+                                child: Divider(
+                                  height: 1,
+                                  color: Color(0x281B2538),
+                                ),
+                              ),
+                            Builder(
+                              builder: (_) {
+                                final line = widget.stage.outroDialogue[sIdx];
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    NightSpriteIcon(
+                                      assetPath: NightArtRegistry.charFace(
+                                        line.portraitPrefix,
+                                      ),
+                                      fallbackIcon: Icons.person_rounded,
+                                      size: 34,
+                                      borderRadius: 17,
+                                      showFrame: true,
+                                      frameColor: const Color(0xFF2D3C59),
+                                    ),
+                                    const SizedBox(width: 9),
+                                    Expanded(
+                                      child: RichText(
+                                        text: TextSpan(
+                                          style: const TextStyle(
+                                            fontSize: 12.8,
+                                            height: 1.42,
+                                            color: Color(0xFF222E45),
+                                          ),
+                                          children: [
+                                            TextSpan(
+                                              text: '${line.speaker}: ',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF14213D),
+                                              ),
+                                            ),
+                                            TextSpan(text: line.text),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -559,13 +698,20 @@ class _BattleScreenState extends State<BattleScreen>
                                   ),
                                 ),
                               );
+                            } else if (summary.victory &&
+                                widget.stage.chapterNumber == 10 &&
+                                widget.stage.stageNumber == 10) {
+                              Navigator.of(context).pop();
                             } else {
                               setState(_startNewSim);
                             }
                           },
                           icon: Icon(
                             summary.victory
-                                ? Icons.skip_next_rounded
+                                ? (widget.stage.chapterNumber == 10 &&
+                                        widget.stage.stageNumber == 10
+                                    ? Icons.emoji_events_rounded
+                                    : Icons.skip_next_rounded)
                                 : Icons.refresh_rounded,
                           ),
                           label: Text(
@@ -573,7 +719,11 @@ class _BattleScreenState extends State<BattleScreen>
                                     widget.stage.globalIndex <
                                         CampaignCatalog.allStages.length
                                 ? '다음 수호 차례 진군'
-                                : '다시 도전하기',
+                                : (summary.victory &&
+                                        widget.stage.chapterNumber == 10 &&
+                                        widget.stage.stageNumber == 10
+                                    ? '🌅 본영으로 금의환향'
+                                    : '다시 도전하기'),
                           ),
                         ),
                       ),
@@ -1514,8 +1664,14 @@ class _BattleScreenState extends State<BattleScreen>
                                   ),
                                   InkWell(
                                     onTap: () => setState(() {
-                                      _liveStoryLine = null;
-                                      _liveStoryTimer = 0.0;
+                                      if (_storyQueue.isNotEmpty) {
+                                        _liveStoryLine =
+                                            _storyQueue.removeAt(0);
+                                        _liveStoryTimer = 3.9;
+                                      } else {
+                                        _liveStoryLine = null;
+                                        _liveStoryTimer = 0.0;
+                                      }
                                     }),
                                     child: const Padding(
                                       padding: EdgeInsets.all(4),
@@ -2139,7 +2295,12 @@ class _BattleScreenState extends State<BattleScreen>
                                                 : 0;
                                             final reqCost = existing == null
                                                 ? _sim.buildCostForType(lt)
-                                                : lt.buildCostTokens;
+                                                : lt.progressiveBuildCost(
+                                                    max(
+                                                      0,
+                                                      _sim.launchers.length - 1,
+                                                    ),
+                                                  );
                                             final canAfford = unlocked &&
                                                 (_sim.fieldTokens + refund) >=
                                                     reqCost;

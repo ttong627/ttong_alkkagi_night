@@ -232,6 +232,17 @@ class GameController extends ChangeNotifier {
   }
 
   // --- 영약각 ---
+  bool upgradeElixirResonance() {
+    final ok = _progress.upgradeElixirResonance();
+    if (ok) {
+      NightAudioController.instance.playAsset('jingle_levelup.ogg');
+      NightHaptics.instance.heavyImpact();
+      saveToDisk();
+      notifyListeners();
+    }
+    return ok;
+  }
+
   bool breakthroughRealm() {
     final ok = _progress.breakthroughRealm();
     if (ok) {

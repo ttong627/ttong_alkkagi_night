@@ -922,4 +922,57 @@ void main() {
     expect(sawMultiPhaseHud, isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('v1.0.0+21 영약각 무한 공명 단련 · 순차 서사 대사 큐 · 10-10 대단원 에필로그 결과창 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final controller = GameController(
+      initialProgress: PlayerProgress(
+        tokens: 800,
+        elixirs: 60,
+        highestClearedGlobalStage: 110,
+        tutorialSeen: true,
+        bgmVolume: 0.0,
+        sfxVolume: 0.0,
+      ),
+    );
+
+    // 1) 영약각 한지 주인공 명패 및 호법 영기 무한 공명 단추 작동 검증
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ForgeSanctuaryScreen(controller: controller, initialTab: 1),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const Key('upgrade_elixir_resonance_btn')), findsOneWidget);
+    expect(controller.progress.elixirResonanceLevel, 0);
+    await tester.tap(find.byKey(const Key('upgrade_elixir_resonance_btn')));
+    await tester.pump();
+    expect(controller.progress.elixirResonanceLevel, 1);
+    expect(tester.takeException(), isNull);
+
+    // 2) 1-1 관문 진입 시 첫 줄 대사부터 누락 없이 표시되고 다음 줄로 순차 전환되는지 검증
+    final st11 = CampaignCatalog.stageAt(1, 1);
+    expect(st11.introDialogue.length, greaterThanOrEqualTo(2));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BattleScreen(
+          controller: controller,
+          stage: st11,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining('${st11.introDialogue[0].speaker}:'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded).first);
+    await tester.pump();
+    expect(find.textContaining('${st11.introDialogue[1].speaker}:'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

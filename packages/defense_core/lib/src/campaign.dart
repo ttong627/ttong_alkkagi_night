@@ -1079,7 +1079,7 @@ class CampaignCatalog {
                       StoryLine(
                         speaker: '묵현',
                         portraitPrefix: 'mukhyeon',
-                        text: '기력을 아껴 전략 요충지부터 개척하고 약점을 직접 저격해야 뚫을 수 있다. 가자!',
+                        text: '전방 고지 망루로 적 선봉을 요격하고, 약점 핵(🎯)을 정밀 저격해 외각 장갑을 부숴야 한다. 가자!',
                       ),
                     ]
                   : isFinalGod
@@ -1095,8 +1095,22 @@ class CampaignCatalog {
                             text: '열 마을 백성들의 염원이 모두 네 수호탑에 모여 있다! 마지막 여덟 물결을 버텨 새벽을 밝혀라!',
                           ),
                         ]
-                      : const [],
-              outroDialogue: isFinalGod ? epilogueDialogue : const [],
+                      : [
+                          StoryLine(
+                            speaker: '묵현',
+                            portraitPrefix: 'mukhyeon',
+                            text: '천상 제$st관문! 과거 [${refChapter.villageName}]을 위협했던 「${refChapter.bossName}」의 심야 환영이 3페이즈 진신으로 가로막고 있다!',
+                          ),
+                        ],
+              outroDialogue: isFinalGod
+                  ? epilogueDialogue
+                  : [
+                      StoryLine(
+                        speaker: '청명',
+                        portraitPrefix: 'cheongmyeong',
+                        text: '「${refChapter.bossName}」의 천상 독기 환영을 정화했습니다! 태극석 신전 정상까지 ${10 - st}관문 남았습니다!',
+                      ),
+                    ],
             ),
           );
         }
@@ -1146,7 +1160,7 @@ class CampaignCatalog {
           sub = '독기 포위망에 갇힌 영수 [${rescuePet.name}] $wCnt물결 구원 작전! (초소 $mountCap곳)';
         } else {
           stageTitle = '${ch.number}-$st 야간 길목 수호 ($st차 밤)';
-          final midKind = _midBossKindFor(ch.number, st);
+          final midKind = st == 1 ? MutantKind.swiftShadowBoss : _midBossKindFor(ch.number, st);
           sub = '${ch.villageName} 12굽이 $wCnt물결 방어 (초소 $mountCap곳) · 두목 [${midKind.name}] 침략!';
         }
 
@@ -1182,8 +1196,24 @@ class CampaignCatalog {
             rescueBeast: rescuePet,
             alsoRescuesMukhyeon: rescuesMukhyeon,
             waves: waves,
-            introDialogue: _introDialogueFor(ch, st, isChapterBoss, isMukhyeonStage),
-            outroDialogue: _outroDialogueFor(ch, st, isChapterBoss, isMukhyeonStage),
+            introDialogue: _introDialogueFor(
+              ch,
+              st,
+              isChapterBoss,
+              isHeukpungStage,
+              isMukhyeonStage,
+              rescueHero,
+              rescuePet,
+            ),
+            outroDialogue: _outroDialogueFor(
+              ch,
+              st,
+              isChapterBoss,
+              isHeukpungStage,
+              isMukhyeonStage,
+              rescueHero,
+              rescuePet,
+            ),
           ),
         );
       }
@@ -1648,7 +1678,10 @@ class CampaignCatalog {
     ChapterSpec ch,
     int st,
     bool isBoss,
+    bool isHeukpung,
     bool isMukhyeon,
+    CompanionHero? rescueHero,
+    SpiritBeast? rescuePet,
   ) {
     if (ch.number == 1 && st == 1) {
       return const [
@@ -1660,7 +1693,7 @@ class CampaignCatalog {
         StoryLine(
           speaker: '석두',
           portraitPrefix: 'seokdu',
-          text: '초기 군수 기력(48⚡)으로는 단 1기의 초소만 먼저 세울 수 있습니다! 포탑이 늘수록 보급비가 오르고 전방 거점은 마기 암석을 개척해야 하니 신중히 지휘하십시오!',
+          text: '북중단 고지 망루(2번)에 세우면 선봉을 조기 타격하고, 남단 관문(1번)에 세우면 마을 목을 굳건히 지킵니다! 지휘를 내려주십시오!',
         ),
       ];
     }
@@ -1673,12 +1706,67 @@ class CampaignCatalog {
         ),
       ];
     }
-    if (isMukhyeon && ch.number == 6) {
+    if (isMukhyeon) {
+      if (ch.number == 3) {
+        return const [
+          StoryLine(
+            speaker: '묵현',
+            portraitPrefix: 'mukhyeon',
+            text: '비켜라 사제여… 심야의 독기를 삼켜서라도 더 강한 힘을 얻어야만 세상을 구할 수 있다!',
+          ),
+          StoryLine(
+            speaker: '청명',
+            portraitPrefix: 'cheongmyeong',
+            text: '사형! 독기가 검끝을 잠식하고 있어요! 정화의 수호석으로 정신을 일깨워 드려야 합니다!',
+          ),
+        ];
+      }
+      if (ch.number == 5) {
+        return const [
+          StoryLine(
+            speaker: '묵현',
+            portraitPrefix: 'mukhyeon',
+            text: '크윽… 머릿속에서 마기의 속삭임이 멈추지 않는다…! 내 검을 꺾을 수 있겠느냐!!',
+          ),
+        ];
+      }
       return const [
         StoryLine(
           speaker: '묵현',
           portraitPrefix: 'mukhyeon',
           text: '크으윽… 마을을 지키려 삼킨 독기가… 내 정신을 집어삼키려 한다…! 나를 막아라 사제여!!',
+        ),
+      ];
+    }
+    if (isHeukpung) {
+      return [
+        StoryLine(
+          speaker: '부두목 흑풍',
+          portraitPrefix: 'budumok',
+          text: '크하하하! ${ch.villageName}의 식량 수레와 영약은 이 흑풍 님이 전부 약탈해 가마!!',
+        ),
+        const StoryLine(
+          speaker: '석두',
+          portraitPrefix: 'seokdu',
+          text: '약탈 선봉 흑풍입니다! 3페이즈 광폭화 전에 회전 약점(🎯)을 정밀 저격해 꺾어야 합니다!',
+        ),
+      ];
+    }
+    if (rescueHero != null && !isBoss) {
+      return [
+        StoryLine(
+          speaker: rescueHero.name,
+          portraitPrefix: rescueHero.portraitPrefix,
+          text: '여기는 ${rescueHero.title} ${rescueHero.name}! 열두 굽이 협곡에 변이 무리가 겹겹이 포위했습니다! 7물결만 버텨 주십시오!',
+        ),
+      ];
+    }
+    if (rescuePet != null && !isBoss) {
+      return [
+        StoryLine(
+          speaker: '연비',
+          portraitPrefix: 'yeonbi',
+          text: '저기 독기 안개 속에서 신비 영수 [${rescuePet.name}]의 울음소리가 들려요! 포위망을 뚫고 구원해요!',
         ),
       ];
     }
@@ -1689,6 +1777,12 @@ class CampaignCatalog {
           portraitPrefix: 'yeonbi',
           text: '밤안개가 가장 짙어졌어요! ${ch.bossName}의 8물결 본대가 열두 굽이 끝에서 다가옵니다!',
         ),
+        if (rescueHero != null)
+          StoryLine(
+            speaker: rescueHero.name,
+            portraitPrefix: rescueHero.portraitPrefix,
+            text: '대수괴의 외각 장갑 핵(🎯)을 깨뜨려 주십시오! 포위망을 뚫고 즉시 합류하겠습니다!',
+          ),
       ];
     }
     return const [];
@@ -1698,60 +1792,122 @@ class CampaignCatalog {
     ChapterSpec ch,
     int st,
     bool isBoss,
+    bool isHeukpung,
     bool isMukhyeon,
+    CompanionHero? rescueHero,
+    SpiritBeast? rescuePet,
   ) {
-    if (isMukhyeon && ch.number == 6) {
+    if (isMukhyeon) {
+      if (ch.number == 6) {
+        return const [
+          StoryLine(
+            speaker: '묵현',
+            portraitPrefix: 'mukhyeon',
+            text: '아아… 따뜻한 기명석의 빛이 내 안의 독기를 씻어 내렸구나… 사부의 말씀이 맞았다. 이제부터 내 검은 너희와 마을을 지키는 데 쓰겠다!',
+          ),
+        ];
+      }
       return const [
         StoryLine(
           speaker: '묵현',
           portraitPrefix: 'mukhyeon',
-          text: '아아… 따뜻한 기명석의 빛이 내 안의 독기를 씻어 내렸구나… 사부의 말씀이 맞았다. 이제부터 내 검은 너희와 마을을 지키는 데 쓰겠다!',
+          text: '윽… 만만치 않군! 하지만 아직 독기의 근원은 깊다… 다음 관문에서 다시 보자!',
+        ),
+      ];
+    }
+    if (isHeukpung) {
+      return [
+        StoryLine(
+          speaker: '부두목 흑풍',
+          portraitPrefix: 'budumok',
+          text: '크악! 이놈들의 지형 진법과 약점 저격에 당하다니… 수레는 두고 후퇴다!!',
+        ),
+      ];
+    }
+    if (!isBoss && rescueHero != null) {
+      return [
+        StoryLine(
+          speaker: rescueHero.name,
+          portraitPrefix: rescueHero.portraitPrefix,
+          text: '구원해 주셔서 감사합니다! 이제부터 저 ${rescueHero.title} [${rescueHero.name}]의 무공(${rescueHero.skillDesc})으로 수호진을 함께 지키겠습니다!',
+        ),
+      ];
+    }
+    if (!isBoss && rescuePet != null) {
+      return [
+        StoryLine(
+          speaker: '청명',
+          portraitPrefix: 'cheongmyeong',
+          text: '해냈습니다! 독기가 걷히며 신비 영수 [${rescuePet.name}]가 감응하여 우리 수호진과 계약을 맺었습니다! (${rescuePet.battleCry})',
         ),
       ];
     }
     if (!isBoss) return const [];
+    final bossOutro = <StoryLine>[];
     switch (ch.number) {
       case 1:
-        return const [
-          StoryLine(
+        bossOutro.add(
+          const StoryLine(
             speaker: '촌장',
             portraitPrefix: 'chonjang',
             text: '장하다! 우리 흙먼지 마을은 지켰으나 아랫마을 통통 객잔 곡식 창고가 무너지면 모두가 굶게 된다. 이 의용대 지원패를 들고 구원하러 가거라!',
           ),
-        ];
+        );
+        break;
       case 2:
-        return const [
-          StoryLine(
+        bossOutro.add(
+          const StoryLine(
             speaker: '통통',
             portraitPrefix: 'tongtong',
             text: '하하하! 덕분이다! 객잔 곡식 창고가 무사하니 지금 바로 흙먼지 마을로 첫 식량·영약 호송 마차를 출발시키마!',
           ),
-        ];
+        );
+        break;
       case 4:
-        return const [
-          StoryLine(
+        bossOutro.add(
+          const StoryLine(
             speaker: '쿠비',
             portraitPrefix: 'kubi',
             text: '산채 목재와 봉화대를 되찾았다! 이제 우리 산채 정찰대가 밤마다 산야를 돌며 영약과 지원패를 찾아오겠다!',
           ),
-        ];
+        );
+        break;
       case 6:
-        return const [
-          StoryLine(
+        bossOutro.add(
+          const StoryLine(
             speaker: '무림맹주',
             portraitPrefix: 'maengju',
             text: '여섯 거점의 무사들을 묶어 「무림수호단」을 창설한다! 이 황금 지원패를 들면 언제든 전군이 달려와 돌연변이를 싹 쓸어버릴 것이다!',
           ),
-        ];
+        );
+        break;
       default:
-        return [
+        bossOutro.add(
           StoryLine(
             speaker: '청명',
             portraitPrefix: 'cheongmyeong',
             text: '새벽해가 밝았습니다! ${ch.villageName}의 논밭과 외양간이 다시 살아나고 있습니다! (${ch.unlockNotice})',
           ),
-        ];
+        );
     }
+    if (rescueHero != null) {
+      bossOutro.add(
+        StoryLine(
+          speaker: rescueHero.name,
+          portraitPrefix: rescueHero.portraitPrefix,
+          text: '저 [${rescueHero.name}]도 오늘부터 수호진의 일원으로 끝까지 동행하겠습니다!',
+        ),
+      );
+    } else if (rescuePet != null) {
+      bossOutro.add(
+        StoryLine(
+          speaker: '연비',
+          portraitPrefix: 'yeonbi',
+          text: '신비 영수 [${rescuePet.name}]도 정화되어 우리 곁으로 날아왔어요!',
+        ),
+      );
+    }
+    return bossOutro;
   }
 
   static const List<StoryLine> epilogueDialogue = [

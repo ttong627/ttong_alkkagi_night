@@ -2092,5 +2092,114 @@ void main() {
       expect(targetL.purifiedBoostTimer, greaterThan(2.5));
       expect(sim.purifiedCorruptionCount, 1);
     });
+
+    test('v1.0.0+21 정밀 감사 게이트: 체증 교체 꼼수 차단 · 미해금 포탑 누수 0건 · 초반 8초 내 첫 타격 · 영약 무한 공명 및 서사 완결 검증', () {
+      // 1) 1-1 초반 관문에서 도박 소환·연성 합치기 시 미해금 포탑(한빙 역장기·기공 증폭기) 누수 0건 검증
+      final p1 = PlayerProgress();
+      final simLeak = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 1),
+        difficulty: DefenseDifficulty.normal,
+        progress: p1,
+        seed: 20261121,
+      );
+      for (int trial = 0; trial < 80; trial++) {
+        simLeak.launchers.clear();
+        simLeak.fieldTokens = 9999;
+        final rolled = simLeak.summonLuckyLauncherInBattle(0);
+        expect(rolled, isNotNull);
+        expect(simLeak.isLauncherTypeUnlocked(rolled!.type), isTrue);
+      }
+      for (int trial = 0; trial < 60; trial++) {
+        simLeak.launchers.clear();
+        simLeak.fieldTokens = 9999;
+        expect(simLeak.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
+        expect(simLeak.placeLauncherInBattle(1, LauncherType.rapid), isTrue);
+        for (final l in simLeak.launchers) {
+          l.constructTimer = 0;
+        }
+        expect(simLeak.mergeLauncherAtSlot(0), isTrue);
+        final evolved = simLeak.launcherAtSlot(0)!;
+        expect(simLeak.isLauncherTypeUnlocked(evolved.type), isTrue);
+        expect(evolved.type, isNot(LauncherType.qiAmplifier));
+      }
+
+      // 2) 다수 초소 설치 상태에서 저가 포탑 건설 후 고가 포탑 교체 시 체증 비용 우회 꼼수 완전 차단 검증
+      final pSwap = PlayerProgress(highestClearedGlobalStage: 60);
+      final simSwap = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(6, 6),
+        difficulty: DefenseDifficulty.normal,
+        progress: pSwap,
+        seed: 77,
+      );
+      simSwap.currentWaveIndex = 5;
+      for (int s = 0; s < 6; s++) {
+        simSwap.excavatedSlots.add(s);
+      }
+      simSwap.fieldTokens = 2000;
+      for (int s = 0; s < 5; s++) {
+        expect(simSwap.placeLauncherInBattle(s, LauncherType.rapid), isTrue);
+      }
+      final directHeavyCost = simSwap.buildCostForType(LauncherType.heavy); // 56 + 5*14 = 126
+      final tokensBefore6th = simSwap.fieldTokens;
+      expect(simSwap.placeLauncherInBattle(5, LauncherType.rapid), isTrue); // 45 + 5*14 = 115
+      final constructBeforeSwap = simSwap.launcherAtSlot(5)!.constructTimer;
+      expect(simSwap.replaceLauncherInBattle(5, LauncherType.heavy), isTrue);
+      final netSpentViaSwap = tokensBefore6th - simSwap.fieldTokens;
+      expect(
+        netSpentViaSwap,
+        greaterThanOrEqualTo(directHeavyCost),
+        reason: '교체 경유 시 직접 건설($directHeavyCost⚡)보다 싸게 지어지는 꼼수가 없어야 함',
+      );
+      expect(
+        simSwap.launcherAtSlot(5)!.constructTimer,
+        greaterThanOrEqualTo(constructBeforeSwap),
+        reason: '건설 중인 포탑을 교체해 축조 시간을 단축하는 꼼수가 없어야 함',
+      );
+
+      // 3) 초반 제1물결 진입 후 기본 시작 기력(48⚡)으로 초소 1곳 축조 시 첫 타격까지 8.5초 이내 박진감 교전 개시 검증
+      final simFast = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 1),
+        difficulty: DefenseDifficulty.normal,
+        progress: PlayerProgress(),
+        seed: 42,
+      );
+      expect(simFast.placeLauncherInBattle(1, LauncherType.rapid), isTrue);
+      double? firstHitSec;
+      for (int i = 0; i < 400; i++) {
+        simFast.step(1.0 / 30.0);
+        if (firstHitSec == null &&
+            (simFast.killCount > 0 ||
+                simFast.damagePopups.isNotEmpty ||
+                simFast.mutants.any((m) => m.hp < m.maxHp))) {
+          firstHitSec = simFast.elapsedSec;
+          break;
+        }
+      }
+      expect(firstHitSec, isNotNull);
+      expect(firstHitSec!, lessThan(8.5));
+
+      // 4) 호법 영기 무한 공명(elixirResonanceLevel) 승급·직렬화 및 전 구출/10장 결전 서사 완결 검증
+      final pElixir = PlayerProgress(elixirs: 50);
+      expect(pElixir.elixirResonanceLevel, 0);
+      expect(pElixir.upgradeElixirResonance(), isTrue);
+      expect(pElixir.elixirResonanceLevel, 1);
+      expect(pElixir.elixirResonanceBonus, closeTo(0.055, 1e-6));
+      final restored = PlayerProgress.decodeJson(pElixir.encodeJson());
+      expect(restored.elixirResonanceLevel, 1);
+
+      final rescuesWithStory = CampaignCatalog.allStages
+          .where(
+            (s) =>
+                (s.rescueCompanion != null || s.rescueBeast != null) &&
+                s.introDialogue.isNotEmpty &&
+                s.outroDialogue.isNotEmpty,
+          )
+          .length;
+      final totalRescues = CampaignCatalog.allStages
+          .where((s) => s.rescueCompanion != null || s.rescueBeast != null)
+          .length;
+      expect(rescuesWithStory, totalRescues);
+      expect(CampaignCatalog.stageAt(10, 10).outroDialogue.length, greaterThanOrEqualTo(3));
+    });
   });
 }

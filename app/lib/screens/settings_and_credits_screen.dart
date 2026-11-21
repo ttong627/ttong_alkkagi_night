@@ -572,7 +572,7 @@ class CreditsScreen extends StatelessWidget {
                         showLicensePage(
                           context: context,
                           applicationName: '수호알까기 · 탄지무림 심야기습',
-                          applicationVersion: '1.0.0',
+                          applicationVersion: '1.0.0+21',
                           applicationLegalese: '© 2026 (주)웰쉐어로지스 (TTong Studio)',
                         );
                       },

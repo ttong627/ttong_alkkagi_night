@@ -344,6 +344,8 @@ class _PendingSpawn {
     required this.laneIndex,
     this.customTitle,
     this.customPortrait,
+    this.startLaneProgress = 0.0,
+    this.hpScale = 1.0,
   });
 
   double delaySec;
@@ -351,6 +353,8 @@ class _PendingSpawn {
   final int laneIndex;
   final String? customTitle;
   final String? customPortrait;
+  final double startLaneProgress;
+  final double hpScale;
 }
 
 /// 《수호알까기 · 탄지무림 심야기습》 실시간 & 자동 검증 공용 2차원 물리 전투 시뮬레이터.
@@ -619,6 +623,7 @@ class DefenseBattleSim {
   final List<FloatingCallout> callouts = [];
   final List<FxBurst> bursts = [];
   final List<SoundCue> pendingSounds = [];
+  final List<StoryLine> pendingStoryLines = [];
   final List<double> pillarAngles = [];
 
   /// 침공 길목 입구 독기 균열문 활성도(0.0 ~ 1.0), 전장 진동 및 보스 동반 침공 경보 상태.
@@ -1006,7 +1011,9 @@ class DefenseBattleSim {
 
     fieldTokens -= luckyCost;
 
-    final rolledType = LauncherType.values[rng.nextInt(LauncherType.values.length)];
+    final unlockedTypes = LauncherType.values.where(isLauncherTypeUnlocked).toList();
+    final luckyPool = unlockedTypes.isEmpty ? <LauncherType>[LauncherType.rapid] : unlockedTypes;
+    final rolledType = luckyPool[rng.nextInt(luckyPool.length)];
     final tierRoll = rng.nextDouble();
     final int rolledTier = tierRoll < 0.06 ? 3 : (tierRoll < 0.30 ? 2 : 1);
 
@@ -1129,7 +1136,13 @@ class DefenseBattleSim {
     fieldTokens -= mergeCost;
 
     launchers.remove(partner);
-    final evolvedType = LauncherType.values[rng.nextInt(LauncherType.values.length)];
+    final unlockedTypes = LauncherType.values.where(isLauncherTypeUnlocked).toList();
+    var mergePool = unlockedTypes.isEmpty ? <LauncherType>[LauncherType.rapid] : unlockedTypes;
+    if (launchers.length <= 1) {
+      final directDps = mergePool.where((t) => t != LauncherType.qiAmplifier).toList();
+      if (directDps.isNotEmpty) mergePool = directDps;
+    }
+    final evolvedType = mergePool[rng.nextInt(mergePool.length)];
     target.type = evolvedType;
     target.tier = (target.tier + 1).clamp(2, 5);
     target.investedTokens += (partner.investedTokens * 0.70).round() + mergeCost;
@@ -1180,7 +1193,9 @@ class DefenseBattleSim {
       for (int j = i + 1; j < launchers.length; j++) {
         final a = launchers[i];
         final b = launchers[j];
-        if (a.pos.distanceTo(b.pos) > 315) continue;
+        final maxLinkDist =
+            (a.type == b.type || (a.slotIndex <= 1 && b.slotIndex <= 1)) ? 680.0 : 460.0;
+        if (a.pos.distanceTo(b.pos) > maxLinkDist) continue;
         final types = {a.type, b.type};
         if (types.containsAll([LauncherType.frostField, LauncherType.heavy])) {
           links.add(
@@ -1668,12 +1683,15 @@ class DefenseBattleSim {
     if (!isLauncherTypeUnlocked(newType)) return false;
 
     final refund = (existing.investedTokens * 0.80).round();
-    final buildCost = newType.buildCostTokens;
+    final buildCost = newType.progressiveBuildCost(max(0, launchers.length - 1));
     if (fieldTokens + refund < buildCost) return false;
 
     fieldTokens = fieldTokens + refund - buildCost;
     final idx = launchers.indexOf(existing);
     final permLv = progress.launcherPermanentLevels[newType] ?? 1;
+    final nextConstruct = existing.isConstructing
+        ? max(existing.constructTimer, upgradeConstructSec)
+        : upgradeConstructSec;
     launchers[idx] = ActiveLauncher(
       slotIndex: slotIndex,
       pos: existing.pos,
@@ -1681,8 +1699,8 @@ class DefenseBattleSim {
       permanentLevel: permLv,
       terrainType: existing.terrainType,
       investedTokens: buildCost,
-      constructTimer: upgradeConstructSec,
-      constructDuration: upgradeConstructSec,
+      constructTimer: nextConstruct,
+      constructDuration: max(existing.constructDuration, nextConstruct),
     );
 
     pendingSounds.add(SoundCue.gearMotion);
@@ -2104,7 +2122,23 @@ class DefenseBattleSim {
     }
     if (waveIdx >= stage.waves.length) return;
     final groups = stage.waves[waveIdx];
-    final startGrace = (waveIdx == 0 && !appendExisting) ? 2.0 : 0.40;
+    final startGrace = (waveIdx == 0 && !appendExisting) ? 1.85 : 0.40;
+    if (waveIdx == 0 && !appendExisting) {
+      // 초반 15초 침묵 방지! 협곡 중단·하단 수풀에 미리 잠복해 있던 선봉 척후 독쥐 3마리가 즉시 기습 돌입해 4~6초 안에 첫 탄지 타격감이 터지도록 구성!
+      const scoutProgress = <double>[0.62, 0.78, 0.82];
+      for (int s = 0; s < scoutProgress.length; s++) {
+        _spawnQueue.add(
+          _PendingSpawn(
+            delaySec: 2.85 + s * 0.45,
+            kind: MutantKind.swarmRat,
+            laneIndex: s % chapter.lanes.length,
+            customTitle: '선봉 척후 독쥐',
+            startLaneProgress: scoutProgress[s],
+            hpScale: 0.68,
+          ),
+        );
+      }
+    }
     bool hasBossInWave = false;
     int groupIdx = 0;
     for (final g in groups) {
@@ -2481,7 +2515,11 @@ class DefenseBattleSim {
     if (launchers.isNotEmpty && shieldHp > 0 && shieldHp < shieldMaxHpDynamic) {
       shieldHp = min(
         shieldMaxHpDynamic,
-        shieldHp + (1.15 + progress.coreFortitudeBonus * 12.0) * dt,
+        shieldHp +
+            (1.15 +
+                    progress.coreFortitudeBonus * 12.0 +
+                    progress.elixirResonanceBonus * 4.5) *
+                dt,
       );
     }
 
@@ -2647,6 +2685,36 @@ class DefenseBattleSim {
         wavePauseTimer = 1.15;
         _enqueueWave(currentWaveIndex);
         _announceNewlyUnlockedPads();
+
+        // 무정지 실시간 전투 중 동료·보스 서사 교신!
+        if (currentWaveIndex == 2) {
+          final ally = preset.companions.isNotEmpty ? preset.companions.first : null;
+          pendingStoryLines.add(
+            StoryLine(
+              speaker: ally?.name ?? '기명',
+              portraitPrefix: ally?.portraitPrefix ?? 'player',
+              text: '제3물결 전방 요충지가 열렸소! 마기 암석을 개척해 협곡 상류부터 화망으로 조이시오!',
+            ),
+          );
+        } else if (currentWaveIndex == stage.waves.length - 1) {
+          final bossGroup = stage.waves[currentWaveIndex].where((g) => g.kind.isBoss).firstOrNull;
+          if (bossGroup != null) {
+            pendingStoryLines.add(
+              StoryLine(
+                speaker: bossGroup.customBossTitle ?? bossGroup.kind.name,
+                portraitPrefix: bossGroup.customPortrait ??
+                    (bossGroup.kind == MutantKind.raiderHeukpung
+                        ? 'heukpung'
+                        : bossGroup.kind == MutantKind.rivalMukhyeon
+                            ? 'mukhyeon'
+                            : 'boss'),
+                text: bossGroup.kind.isMidBoss
+                    ? '크하하! 2단 재변이 마갑을 두른 내 돌격을 막을 수 있겠느냐!'
+                    : '어리석은 수호자여! 3페이즈 불멸 마갑을 정밀 신궁탄으로 깨지 못하면 이 마을은 잿더미다!',
+              ),
+            );
+          }
+        }
 
         // 물결 방어 성공 시(최소 1초소 건설 또는 수동 공명 상태) 보너스 기력 +15⚡ & 3택 1 돌파 비급 발동!
         if (isFormationActive) {
@@ -2881,14 +2949,18 @@ class DefenseBattleSim {
         item.kind.swarmHpFactor *
         chScale *
         ch1Ease *
-        difficulty.hpMult;
+        difficulty.hpMult *
+        item.hpScale;
     // 720×1360 12굽이 천리협곡 경로(3,900~5,100px) 위를 박진감 있게 주파하도록 행군 속도 2.45배 조율!
     final spd =
         item.kind.speed * 2.45 * (1.0 + (stage.chapterNumber - 1) * 0.025) * difficulty.speedMult;
     final latOffset = item.kind.isBoss ? 0.0 : (rng.nextDouble() - 0.5) * 18.0;
-    final spawnPos = lane.first + Vec2(latOffset * 0.65, 0);
+    final int startWpIdx = item.startLaneProgress <= 0.0
+        ? 0
+        : (lane.length * item.startLaneProgress).round().clamp(0, max(0, lane.length - 3)).toInt();
+    final spawnPos = lane[startWpIdx] + Vec2(latOffset * 0.65, 0);
 
-    final nextWp = lane.length > 2 ? lane[2] : CampaignCatalog.villageCenter;
+    final nextWp = startWpIdx + 2 < lane.length ? lane[startWpIdx + 2] : CampaignCatalog.villageCenter;
     final initDelta = nextWp - spawnPos;
     final initHeading = initDelta.length > 1e-4 ? atan2(initDelta.y, initDelta.x) : 1.5707963;
 
@@ -2905,6 +2977,7 @@ class DefenseBattleSim {
       lateralSeed: rng.nextDouble() * pi * 2,
       laneLateralOffset: latOffset,
     )
+      ..waypointIndex = min<int>(lane.length - 1, startWpIdx + 1)
       ..headingRad = initHeading
       ..smoothVel = Vec2(cos(initHeading) * spd, sin(initHeading) * spd)
       ..dashCooldown = item.kind == MutantKind.swiftShadowBoss ? 2.2 : 2.6;
@@ -3791,7 +3864,8 @@ class DefenseBattleSim {
     final allyMaxR = (278.0 * liveRangeMultiplier).clamp(268.0, 385.0);
     final target = _pickMostThreateningMutant(CampaignCatalog.villageCenter, maxRange: allyMaxR);
     if (target == null) return;
-    final allyMult = 1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45;
+    final allyMult = (1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45) *
+        (1.0 + progress.elixirResonanceBonus);
     final power =
         centralSpec.baseDamage * (1.55 + lv * 0.22) * progress.realm.powerMult * allyMult;
 
@@ -3875,7 +3949,8 @@ class DefenseBattleSim {
     final allyMaxR = (278.0 * liveRangeMultiplier).clamp(268.0, 385.0);
     final target = _pickMostThreateningMutant(CampaignCatalog.villageCenter, maxRange: allyMaxR);
     if (target == null) return;
-    final allyMult = 1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45;
+    final allyMult = (1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45) *
+        (1.0 + progress.elixirResonanceBonus);
     final baseDmg =
         centralSpec.baseDamage * (1.50 + lv * 0.20) * progress.realm.powerMult * allyMult;
     final key = 'hero_${hero.id}';
@@ -5420,14 +5495,23 @@ class DefenseBattleSim {
         dp.vel = Vec2(dp.vel.x * 0.92, dp.vel.y + 82.0 * dt);
       }
     }
+    final seenCalloutTexts = <String>{};
     for (int i = callouts.length - 1; i >= 0; i--) {
       callouts[i].ttlSec -= dt;
       callouts[i].pos = callouts[i].pos + const Vec2(0, -14 * 0.016);
-      if (callouts[i].ttlSec <= 0) callouts.removeAt(i);
+      if (callouts[i].ttlSec <= 0 || !seenCalloutTexts.add(callouts[i].text)) {
+        callouts.removeAt(i);
+      }
+    }
+    if (callouts.length > 6) {
+      callouts.removeRange(0, callouts.length - 6);
     }
     for (int i = bursts.length - 1; i >= 0; i--) {
       bursts[i].ttlSec -= dt;
       if (bursts[i].ttlSec <= 0) bursts.removeAt(i);
+    }
+    if (bursts.length > 48) {
+      bursts.removeRange(0, bursts.length - 48);
     }
   }
 
@@ -5487,7 +5571,7 @@ class DefenseBattleSim {
           ? '완벽한 수호 진법입니다! 식량 창고·논밭·외양간 모두 온전히 지켜냈습니다!'
           : '승리했습니다! 초소 조합 시너지와 돌파 비급·합치기 진화를 활용하면 ★3 만점 수호가 쉬워집니다.';
     } else if (launchers.isEmpty) {
-      tip = '길목 초소가 0곳이라 본진이 돌파당했습니다! 초반 군수 기력(⚡)으로 반드시 빈 초소에 발사대를 세우거나 운빨 소환(35⚡)을 실행하세요!';
+      tip = '길목 초소가 0곳이라 본진이 돌파당했습니다! 초반 군수 기력(⚡)으로 반드시 빈 초소에 지정 축조(45⚡~) 또는 도박 소환(50⚡~)을 실행하세요!';
     } else if (shieldYachaBlocks >= 6) {
       tip = '뼈방패 야차에게 정면 탄이 막혔습니다! 거점에 「곡사 회전기」를 세우거나 「파갑 멸마송」 비급을 선택해보세요.';
     } else if (heavyHitsOnShield >= 3) {

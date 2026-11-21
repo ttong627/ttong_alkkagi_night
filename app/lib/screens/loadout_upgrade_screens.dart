@@ -1043,186 +1043,316 @@ class UpgradeScreen extends StatelessWidget {
         p.elixirs >= nextRealm.reqElixir;
 
     return ListView(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(18, 22, 18, 28),
       children: [
-        const Text(
-          '기연·호송·탐색·보스 토벌로 얻은 「영약」으로 내공 경지와 영수·동료를 강화합니다.',
-          style: TextStyle(fontSize: 13, color: NightPalette.textMuted),
-        ),
-        const SizedBox(height: 10),
-        MurimCard(
-          borderColor: NightPalette.elixirPurple,
-          child: Row(
-            children: [
-              const NightSpriteIcon(
-                assetPath: NightArtRegistry.nightMeridian,
-                fallbackAssetPath: NightArtRegistry.fxQi,
-                fallbackIcon: Icons.self_improvement_rounded,
-                size: 50,
-                color: NightPalette.elixirPurple,
-                showFrame: true,
+        // 1) 상단 한지 명패 주인공: 내공 8경지 승급 + 호법 영기 무한 공명 (게슈탈트 제1덩어리)
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E7CC),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: NightPalette.accentGold, width: 1.6),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '내공 경지 승급 · 현재 [${p.realm.name}]',
-                      style: const TextStyle(
-                        fontSize: 16.5,
-                        color: NightPalette.elixirPurple,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const NightSpriteIcon(
+                        assetPath: NightArtRegistry.nightMeridian,
+                        fallbackAssetPath: NightArtRegistry.fxQi,
+                        fallbackIcon: Icons.self_improvement_rounded,
+                        size: 58,
+                        color: Color(0xFF4A2574),
+                        showFrame: true,
+                        frameColor: Color(0xFF233048),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      nextRealm != null
-                          ? '다음 [${nextRealm.name}] 조건: 내공 ${p.naegongPoints}/${nextRealm.reqNaegong} · 영약 ${nextRealm.reqElixir}개\n(자동 어기어석 동행 알 ${nextRealm.eogieoseokCount}기 · 공방 대폭 상승!)'
-                          : '최고 경지 [생사경] 완성!',
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        color: NightPalette.textMuted,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '영약각 단전 승급 · 호법 영기 무한 공명',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF4A2574),
+                              ),
+                            ),
+                            Text(
+                              '내공 경지 승급 · 현재 [${p.realm.name}]',
+                              style: const TextStyle(
+                                fontFamily: 'BlackHanSans',
+                                fontSize: 20.5,
+                                color: Color(0xFF1B2538),
+                              ),
+                            ),
+                            Text(
+                              nextRealm != null
+                                  ? '다음 [${nextRealm.name}] 조건: 내공 ${p.naegongPoints}/${nextRealm.reqNaegong} · 영약 ${nextRealm.reqElixir}개 (동행 알 ${nextRealm.eogieoseokCount}기 · 공방 대폭 상승!)'
+                                  : '최고 경지 [생사경] 완성! 남는 영약은 아래 무한 공명에 주입하세요.',
+                              style: const TextStyle(
+                                fontSize: 12.4,
+                                color: Color(0xFF3B4A66),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                      if (nextRealm != null) ...[
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF1F2B42),
+                            foregroundColor: NightPalette.accentGold,
+                            disabledBackgroundColor: const Color(0x241F2B42),
+                            disabledForegroundColor: const Color(0x9E1F2B42),
+                          ),
+                          onPressed: canRealmUp ? controller.breakthroughRealm : null,
+                          child: Text('영약 ${nextRealm.reqElixir} 승급'),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1, color: Color(0x331B2538)),
+                  ),
+                  Row(
+                    children: [
+                      const NightSpriteIcon(
+                        assetPath: NightArtRegistry.nightElixir,
+                        fallbackAssetPath: NightArtRegistry.fxQi,
+                        fallbackIcon: Icons.auto_awesome_rounded,
+                        size: 46,
+                        showFrame: true,
+                        frameColor: Color(0xFF233048),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '☯️ 호법 영기 무한 공명 (${p.elixirResonanceLevel}단 · 영수/동료 화력 +${(p.elixirResonanceBonus * 100).toStringAsFixed(1)}%)',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15.2,
+                                color: Color(0xFF1B2538),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              '남는 영약을 주입해 영수 5종·동료 14인 화력과 결계 재생력을 무한 증폭',
+                              style: TextStyle(
+                                fontSize: 12.2,
+                                color: Color(0xFF3B4A66),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        key: const Key('upgrade_elixir_resonance_btn'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF1F2B42),
+                          foregroundColor: NightPalette.jadeGreen,
+                          disabledBackgroundColor: const Color(0x241F2B42),
+                          disabledForegroundColor: const Color(0x9E1F2B42),
+                        ),
+                        onPressed: p.elixirs >= p.elixirResonanceCost
+                            ? controller.upgradeElixirResonance
+                            : null,
+                        child: Text('영약 ${p.elixirResonanceCost}'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              if (nextRealm != null) ...[
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: canRealmUp ? controller.breakthroughRealm : null,
-                  child: Text('영약 ${nextRealm.reqElixir} 승급'),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
-        const SizedBox(height: 14),
-        const Text(
-          '수호 영수 5종 강화',
-          style: TextStyle(fontSize: 16, color: NightPalette.jadeGreen),
-        ),
-        const SizedBox(height: 8),
-        ...SpiritBeast.values.map((b) {
-          final lv = p.beastLevels[b] ?? 0;
-          final cost = lv == 0 ? b.unlockElixirs : b.upgradeElixirCost(lv);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+        const SizedBox(height: 16),
+
+        // 2) 수호 영수 5종 통합 단련반 (게슈탈트 제2덩어리 · 같은 정보 한 상자)
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
             child: MurimCard(
-              borderColor: lv > 0
-                  ? Color(b.colorHex).withValues(alpha: 0.65)
-                  : NightPalette.borderGold.withValues(alpha: 0.35),
-              child: Row(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  NightSpriteIcon(
-                    assetPath: NightArtRegistry.beastAsset(b),
-                    fallbackIcon: Icons.pets_rounded,
-                    size: 48,
-                    color: Color(b.colorHex),
-                    dimmed: lv == 0,
-                    showFrame: true,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${b.name} ${lv == 0 ? "(미영입)" : "(Lv.$lv)"}',
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            color: Color(b.colorHex),
-                          ),
-                        ),
-                        Text(
-                          b.skillSummary,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: NightPalette.textMuted,
-                          ),
-                        ),
-                      ],
+                  const Text(
+                    '수호 영수 5종 강화',
+                    style: TextStyle(
+                      fontFamily: 'BlackHanSans',
+                      fontSize: 18,
+                      color: NightPalette.jadeGreen,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: (lv < 10 && p.elixirs >= cost)
-                        ? () => controller.upgradeBeast(b)
-                        : null,
-                    child: Text(
-                      lv >= 10
-                          ? '최고단계'
-                          : (lv == 0 ? '영약 $cost 영입' : '영약 $cost 강화'),
+                  const SizedBox(height: 10),
+                  for (int idx = 0; idx < SpiritBeast.values.length; idx++) ...[
+                    if (idx > 0)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 9),
+                        child: Divider(height: 1, color: Colors.white12),
+                      ),
+                    Builder(
+                      builder: (_) {
+                        final b = SpiritBeast.values[idx];
+                        final lv = p.beastLevels[b] ?? 0;
+                        final cost = lv == 0 ? b.unlockElixirs : b.upgradeElixirCost(lv);
+                        return Row(
+                          children: [
+                            NightSpriteIcon(
+                              assetPath: NightArtRegistry.beastAsset(b),
+                              fallbackIcon: Icons.pets_rounded,
+                              size: 46,
+                              color: Color(b.colorHex),
+                              dimmed: lv == 0,
+                              showFrame: true,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${b.name} ${lv == 0 ? "(미영입)" : "(Lv.$lv)"}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15.2,
+                                      color: Color(b.colorHex),
+                                    ),
+                                  ),
+                                  Text(
+                                    b.skillSummary,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: NightPalette.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed: (lv < 10 && p.elixirs >= cost)
+                                  ? () => controller.upgradeBeast(b)
+                                  : null,
+                              child: Text(
+                                lv >= 10
+                                    ? '최고단계'
+                                    : (lv == 0 ? '영약 $cost 영입' : '영약 $cost 강화'),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
-          );
-        }),
-        const SizedBox(height: 14),
-        const Text(
-          '방어 초소 동료 강화',
-          style: TextStyle(fontSize: 16, color: NightPalette.accentGold),
+          ),
         ),
-        const SizedBox(height: 8),
-        ...CompanionHero.values.map((h) {
-          final lv = p.companionLevels[h] ?? 0;
-          final cost = lv == 0 ? h.unlockElixirs : h.upgradeElixirCost(lv);
-          final canAcquire = lv > 0 ||
-              (h.unlockElixirs > 0 &&
-                  p.highestUnlockedChapter >= h.unlockChapter);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+        const SizedBox(height: 16),
+
+        // 3) 방어 초소 동료 14인 통합 단련반 (게슈탈트 제3덩어리 · 같은 정보 한 상자)
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
             child: MurimCard(
-              child: Row(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  NightSpriteIcon(
-                    assetPath: NightArtRegistry.heroIdleAsset(h),
-                    fallbackAssetPath: NightArtRegistry.heroFaceAsset(h),
-                    fallbackIcon: Icons.person_rounded,
-                    size: 50,
-                    borderRadius: 12,
-                    dimmed: lv == 0,
-                    showFrame: true,
-                    frameColor: lv > 0
-                        ? NightPalette.accentGold
-                        : NightPalette.borderGold,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${h.name} · ${h.title} ${lv > 0 ? "(Lv.$lv)" : "(${h.unlockChapter}장 합류)"}',
-                        ),
-                        Text(
-                          h.skillDesc,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: NightPalette.textMuted,
-                          ),
-                        ),
-                      ],
+                  const Text(
+                    '방어 초소 동료 강화',
+                    style: TextStyle(
+                      fontFamily: 'BlackHanSans',
+                      fontSize: 18,
+                      color: NightPalette.accentGold,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: (canAcquire && lv < 10 && p.elixirs >= cost)
-                        ? () => controller.upgradeCompanion(h)
-                        : null,
-                    child: Text(
-                      !canAcquire
-                          ? '${h.unlockChapter}장 개방'
-                          : (lv >= 10 ? '최고' : '영약 $cost'),
+                  const SizedBox(height: 10),
+                  for (int idx = 0; idx < CompanionHero.values.length; idx++) ...[
+                    if (idx > 0)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 9),
+                        child: Divider(height: 1, color: Colors.white12),
+                      ),
+                    Builder(
+                      builder: (_) {
+                        final h = CompanionHero.values[idx];
+                        final lv = p.companionLevels[h] ?? 0;
+                        final cost = lv == 0 ? h.unlockElixirs : h.upgradeElixirCost(lv);
+                        final canAcquire = lv > 0 ||
+                            (h.unlockElixirs > 0 &&
+                                p.highestUnlockedChapter >= h.unlockChapter);
+                        return Row(
+                          children: [
+                            NightSpriteIcon(
+                              assetPath: NightArtRegistry.heroIdleAsset(h),
+                              fallbackAssetPath: NightArtRegistry.heroFaceAsset(h),
+                              fallbackIcon: Icons.person_rounded,
+                              size: 46,
+                              borderRadius: 12,
+                              dimmed: lv == 0,
+                              showFrame: true,
+                              frameColor: lv > 0
+                                  ? NightPalette.accentGold
+                                  : NightPalette.borderGold,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${h.name} · ${h.title} ${lv > 0 ? "(Lv.$lv)" : "(${h.unlockChapter}장 합류)"}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14.6,
+                                    ),
+                                  ),
+                                  Text(
+                                    h.skillDesc,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: NightPalette.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed: (canAcquire && lv < 10 && p.elixirs >= cost)
+                                  ? () => controller.upgradeCompanion(h)
+                                  : null,
+                              child: Text(
+                                !canAcquire
+                                    ? '${h.unlockChapter}장 개방'
+                                    : (lv >= 10 ? '최고' : '영약 $cost'),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
-          );
-        }),
+          ),
+        ),
       ],
     );
   }

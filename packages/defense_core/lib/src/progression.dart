@@ -407,6 +407,7 @@ class PlayerProgress {
     this.totalChainShatterCount = 0,
     this.bestEndlessWave = 0,
     this.forgeMasteryLevel = 0,
+    this.elixirResonanceLevel = 0,
     this.tutorialSeen = false,
     this.bgmVolume = 0.38,
     this.sfxVolume = 0.72,
@@ -539,6 +540,7 @@ class PlayerProgress {
   int totalChainShatterCount;
   int bestEndlessWave;
   int forgeMasteryLevel;
+  int elixirResonanceLevel;
   bool tutorialSeen;
   double bgmVolume;
   double sfxVolume;
@@ -801,7 +803,18 @@ class PlayerProgress {
     return true;
   }
 
-  /// 5) 영약각 — 영약으로 내공 8경지 돌파, 영수 강화, 동료 강화.
+  /// 5) 영약각 — 영약으로 내공 8경지 돌파, 호법 영기 무한 공명, 영수 강화, 동료 강화.
+  int get elixirResonanceCost => 10 + elixirResonanceLevel * 4;
+  double get elixirResonanceBonus => elixirResonanceLevel * 0.055;
+
+  bool upgradeElixirResonance() {
+    final cost = elixirResonanceCost;
+    if (elixirs < cost) return false;
+    elixirs -= cost;
+    elixirResonanceLevel++;
+    return true;
+  }
+
   bool breakthroughRealm() {
     final next = realm.nextRealm;
     if (next == null) return false;
@@ -1384,6 +1397,7 @@ class PlayerProgress {
         'totChain': totalChainShatterCount,
         'bestEndless': bestEndlessWave,
         'forgeMastery': forgeMasteryLevel,
+        'elixirResonance': elixirResonanceLevel,
         'tutSeen': tutorialSeen,
         'bgmVol': bgmVolume,
         'sfxVol': sfxVolume,
@@ -1487,6 +1501,7 @@ class PlayerProgress {
       totalChainShatterCount: _safeInt(j['totChain'], 0).clamp(0, 999999999),
       bestEndlessWave: _safeInt(j['bestEndless'], 0).clamp(0, 9999),
       forgeMasteryLevel: _safeInt(j['forgeMastery'], 0).clamp(0, 9999),
+      elixirResonanceLevel: _safeInt(j['elixirResonance'], 0).clamp(0, 9999),
       tutorialSeen: _safeBool(j['tutSeen'], false),
       bgmVolume: _safeDouble(j['bgmVol'] ?? j['bgmVolume'], 0.38).clamp(0.0, 1.0),
       sfxVolume: _safeDouble(j['sfxVol'] ?? j['sfxVolume'], 0.72).clamp(0.0, 1.0),
