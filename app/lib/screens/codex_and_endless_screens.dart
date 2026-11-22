@@ -569,12 +569,19 @@ class CodexScreen extends StatelessWidget {
                   sheetAssetPath: NightArtRegistry.mutantSheetAsset(m),
                   fallbackAssetPath: NightArtRegistry.mutantShowcaseAsset(m),
                   frameLabels: m.isBoss
-                      ? const [
-                          '① 1페이즈 중갑 강림',
-                          '② 2페이즈 외피 변이',
-                          '③ 3페이즈 심연 폭주',
-                          '④ 파성 필살 강타',
-                        ]
+                      ? (m.isMidBoss
+                          ? const [
+                              '① 선봉 지휘 돌격',
+                              '② 2차 흉폭 재변이',
+                              '③ 마갑 연타 저항',
+                              '④ 진영 돌파 강타',
+                            ]
+                          : const [
+                              '① 1페이즈 중갑 강림',
+                              '② 2페이즈 외피 변이',
+                              '③ 3페이즈 심연 폭주',
+                              '④ 파성 필살 강타',
+                            ])
                       : const [
                           '① 포식 배회',
                           '② 질주 도약',

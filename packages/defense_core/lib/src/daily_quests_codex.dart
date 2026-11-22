@@ -566,7 +566,7 @@ class EndlessWaveBuilder {
       waves.add(groups);
     }
 
-    final cappedStartWave = totalWaves > 30 ? 30 : totalWaves;
+    final cappedStartWave = totalWaves > 100 ? 100 : totalWaves;
     return StageSpec(
       globalIndex: 999,
       chapterNumber: safeTheme,
@@ -583,7 +583,7 @@ class EndlessWaveBuilder {
       isBossStage: true,
       maxMountCount: CampaignCatalog.chapterOf(safeTheme).mounts.length,
       waves: waves,
-      startingFieldTokens: 155 + cappedStartWave * 6,
+      startingFieldTokens: 165 + cappedStartWave * 3,
       clearElixirBonus: 3 + (totalWaves ~/ 5),
     );
   }

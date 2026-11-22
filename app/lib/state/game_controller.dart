@@ -109,16 +109,25 @@ class GameController extends ChangeNotifier {
 
     final unlockedBeasts = SpiritBeast.values
         .where((b) => (_progress.beastLevels[b] ?? 0) > 0)
-        .toList();
+        .toList()
+      ..sort((a, b) {
+        final scoreA = (_progress.beastLevels[a] ?? 0) * 2 + a.index * 3;
+        final scoreB = (_progress.beastLevels[b] ?? 0) * 2 + b.index * 3;
+        return scoreB.compareTo(scoreA);
+      });
     if (unlockedBeasts.isNotEmpty) {
-      preset.equippedBeast = unlockedBeasts.last;
-      preset.beastCondition = unlockedBeasts.last.defaultCondition;
+      preset.equippedBeast = unlockedBeasts.first;
+      preset.beastCondition = unlockedBeasts.first.defaultCondition;
     }
 
+    // 묵현은 위기 시(방어막 35% 이하) 전장에 자동 긴급 난입하므로, 상시 편성 3슬롯은 일반 정예 동료를 우선 채운다!
     final unlockedHeroes = CompanionHero.values
         .where((h) => (_progress.companionLevels[h] ?? 0) > 0)
         .toList()
       ..sort((a, b) {
+        final aIsMuk = a == CompanionHero.mukhyeon ? 1 : 0;
+        final bIsMuk = b == CompanionHero.mukhyeon ? 1 : 0;
+        if (aIsMuk != bIsMuk) return aIsMuk.compareTo(bIsMuk);
         final lvCmp = (_progress.companionLevels[b] ?? 0)
             .compareTo(_progress.companionLevels[a] ?? 0);
         if (lvCmp != 0) return lvCmp;
@@ -188,7 +197,7 @@ class GameController extends ChangeNotifier {
     return res;
   }
 
-  /// 손목 부담 없는 연속 단전 운기 일괄 수행 (기본 10회 · 오늘의 깨달음 6배 포함 · 즉시 저장).
+  /// 손목 부담 없는 연속 단전 운기 일괄 수행 (기본 10회 · 오늘의 깨달음 3배 포함 · 즉시 저장).
   MeditationResult meditateBatch(int count, {bool hitGoldenRing = true}) {
     final res = _progress.meditateBatch(
       count: count,

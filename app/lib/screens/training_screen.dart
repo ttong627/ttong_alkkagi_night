@@ -184,7 +184,7 @@ class _TrainingScreenState extends State<TrainingScreen>
                         const SizedBox(height: 6),
                         Text(
                           nextRealm != null
-                              ? '다음 경지 [${nextRealm.name}] 목표 내공: ${p.naegongPoints} / ${nextRealm.reqNaegong} · 오늘 깨달음(6배) 남은 횟수: $remainBonus/10회'
+                              ? '다음 경지 [${nextRealm.name}] 목표 내공: ${p.naegongPoints} / ${nextRealm.reqNaegong} · 오늘 깨달음(3배) 남은 횟수: $remainBonus/10회'
                               : '최고 경지 [생사경] 도달 완료! · 오늘 깨달음 남은 횟수: $remainBonus/10회',
                           style: const TextStyle(
                             fontSize: 12.5,
@@ -446,7 +446,7 @@ class _TrainingScreenState extends State<TrainingScreen>
                           icon: const Icon(Icons.bolt_rounded),
                           label: Text(
                             p.remainingDailyEnlightenment() > 0
-                                ? '⚡ 오늘의 깨달음 10회 연속 운기 (6배 대박)'
+                                ? '⚡ 오늘의 깨달음 10회 연속 운기 (3배 대박)'
                                 : '⚡ 10회 연속 대주천 운기 (즉시 수련)',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -539,10 +539,13 @@ class _TrainingScreenState extends State<TrainingScreen>
                     child: FilledButton.icon(
                       key: const Key('meridian_instant_open_btn'),
                       onPressed: () {
-                        for (int i = 0;
-                            i < currentSpec.acupointCoords.length;
-                            i++) {
-                          _tapAcupoint(i, currentSpec);
+                        final opened = widget.controller.openMeridian();
+                        if (opened != null && mounted) {
+                          setState(() {
+                            _litAcupoints.clear();
+                            _lastLog =
+                                '🎉 [${opened.name}] 개통 완료! 증표 +${opened.rewardTokens} · 영약 +${opened.rewardElixirs} 수령!';
+                          });
                         }
                       },
                       icon: const Icon(Icons.bolt_rounded),

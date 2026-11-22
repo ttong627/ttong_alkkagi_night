@@ -426,26 +426,28 @@ class ChapterSpec {
   final double excavationCostMultiplier;
   final double swarmVolumeMultiplier;
 
-  /// 각 장 수호탑 위치(하단/중앙/상단)에 맞춘 ×2 배율 복제진 기본 좌표.
+  /// 각 장 수호탑 위치(하단/중앙/상단·좌/우)에 맞춰 수동 탄지 사거리(365px) 안에서 항상 맞힐 수 있는 ×2 배율 복제진 기본 좌표!
   Vec2 get cloneGateBasePos {
+    final anchorX = (towerPos.x * 0.62 + 360.0 * 0.38).clamp(165.0, 555.0);
     if (towerPos.y < 360.0) {
-      return Vec2(360.0, (towerPos.y + 195.0).clamp(380.0, 560.0));
+      return Vec2(anchorX, (towerPos.y + 175.0).clamp(360.0, 540.0));
     }
     if (towerPos.y < 760.0) {
-      return Vec2(360.0, (towerPos.y - 178.0).clamp(360.0, 520.0));
+      return Vec2(anchorX, (towerPos.y - 178.0).clamp(360.0, 520.0));
     }
-    return Vec2(360.0, (towerPos.y - 185.0).clamp(585.0, 820.0));
+    return Vec2(anchorX, (towerPos.y - 185.0).clamp(585.0, 820.0));
   }
 
-  /// 각 장 수호탑 위치에 맞춘 🎯 화력 증폭 과녁패 기본 좌표.
+  /// 각 장 수호탑 위치에 맞춰 기본 수동 탄지 사거리(365px) 안에 들어오는 🎯 화력 증폭 과녁패 기본 좌표!
   Vec2 get powerTargetBasePos {
+    final anchorX = (towerPos.x * 0.55 + 360.0 * 0.45).clamp(175.0, 545.0);
     if (towerPos.y < 360.0) {
-      return Vec2(360.0, (towerPos.y + 385.0).clamp(560.0, 780.0));
+      return Vec2(anchorX, (towerPos.y + 275.0).clamp(450.0, 620.0));
     }
     if (towerPos.y < 760.0) {
-      return Vec2(360.0, (towerPos.y + 195.0).clamp(760.0, 920.0));
+      return Vec2(anchorX, (towerPos.y + 185.0).clamp(740.0, 890.0));
     }
-    return Vec2(360.0, (towerPos.y - 375.0).clamp(410.0, 635.0));
+    return Vec2(anchorX, (towerPos.y - 295.0).clamp(510.0, 790.0));
   }
 
   static List<Vec2> _orthogonalUniform(List<Vec2> raw) {
@@ -525,24 +527,48 @@ class ChapterSpec {
     return uniform;
   }
 
+  static final Map<int, List<Vec2>> _smoothedLaneCache = <int, List<Vec2>>{};
+  static final Map<int, List<Vec2>> _smoothedSpineCache = <int, List<Vec2>>{};
+  static final Map<int, List<List<Vec2>>> _smoothedGuidesCache =
+      <int, List<List<Vec2>>>{};
+
   List<Vec2> _interpolatePath(List<Vec2> raw) =>
       isOrthogonalLabyrinth ? _orthogonalUniform(raw) : _catmullSplineUniform(raw);
 
-  /// 제어점 배열을 장 특성에 맞춰(3차 카트멀-롬 곡선 또는 90° 직각 미궁 복도) 8px 등간격으로 보간한다.
-  List<Vec2> smoothedLane(int laneIndex) =>
-      _interpolatePath(lanes[laneIndex % lanes.length]);
-
-  /// 시각 유도선용 도로 기준 스플라인 반환.
-  List<Vec2> get smoothedVisualSpine =>
-      roadVisualSpine.length >= 2 ? _interpolatePath(roadVisualSpine) : smoothedLane(0);
-
-  /// 전장의 모든 고유 침공 갈래를 깔끔하게 렌더링하기 위한 스플라인 배열.
-  List<List<Vec2>> get smoothedVisualGuides {
-    if (visualGuideLanes.isNotEmpty) {
-      return visualGuideLanes.map(_interpolatePath).toList();
-    }
-    return <List<Vec2>>[smoothedVisualSpine];
+  /// 제어점 배열을 장 특성에 맞춰(3차 카트멀-롬 곡선 또는 90° 직각 미궁 복도) 8px 등간격으로 보간(정적 캐시 적용).
+  List<Vec2> smoothedLane(int laneIndex) {
+    final normIdx = laneIndex % lanes.length;
+    final key = number * 100 + normIdx;
+    return _smoothedLaneCache.putIfAbsent(
+      key,
+      () => List<Vec2>.unmodifiable(_interpolatePath(lanes[normIdx])),
+    );
   }
+
+  /// 시각 유도선용 도로 기준 스플라인 반환(정적 캐시 적용).
+  List<Vec2> get smoothedVisualSpine => _smoothedSpineCache.putIfAbsent(
+        number,
+        () => List<Vec2>.unmodifiable(
+          roadVisualSpine.length >= 2
+              ? _interpolatePath(roadVisualSpine)
+              : smoothedLane(0),
+        ),
+      );
+
+  /// 전장의 모든 고유 침공 갈래를 깔끔하게 렌더링하기 위한 스플라인 배열(정적 캐시 적용).
+  List<List<Vec2>> get smoothedVisualGuides => _smoothedGuidesCache.putIfAbsent(
+        number,
+        () {
+          if (visualGuideLanes.isNotEmpty) {
+            return List<List<Vec2>>.unmodifiable(
+              visualGuideLanes
+                  .map((l) => List<Vec2>.unmodifiable(_interpolatePath(l)))
+                  .toList(),
+            );
+          }
+          return List<List<Vec2>>.unmodifiable(<List<Vec2>>[smoothedVisualSpine]);
+        },
+      );
 
   /// 해당 장의 평균 침공 경로 총 연장(px) 계산.
   double get averageLaneLengthPx {
@@ -1230,7 +1256,11 @@ class CampaignCatalog {
           Vec2(288, 696),
           Vec2(108, 696),
           Vec2(108, 872),
-          Vec2(512, 872),
+          Vec2(388, 872),
+          Vec2(388, 1212),
+          Vec2(636, 1212),
+          Vec2(636, 922),
+          Vec2(512, 922),
           Vec2(512, 1052),
         ],
         [
@@ -1246,7 +1276,11 @@ class CampaignCatalog {
           Vec2(624, 718),
           Vec2(548, 718),
           Vec2(548, 872),
-          Vec2(512, 872),
+          Vec2(388, 872),
+          Vec2(388, 1212),
+          Vec2(636, 1212),
+          Vec2(636, 922),
+          Vec2(512, 922),
           Vec2(512, 1052),
         ],
       ],
@@ -1301,6 +1335,7 @@ class CampaignCatalog {
           Vec2(108, 696),
           Vec2(108, 872),
           Vec2(388, 872),
+          Vec2(388, 922),
           Vec2(636, 922),
           Vec2(636, 1212),
           Vec2(388, 1212),
@@ -2137,8 +2172,8 @@ class CampaignCatalog {
       ],
       pillars: const [
         TerrainPillar(center: Vec2(382, 395), radius: 20, sides: 8, rotationSpeedRad: 1.7, restitutionBoost: 1.50),
-        TerrainPillar(center: Vec2(525, 685), radius: 19, sides: 6, rotationSpeedRad: -1.4, restitutionBoost: 1.45),
-        TerrainPillar(center: Vec2(128, 515), radius: 19, sides: 8, rotationSpeedRad: -1.5, restitutionBoost: 1.48),
+        TerrainPillar(center: Vec2(486, 422), radius: 19, sides: 6, rotationSpeedRad: -1.4, restitutionBoost: 1.45),
+        TerrainPillar(center: Vec2(305, 818), radius: 19, sides: 8, rotationSpeedRad: -1.5, restitutionBoost: 1.48),
       ],
       cliffs: const [
         CliffZone(center: Vec2(76, 515), radius: 46, label: '천상 서쪽 운해 심연'),

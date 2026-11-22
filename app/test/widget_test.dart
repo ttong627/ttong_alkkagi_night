@@ -1249,4 +1249,62 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
+
+  testWidgets('v1.0.0+26 전장 장별 개척비 일치 · 자동비급 토글 칩 · 제7장 우측 PIP 도킹 · 영약각 장 해금 가드 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2280);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    // 1) 1장 유저가 영약이 많아도 제8장 금룡 영입 버튼이 비활성('8장 해금')인지 검증
+    final earlyP = PlayerProgress(elixirs: 200, tutorialSeen: true, bgmVolume: 0.0, sfxVolume: 0.0);
+    final earlyCtrl = GameController(initialProgress: earlyP);
+    await tester.pumpWidget(
+      MaterialApp(home: UpgradeScreen(controller: earlyCtrl, initialTab: 1)),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.drag(find.byType(ListView).first, const Offset(0, -520));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('8장 해금'), findsWidgets);
+
+    // 2) 제7장 전장에서 개척 비용 배율 반영 및 자동비급 토글 칩 작동 검증
+    final p7 = PlayerProgress(
+      tokens: 1200,
+      elixirs: 60,
+      highestClearedGlobalStage: 75,
+      tutorialSeen: true,
+      bgmVolume: 0.0,
+      sfxVolume: 0.0,
+    );
+    p7.companionLevels[CompanionHero.mukhyeon] = 8;
+    p7.companionLevels[CompanionHero.seokdu] = 5;
+    p7.companionLevels[CompanionHero.yeonbi] = 5;
+    p7.companionLevels[CompanionHero.cheongmyeong] = 5;
+    final ctrl7 = GameController(initialProgress: p7);
+    final st7 = CampaignCatalog.stageAt(7, 3);
+    ctrl7.applyRecommendedLoadoutForStage(st7);
+    // 3인 이상의 일반 동료가 있을 때 위기 자동 난입형인 묵현 대신 상시 동료 3인이 우선 편성됨!
+    expect(ctrl7.progress.activePreset.companions.contains(CompanionHero.mukhyeon), isFalse);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BattleScreen(
+          key: ValueKey(st7.code),
+          controller: ctrl7,
+          stage: st7,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+    final autoPerkChip = find.byKey(const Key('battle_auto_perk_chip'));
+    await tester.ensureVisible(autoPerkChip);
+    await tester.tap(autoPerkChip);
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(ctrl7.autoChooseBattlePerks, isTrue);
+    await tester.tap(autoPerkChip);
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(ctrl7.autoChooseBattlePerks, isFalse);
+    expect(tester.takeException(), isNull);
+  });
 }

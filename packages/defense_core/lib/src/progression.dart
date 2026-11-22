@@ -677,8 +677,8 @@ class PlayerProgress {
       dailyEnlightenmentUsed++;
     }
 
-    int baseNaegong = hasDailyBonus ? 24 : 12;
-    int baseSeals = hasDailyBonus ? 7 : 3;
+    int baseNaegong = hasDailyBonus ? 36 : 12;
+    int baseSeals = hasDailyBonus ? 9 : 3;
 
     final serendipityChance = (hitGoldenRing ? 0.45 : 0.16) + meridianSerendipityBonus;
     final isCrit = hitGoldenRing || rng.nextDouble() < serendipityChance * 0.5;
@@ -695,7 +695,7 @@ class PlayerProgress {
 
     naegongPoints += baseNaegong;
     trainingSeals += baseSeals;
-    moonOmenGauge = (moonOmenGauge + 4).clamp(0, 100);
+    moonOmenGauge = (moonOmenGauge + (hasDailyBonus ? 4 : 1)).clamp(0, 100);
     recordDeed(NightDeed.meditate, 1, todayKey: day);
     if (isCrit || isOneMore) {
       recordDeed(NightDeed.serendipityHit, 1, todayKey: day);
@@ -770,15 +770,18 @@ class PlayerProgress {
   }
 
   bool upgradeCoreStat(CoreStatType type) {
+    final cur = coreStatLevels[type] ?? 0;
+    if (cur >= 999) return false;
     final cost = coreStatUpgradeCost(type);
     if (trainingSeals < cost) return false;
     trainingSeals -= cost;
-    coreStatLevels[type] = (coreStatLevels[type] ?? 0) + 1;
+    coreStatLevels[type] = cur + 1;
     return true;
   }
 
   /// 4) 대장간 — 증표로 중앙 보호 장치 / 길목 발사대 영구 강화 및 알 해금.
   bool upgradeCentralGuardian() {
+    if (centralGuardianLevel >= 999) return false;
     final cost = CentralGuardianSpec.permanentUpgradeCost(centralGuardianLevel);
     if (tokens < cost) return false;
     tokens -= cost;
@@ -788,6 +791,7 @@ class PlayerProgress {
 
   bool upgradeLauncherPermanent(LauncherType type) {
     final lv = launcherPermanentLevels[type] ?? 1;
+    if (lv >= 999) return false;
     final cost = type.permanentUpgradeCost(lv);
     if (tokens < cost) return false;
     tokens -= cost;
@@ -799,6 +803,7 @@ class PlayerProgress {
   double get forgeMasteryPowerBonus => forgeMasteryLevel * 0.045;
 
   bool upgradeForgeMastery() {
+    if (forgeMasteryLevel >= 9999) return false;
     final cost = forgeMasteryCost;
     if (tokens < cost) return false;
     tokens -= cost;
@@ -854,19 +859,36 @@ class PlayerProgress {
 
   bool unlockOrUpgradeBeast(SpiritBeast beast) {
     final cur = beastLevels[beast] ?? 0;
-    final cost = cur == 0 ? beast.unlockElixirs : beast.upgradeElixirCost(cur);
+    if (cur == 0 && highestUnlockedChapter < beast.unlockChapter) return false;
+    final cost = cur == 0 ? beast.unlockElixirs : beast.upgradeElixirCost(lvOrZero(cur));
     if (cur >= 10 || elixirs < cost) return false;
     elixirs -= cost;
     beastLevels[beast] = cur + 1;
+    if (cur == 0 && beast.index > activePreset.equippedBeast.index) {
+      activePreset.equippedBeast = beast;
+      activePreset.beastCondition = beast.defaultCondition;
+    }
     return true;
   }
 
+  static int lvOrZero(int v) => v < 0 ? 0 : v;
+
   bool unlockOrUpgradeCompanion(CompanionHero hero) {
     final cur = companionLevels[hero] ?? 0;
-    final cost = cur == 0 ? hero.unlockElixirs : hero.upgradeElixirCost(cur);
+    if (cur == 0 &&
+        (hero.unlockElixirs <= 0 || highestUnlockedChapter < hero.unlockChapter)) {
+      return false;
+    }
+    final cost = cur == 0 ? hero.unlockElixirs : hero.upgradeElixirCost(lvOrZero(cur));
     if (cur >= 10 || elixirs < cost) return false;
     elixirs -= cost;
     companionLevels[hero] = cur + 1;
+    if (cur == 0 &&
+        hero != CompanionHero.mukhyeon &&
+        activePreset.companions.length < 3 &&
+        !activePreset.companions.contains(hero)) {
+      activePreset.companions.add(hero);
+    }
     return true;
   }
 
@@ -878,7 +900,7 @@ class PlayerProgress {
     return true;
   }
 
-  DispatchClaimResult? claimSupplyConvoy(Random rng) {
+  DispatchClaimResult? claimSupplyConvoy(Random rng, {String? todayKey}) {
     if (!convoyActive || convoyBattlesRemaining > 0) return null;
     convoyActive = false;
     convoyCompletedCount++;
@@ -911,7 +933,7 @@ class PlayerProgress {
     final bonusMat = CraftMaterial.values[rng.nextInt(CraftMaterial.values.length)];
     materials[bonusMat] = (materials[bonusMat] ?? 0) + 1;
     if (isCrit || isEncore) {
-      recordDeed(NightDeed.serendipityHit, 1);
+      recordDeed(NightDeed.serendipityHit, 1, todayKey: todayKey);
     }
 
     return DispatchClaimResult(
@@ -932,7 +954,7 @@ class PlayerProgress {
     return true;
   }
 
-  DispatchClaimResult? claimNightExplore(Random rng) {
+  DispatchClaimResult? claimNightExplore(Random rng, {String? todayKey}) {
     if (!exploreActive || exploreBattlesRemaining > 0) return null;
     exploreActive = false;
 
@@ -962,7 +984,7 @@ class PlayerProgress {
     final bonusMat = CraftMaterial.values[rng.nextInt(CraftMaterial.values.length)];
     materials[bonusMat] = (materials[bonusMat] ?? 0) + 1;
     if (isCrit || isEncore) {
-      recordDeed(NightDeed.serendipityHit, 1);
+      recordDeed(NightDeed.serendipityHit, 1, todayKey: todayKey);
     }
 
     return DispatchClaimResult(
@@ -977,7 +999,7 @@ class PlayerProgress {
   }
 
   /// 7) 보름달 길조 게이지 100% 달성 확정 기연 열기 (기연 경로 지원패!).
-  DispatchClaimResult? claimFullMoonSerendipity(Random rng) {
+  DispatchClaimResult? claimFullMoonSerendipity(Random rng, {String? todayKey}) {
     if (moonOmenGauge < 100) return null;
     moonOmenGauge = 0;
 
@@ -1002,7 +1024,7 @@ class PlayerProgress {
     elixirs += gainElixirs;
     supportTokens += gainSupport;
     _grantRandomShards(gainShards, rng);
-    recordDeed(NightDeed.serendipityHit, 1);
+    recordDeed(NightDeed.serendipityHit, 1, todayKey: todayKey);
 
     return DispatchClaimResult(
       title: '보름달 대길조 특급 기연 발동!',
@@ -1104,8 +1126,13 @@ class PlayerProgress {
   }
 
   bool canClaimMission(NightMissionSpec m, {String? todayKey}) {
-    return !isMissionClaimed(m, todayKey: todayKey) &&
-        deedProgress(m, todayKey: todayKey) >= m.goal;
+    final day = todayKey ?? _todayString();
+    if (m.period == QuestPeriodKind.daily &&
+        !todayDailyMissions(todayKey: day).any((dm) => dm.id == m.id)) {
+      return false;
+    }
+    return !isMissionClaimed(m, todayKey: day) &&
+        deedProgress(m, todayKey: day) >= m.goal;
   }
 
   NightRewardBundle? claimMission(NightMissionSpec m, {Random? rng, String? todayKey}) {
@@ -1233,21 +1260,21 @@ class PlayerProgress {
     int count = 0;
 
     if (moonOmenGauge >= 100) {
-      final r = claimFullMoonSerendipity(rng);
+      final r = claimFullMoonSerendipity(rng, todayKey: todayKey);
       if (r != null) {
         count++;
         sources.add('보름달 기연');
       }
     }
     if (convoyActive && convoyBattlesRemaining <= 0) {
-      final r = claimSupplyConvoy(rng);
+      final r = claimSupplyConvoy(rng, todayKey: todayKey);
       if (r != null) {
         count++;
         sources.add('물자 호송');
       }
     }
     if (exploreActive && exploreBattlesRemaining <= 0) {
-      final r = claimNightExplore(rng);
+      final r = claimNightExplore(rng, todayKey: todayKey);
       if (r != null) {
         count++;
         sources.add('심야 탐색');
@@ -1326,6 +1353,7 @@ class PlayerProgress {
 
   /// 보유 증표·영약·수련인장으로 가장 효율 높은 항목을 최대 [maxSteps]회 스마트 일괄 강화!
   List<String> upgradeRecommendedBatch({int maxSteps = 5}) {
+    if (maxSteps <= 0) return const [];
     final logs = <String>[];
     final limit = maxSteps.clamp(1, 15);
 
@@ -1343,13 +1371,27 @@ class PlayerProgress {
         continue;
       }
 
-      // 3순위: 조각 수호석(11~13단) 해금 가능 시 해금
+      // 3순위: 조각 수호석(11~13단) 및 현재 장 해금 가능한 상위 증표 수호석(2~10단) 해금!
       StoneMaterial? unlockedStoneNow;
       for (final st in StoneMaterial.values.reversed) {
         if (st.isShardStone && canUnlockStone(st) && unlockStoneWithTokens(st)) {
           unlockedStoneNow = st;
-          activePreset.primaryStone = st;
+          if (st.grade > activePreset.primaryStone.grade) {
+            activePreset.primaryStone = st;
+          }
           break;
+        }
+      }
+      if (unlockedStoneNow == null) {
+        for (final st in StoneMaterial.values) {
+          if (!st.isShardStone &&
+              st.grade > activePreset.primaryStone.grade &&
+              canUnlockStone(st) &&
+              unlockStoneWithTokens(st)) {
+            unlockedStoneNow = st;
+            activePreset.primaryStone = st;
+            break;
+          }
         }
       }
       if (unlockedStoneNow != null) {
@@ -1357,13 +1399,20 @@ class PlayerProgress {
         continue;
       }
 
-      // 4순위: 중앙 수호탑 vs 해금된 주력 발사대 중 최소 비용 강화
+      // 4순위: 중앙 수호탑 vs 현재 진법/해금 주력 발사대 중 최소 비용 강화
       final unlockedLaunchers = LauncherType.values
-          .where((t) => t.unlockChapter <= highestUnlockedChapter + 1)
+          .where((t) => t.unlockChapter <= highestUnlockedChapter)
           .toList();
+      final presetSet = activePreset.mountTypes.toSet();
+      final candidateLaunchers = unlockedLaunchers
+          .where(presetSet.contains)
+          .toList();
+      final pool = candidateLaunchers.isNotEmpty
+          ? candidateLaunchers
+          : unlockedLaunchers;
       LauncherType? cheapestLauncher;
       int cheapestLauncherCost = 1 << 30;
-      for (final lt in unlockedLaunchers) {
+      for (final lt in pool) {
         final c = lt.permanentUpgradeCost(launcherPermanentLevels[lt] ?? 1);
         if (c < cheapestLauncherCost) {
           cheapestLauncherCost = c;
@@ -1384,7 +1433,21 @@ class PlayerProgress {
         continue;
       }
 
-      // 5순위: 영약으로 출전 영수·출전 동료·호법 영기 공명 강화
+      // 5순위: 영약으로 상위 영수 영입/강화 · 상위 동료 영입/출전 동료 강화 · 호법 영기 공명 강화
+      SpiritBeast? newlyHiredBeast;
+      for (final b in SpiritBeast.values.reversed) {
+        if ((beastLevels[b] ?? 0) == 0 &&
+            b.unlockChapter <= highestUnlockedChapter &&
+            unlockOrUpgradeBeast(b)) {
+          newlyHiredBeast = b;
+          break;
+        }
+      }
+      if (newlyHiredBeast != null) {
+        logs.add('${newlyHiredBeast.name} 영입');
+        continue;
+      }
+
       final activeBeast = activePreset.equippedBeast;
       if ((beastLevels[activeBeast] ?? 0) > 0 &&
           (beastLevels[activeBeast] ?? 0) < 10 &&
@@ -1392,6 +1455,23 @@ class PlayerProgress {
         logs.add('${activeBeast.name} ${beastLevels[activeBeast]}단');
         continue;
       }
+
+      CompanionHero? newlyHiredHero;
+      for (final h in CompanionHero.values.reversed) {
+        if (h != CompanionHero.mukhyeon &&
+            (companionLevels[h] ?? 0) == 0 &&
+            h.unlockElixirs > 0 &&
+            h.unlockChapter <= highestUnlockedChapter &&
+            unlockOrUpgradeCompanion(h)) {
+          newlyHiredHero = h;
+          break;
+        }
+      }
+      if (newlyHiredHero != null) {
+        logs.add('${newlyHiredHero.name} 영입');
+        continue;
+      }
+
       CompanionHero? upgradedHero;
       for (final h in activePreset.companions) {
         final lv = companionLevels[h] ?? 0;
@@ -1584,6 +1664,10 @@ class PlayerProgress {
             final beast = stage.rescueBeast!;
             final prevBeastLv = beastLevels[beast] ?? 0;
             beastLevels[beast] = prevBeastLv <= 0 ? 1 : (prevBeastLv + 1).clamp(1, 10);
+            if (prevBeastLv <= 0 && beast.index > activePreset.equippedBeast.index) {
+              activePreset.equippedBeast = beast;
+              activePreset.beastCondition = beast.defaultCondition;
+            }
             lastRescuedBeast = beast;
             rescueNotices.add(
               prevBeastLv <= 0
@@ -1718,7 +1802,7 @@ class PlayerProgress {
       realmIndex: _safeInt(j['realm'] ?? j['realmIndex'], 0).clamp(0, maxRealm),
       centralGuardianLevel:
           _safeInt(j['centralLv'] ?? j['centralGuardianLevel'], 1).clamp(1, 999),
-      supportTokens: _safeInt(j['support'] ?? j['supportTokens'], 2).clamp(0, 9999),
+      supportTokens: _safeInt(j['support'] ?? j['supportTokens'], 2).clamp(0, 999999),
       moonOmenGauge: _safeInt(j['moon'] ?? j['moonOmenGauge'], 35).clamp(0, 100),
       highestClearedGlobalStage: _safeInt(
         j['cleared'] ?? j['highestClearedStage'] ?? j['highestClearedGlobalStage'],
@@ -1821,6 +1905,26 @@ class PlayerProgress {
       }
     }
     p.activePresetIndex = p.activePresetIndex.clamp(0, p.presets.length - 1);
+    final bestOwnedStone = (p.unlockedStones.toList()
+          ..sort((a, b) => b.grade.compareTo(a.grade)))
+        .firstOrNull ??
+        StoneMaterial.cheongok;
+    for (final pr in p.presets) {
+      if (!p.unlockedStones.contains(pr.primaryStone)) {
+        pr.primaryStone = bestOwnedStone;
+      }
+      if ((p.beastLevels[pr.equippedBeast] ?? 0) <= 0) {
+        pr.equippedBeast = SpiritBeast.nalssaendol;
+        pr.beastCondition = SpiritBeast.nalssaendol.defaultCondition;
+      }
+      pr.companions = pr.companions
+          .where((h) => (p.companionLevels[h] ?? 0) > 0)
+          .take(3)
+          .toList();
+      if (pr.companions.isEmpty && (p.companionLevels[CompanionHero.seokdu] ?? 0) > 0) {
+        pr.companions.add(CompanionHero.seokdu);
+      }
+    }
 
     if (j['materials'] is Map) {
       (j['materials'] as Map).forEach((k, v) {

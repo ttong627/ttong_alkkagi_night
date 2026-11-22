@@ -696,8 +696,12 @@ class NightBattleSprites {
         raw.lengthInBytes,
       );
       final ui.Codec codec = await ui.instantiateImageCodec(bytes);
-      final ui.FrameInfo frame = await codec.getNextFrame();
-      _cache[assetPath] = frame.image;
+      try {
+        final ui.FrameInfo frame = await codec.getNextFrame();
+        _cache[assetPath] = frame.image;
+      } finally {
+        codec.dispose();
+      }
       return true;
     } catch (_) {
       if (kIsWeb) {

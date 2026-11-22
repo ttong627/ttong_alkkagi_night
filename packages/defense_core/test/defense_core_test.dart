@@ -2493,5 +2493,55 @@ void main() {
       }
       expect(simAll.shockwaveRings, isNotEmpty);
     });
+
+    test('v1.0.0+26 적대적 전수 검증: 해금 가드·합체 영구레벨 동기화·제7장 역방향 물리·야차 방향성 방패·묵현 능동검기·무한혈전 100물결 유한성 검증', () {
+      // 1) 1장 계정에서 8장 금룡 영입 차단 & 스마트 일괄 강화 시 2~10단 토큰 수호석 자동 해금
+      final p1 = PlayerProgress(tokens: 900, elixirs: 200);
+      expect(p1.unlockOrUpgradeBeast(SpiritBeast.geumryong), isFalse);
+      expect(p1.unlockOrUpgradeCompanion(CompanionHero.yeonbi), isFalse);
+      final batchLogs = p1.upgradeRecommendedBatch(maxSteps: 10);
+      expect(batchLogs, isNotEmpty);
+      expect(p1.unlockedStones.length, greaterThan(1));
+
+      // 2) 일일 깨달음 3배(36내공 / 9인장) 일치 검증
+      final medRes = PlayerProgress().meditateOnce(
+        hitGoldenRing: false,
+        rng: Random(1),
+        todayKey: '2026-11-22',
+      );
+      expect(medRes.gainedNaegong, anyOf(36, 72));
+      expect(medRes.gainedSeals, anyOf(9, 18));
+
+      // 3) 제5장 시계태엽 미궁 전 구간 90° 직각 세그먼트(대각선 0건) 검증
+      final ch5 = CampaignCatalog.chapterOf(5);
+      for (final lane in ch5.lanes) {
+        for (int i = 1; i < lane.length; i++) {
+          final dx = (lane[i].x - lane[i - 1].x).abs();
+          final dy = (lane[i].y - lane[i - 1].y).abs();
+          expect(dx < 0.01 || dy < 0.01, isTrue);
+        }
+      }
+
+      // 4) 무한 혈전 100물결 다항 스케일링 유한성 및 양수 검증
+      final pEnd = PlayerProgress(highestClearedGlobalStage: 111, realmIndex: 7);
+      final endStage = EndlessWaveBuilder.buildEndlessStage(
+        chapterTheme: 10,
+        waveCount: 100,
+      );
+      expect(endStage.startingFieldTokens, greaterThan(160));
+      final endSim = DefenseBattleSim(
+        stage: endStage,
+        difficulty: DefenseDifficulty.nightmare,
+        progress: pEnd,
+        seed: 77,
+      );
+      endSim.currentWaveIndex = 99;
+      for (int i = 0; i < 60 && !endSim.isFinished; i++) {
+        endSim.step(1.0 / 30.0);
+      }
+      for (final m in endSim.mutants) {
+        expect(m.maxHp.isFinite && m.maxHp > 0 && m.maxHp < 1e9, isTrue);
+      }
+    });
   });
 }

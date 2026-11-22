@@ -57,6 +57,7 @@ class _BattleScreenState extends State<BattleScreen>
   /// 광각 대협곡 전체 보기(기본) ↔ 1.4배 정밀 확대 보기 전환 상태 & 비상 위험구역 2.8배 확대 영상 모니터 표시 상태!
   bool _zoomedView = false;
   bool _showCrisisZoomPip = true;
+  bool _handedOffBgm = false;
   final TransformationController _zoomController = TransformationController();
 
   @override
@@ -160,6 +161,11 @@ class _BattleScreenState extends State<BattleScreen>
     }
     if (!_sim.isFinished) {
       _sim.step(rawDt * _speedMultiplier);
+    } else if (_sim.dawnPurifyAnimTimer > 0) {
+      _sim.dawnPurifyAnimTimer =
+          max(0.0, _sim.dawnPurifyAnimTimer - rawDt);
+    } else if (_summaryShown) {
+      return;
     }
 
     NightAudioController.instance.flushBattleCues(_sim.pendingSounds);
@@ -212,14 +218,14 @@ class _BattleScreenState extends State<BattleScreen>
     return closest;
   }
 
-  /// 전장에서 다단 변이 보스의 빛나는 약점 과녁(🎯) 또는 동체를 직접 터치했는지 판별!
+  /// 전장에서 다단 변이 보스의 빛나는 약점 과녁(🎯)을 직접 터치했는지 판별 (중앙탑/빈공간 오터치 방지 52px 정밀 반경)!
   ActiveMutant? _hitMultiPhaseBossTarget(Vec2 arenaPos) {
     ActiveMutant? best;
-    double bestDist = 94.0;
+    double bestDist = 52.0;
     for (final m in _sim.mutants) {
       if (m.totalPhases <= 1 || m.phaseTransitionTimer > 0) continue;
       final dWeak = arenaPos.distanceTo(m.weakSpotWorldPos);
-      final dBody = max(0.0, arenaPos.distanceTo(m.pos) - m.effectiveRadius * 0.45);
+      final dBody = max(0.0, arenaPos.distanceTo(m.pos) - m.effectiveRadius * 0.55);
       final d = min(dWeak, dBody);
       if (d <= bestDist) {
         bestDist = d;
@@ -748,11 +754,13 @@ class _BattleScreenState extends State<BattleScreen>
                             if (summary.victory &&
                                 widget.stage.globalIndex <
                                     CampaignCatalog.allStages.length) {
+                              _handedOffBgm = true;
                               final nextStage = CampaignCatalog
                                   .allStages[widget.stage.globalIndex];
                               Navigator.of(context).pushReplacement(
                                 MaterialPageRoute(
                                   builder: (_) => BattleScreen(
+                                    key: ValueKey(nextStage.code),
                                     controller: widget.controller,
                                     stage: nextStage,
                                   ),
@@ -803,7 +811,9 @@ class _BattleScreenState extends State<BattleScreen>
     _ticker.dispose();
     _frameNotifier.dispose();
     _zoomController.dispose();
-    NightAudioController.instance.playBgm('bgm_lobby.ogg');
+    if (!_handedOffBgm) {
+      NightAudioController.instance.playBgm('bgm_lobby.ogg');
+    }
     super.dispose();
   }
 
@@ -833,7 +843,7 @@ class _BattleScreenState extends State<BattleScreen>
                 final nextTargetCost = nextMount == null
                     ? _sim.buildCostForType(LauncherType.rapid)
                     : (needExcavateFirst
-                        ? nextMount.excavationCost
+                        ? _sim.excavationCostForSlot(nextMount)
                         : _sim.buildCostForType(nextMount.recommendedType));
                 final qiFill =
                     (_sim.fieldTokens / max(1, nextTargetCost)).clamp(0.0, 1.0);
@@ -1307,17 +1317,7 @@ class _BattleScreenState extends State<BattleScreen>
                                   });
                                 }
 
-                                // 2) 다단 변이 보스의 빛나는 약점 과녁(🎯) 터치 → 모드 전환 없이 즉시 정밀 파갑 신궁탄 격발!
-                                final bossTarget = _hitMultiPhaseBossTarget(tapPos);
-                                if (bossTarget != null) {
-                                  if (_sim.firePrecisionStrikeAt(tapPos)) {
-                                    NightHaptics.instance.heavyImpact();
-                                    _frameNotifier.value++;
-                                  }
-                                  return;
-                                }
-
-                                // 3) 각 장의 실제 수호 제단(중앙 기명 수호탑) 터치 → 자동 발사 ↔ 수동 탄지 즉시 전환!
+                                // 2) 각 장의 실제 수호 제단(중앙 기명 수호탑) 터치 우선 처리 → 보스가 제단에 붙어도 자동/수동 전환 보장!
                                 if (tapPos.distanceTo(
                                       _sim.towerPos,
                                     ) <=
@@ -1329,7 +1329,16 @@ class _BattleScreenState extends State<BattleScreen>
                                   return;
                                 }
 
-                                // 4) 수동 탄지 모드에서 전장 위쪽 허공 터치 → 해당 지점으로 3갈래 수동 산탄 발사!
+                                // 3) 다단 변이 보스의 빛나는 약점 과녁(🎯) 터치 → 재사용 대기시간이 찼을 때만 정밀 파갑 신궁탄 격발!
+                                final bossTarget = _hitMultiPhaseBossTarget(tapPos);
+                                if (bossTarget != null &&
+                                    _sim.firePrecisionStrikeAt(tapPos)) {
+                                  NightHaptics.instance.heavyImpact();
+                                  _frameNotifier.value++;
+                                  return;
+                                }
+
+                                // 4) 수동 탄지 모드에서 전장 허공 터치 → 해당 지점으로 3갈래 수동 산탄 발사!
                                 if (_sim.centralManualMode) {
                                   if (_sim.fireCentralManualAt(tapPos)) {
                                     NightHaptics.instance.lightTap();
@@ -1355,15 +1364,16 @@ class _BattleScreenState extends State<BattleScreen>
                                         _panStartArenaPos = startPos;
                                         return;
                                       }
-                                      // 다단 변이 보스 약점 위에서 터치한 경우 정밀 파갑 저격 즉시 발동!
-                                      if (_hitMultiPhaseBossTarget(startPos) !=
-                                          null) {
-                                        if (_sim.firePrecisionStrikeAt(
-                                          startPos,
-                                        )) {
-                                          NightHaptics.instance.heavyImpact();
-                                          _frameNotifier.value++;
-                                        }
+                                      // 중앙탑에서 시작한 드래그가 아닐 때만 다단 변이 보스 약점 즉시 저격!
+                                      if (startPos.distanceTo(_sim.towerPos) >
+                                              48.0 &&
+                                          _hitMultiPhaseBossTarget(startPos) !=
+                                              null &&
+                                          _sim.firePrecisionStrikeAt(
+                                            startPos,
+                                          )) {
+                                        NightHaptics.instance.heavyImpact();
+                                        _frameNotifier.value++;
                                         return;
                                       }
                                       _panStartSlot = null;
@@ -1762,13 +1772,17 @@ class _BattleScreenState extends State<BattleScreen>
                         const Color(0xFFFFD166),
                         sirenPulse,
                       )!;
+                      final dockRightForTopMounts = _sim.chapter.number == 7;
                       return Positioned(
-                        top: 42,
-                        left: 10,
+                        top: dockRightForTopMounts ? 88 : 42,
+                        left: dockRightForTopMounts ? null : 10,
+                        right: dockRightForTopMounts ? 10 : null,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 214),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: dockRightForTopMounts
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               // 1) 비상 경보 사이렌 헤더 띠 (접기/펼치기 가능)
@@ -2684,12 +2698,17 @@ class _BattleScreenState extends State<BattleScreen>
                                                 : 0;
                                             final reqCost = existing == null
                                                 ? _sim.buildCostForType(lt)
-                                                : lt.progressiveBuildCost(
-                                                    max(
-                                                      0,
-                                                      _sim.launchers.length - 1,
-                                                    ),
-                                                  );
+                                                : (_sim.chapter
+                                                            .buildCostMultiplier *
+                                                        lt.progressiveBuildCost(
+                                                          max(
+                                                            0,
+                                                            _sim.launchers
+                                                                    .length -
+                                                                1,
+                                                          ),
+                                                        ))
+                                                    .round();
                                             final canAfford = unlocked &&
                                                 (_sim.fieldTokens + refund) >=
                                                     reqCost;
@@ -2790,8 +2809,11 @@ class _BattleScreenState extends State<BattleScreen>
                 final luckyCost = _sim.currentLuckySummonCost;
                 final canQuickLucky =
                     readyEmptySlot != null && _sim.fieldTokens >= luckyCost;
+                final unexcavatedCost = unexcavatedSlot != null
+                    ? _sim.excavationCostForSlot(unexcavatedSlot)
+                    : 0;
                 final canExcavateNext = unexcavatedSlot != null &&
-                    _sim.fieldTokens >= unexcavatedSlot.excavationCost;
+                    _sim.fieldTokens >= unexcavatedCost;
                 final mergePair = _sim.findAnyMergePair();
 
                 return Container(
@@ -2822,7 +2844,7 @@ class _BattleScreenState extends State<BattleScreen>
                                       : Colors.white24,
                                 ),
                                 label: Text(
-                                  '⛏️${unexcavatedSlot.slotIndex + 1}번거점개척(${unexcavatedSlot.excavationCost}⚡)',
+                                  '⛏️${unexcavatedSlot.slotIndex + 1}번거점개척($unexcavatedCost⚡)',
                                   style: TextStyle(
                                     fontSize: 11.2,
                                     fontWeight: FontWeight.bold,
@@ -3250,14 +3272,47 @@ class _BattleScreenState extends State<BattleScreen>
                                 setState(() {});
                               },
                             ),
+                            const SizedBox(width: 5),
+                            FilterChip(
+                              key: const Key('battle_auto_perk_chip'),
+                              visualDensity: VisualDensity.compact,
+                              selected: _sim.autoChoosePerks,
+                              selectedColor: const Color(0xFF332610),
+                              backgroundColor: NightPalette.bgDeep,
+                              checkmarkColor: NightPalette.accentGold,
+                              side: BorderSide(
+                                color: _sim.autoChoosePerks
+                                    ? NightPalette.accentGold
+                                    : Colors.white24,
+                              ),
+                              label: Text(
+                                '자동비급',
+                                style: TextStyle(
+                                  fontSize: 11.0,
+                                  color: _sim.autoChoosePerks
+                                      ? NightPalette.accentGold
+                                      : NightPalette.textMuted,
+                                ),
+                              ),
+                              onSelected: (v) {
+                                widget.controller.autoChooseBattlePerks = v;
+                                _sim.autoChoosePerks = v;
+                                if (v && _sim.pendingPerkChoices.isNotEmpty) {
+                                  final rec = _sim.recommendedPerkChoice() ??
+                                      _sim.pendingPerkChoices.first;
+                                  _sim.chooseRoguePerk(rec);
+                                }
+                                setState(() {});
+                              },
+                            ),
                             const SizedBox(width: 6),
                             OutlinedButton.icon(
                               key: const Key('battle_chuldu_btn'),
                               style: OutlinedButton.styleFrom(
                                 visualDensity: VisualDensity.compact,
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
+                                  horizontal: 7,
+                                  vertical: 5,
                                 ),
                                 backgroundColor: _sim.supportChargesLeft > 0
                                     ? const Color(0xFF332410)
@@ -3283,7 +3338,7 @@ class _BattleScreenState extends State<BattleScreen>
                                 fallbackAssetPath:
                                     NightArtRegistry.nightSupportSeal,
                                 fallbackIcon: Icons.campaign_rounded,
-                                size: 18,
+                                size: 16,
                                 color: _sim.supportChargesLeft > 0
                                     ? NightPalette.accentGold
                                     : Colors.white54,
@@ -3291,9 +3346,9 @@ class _BattleScreenState extends State<BattleScreen>
                                 borderRadius: 4,
                               ),
                               label: Text(
-                                '무림수호단 출두! (${_sim.supportChargesLeft})',
+                                '무림수호단 출두!(${_sim.supportChargesLeft})',
                                 style: const TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 10.8,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

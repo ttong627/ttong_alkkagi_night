@@ -1536,15 +1536,28 @@ class UpgradeScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            FilledButton(
-                              onPressed: (lv < 10 && p.elixirs >= cost)
-                                  ? () => controller.upgradeBeast(b)
-                                  : null,
-                              child: Text(
-                                lv >= 10
-                                    ? '최고단계'
-                                    : (lv == 0 ? '영약 $cost 영입' : '영약 $cost 강화'),
-                              ),
+                            Builder(
+                              builder: (_) {
+                                final chOpen =
+                                    p.highestUnlockedChapter >= b.unlockChapter;
+                                final canBuy = lv < 10 &&
+                                    p.elixirs >= cost &&
+                                    (lv > 0 || chOpen);
+                                return FilledButton(
+                                  onPressed: canBuy
+                                      ? () => controller.upgradeBeast(b)
+                                      : null,
+                                  child: Text(
+                                    lv >= 10
+                                        ? '최고단계'
+                                        : (lv == 0
+                                            ? (chOpen
+                                                ? '영약 $cost 영입'
+                                                : '${b.unlockChapter}장 해금')
+                                            : '영약 $cost 강화'),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         );
