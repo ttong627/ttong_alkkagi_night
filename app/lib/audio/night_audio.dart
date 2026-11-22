@@ -15,6 +15,7 @@ class NightAudioController {
   double sfxVolume = 0.72;
   String? _currentBgm;
   String? _loadedBgmSource;
+  int _bgmOpSeq = 0;
 
   AudioPlayer? _bgmPlayer;
   final List<AudioPlayer> _sfxPool = [];
@@ -27,6 +28,7 @@ class NightAudioController {
     required bool vibOn,
     required int vibStrength,
   }) async {
+    final opSeq = ++_bgmOpSeq;
     bgmVolume = bgmVol.clamp(0.0, 1.0);
     sfxVolume = sfxVol.clamp(0.0, 1.0);
     bgmEnabled = bgmVolume > 0.01;
@@ -40,9 +42,11 @@ class NightAudioController {
         await _bgmPlayer?.pause();
       } else if (_currentBgm != null) {
         if (_bgmPlayer == null || _loadedBgmSource != _currentBgm) {
-          await playBgm(_currentBgm!);
+          await _playBgmInternal(_currentBgm!, opSeq);
         } else {
+          if (opSeq != _bgmOpSeq || !bgmEnabled) return;
           await _bgmPlayer!.setVolume(bgmVolume);
+          if (opSeq != _bgmOpSeq || !bgmEnabled) return;
           await _bgmPlayer!.resume();
         }
       }
@@ -50,6 +54,11 @@ class NightAudioController {
   }
 
   Future<void> playBgm(String assetFileName) async {
+    final opSeq = ++_bgmOpSeq;
+    await _playBgmInternal(assetFileName, opSeq);
+  }
+
+  Future<void> _playBgmInternal(String assetFileName, int opSeq) async {
     if (!bgmEnabled) {
       _currentBgm = assetFileName;
       return;
@@ -58,7 +67,9 @@ class NightAudioController {
         _loadedBgmSource == assetFileName &&
         _bgmPlayer != null) {
       try {
+        if (opSeq != _bgmOpSeq || !bgmEnabled) return;
         await _bgmPlayer!.setVolume(bgmVolume);
+        if (opSeq != _bgmOpSeq || !bgmEnabled) return;
         await _bgmPlayer!.resume();
       } catch (_) {}
       return;
@@ -67,15 +78,22 @@ class NightAudioController {
     try {
       _bgmPlayer ??= AudioPlayer();
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
+      if (opSeq != _bgmOpSeq || !bgmEnabled || _currentBgm != assetFileName) return;
       await _bgmPlayer!.setVolume(bgmVolume);
+      if (opSeq != _bgmOpSeq || !bgmEnabled || _currentBgm != assetFileName) return;
       await _bgmPlayer!.play(AssetSource('sounds/$assetFileName'));
-      _loadedBgmSource = assetFileName;
+      if (opSeq == _bgmOpSeq && _currentBgm == assetFileName) {
+        _loadedBgmSource = assetFileName;
+      } else if (!bgmEnabled) {
+        await _bgmPlayer?.pause();
+      }
     } catch (e) {
       debugPrint('배경음악 재생 생략: $e');
     }
   }
 
   Future<void> stopBgm() async {
+    ++_bgmOpSeq;
     _currentBgm = null;
     _loadedBgmSource = null;
     try {

@@ -46,7 +46,7 @@ enum LauncherType {
     id: 'frostField',
     name: '한빙 역장기',
     roleSummary: '초근접(138) 협곡 빙결 제어 전용! 빙결 적에게 타 병종 +45% 파쇄 피해 (단독 화력 낮음)',
-    tierNames: ['1형 쌍발 냉기포', '2형 서리 산탄기', '3형 삼발 빙결 족쇄포', '4형 만년 빙옥 폭풍포'],
+    tierNames: ['1형 한기 응축포', '2형 서리 빙결포', '3형 현빙 족쇄포', '4형 쌍발 만년빙 폭풍포'],
     baseCooldownSec: 1.08,
     baseDamage: 2.5,
     projectileSpeed: 535.0,
@@ -59,7 +59,7 @@ enum LauncherType {
   qiAmplifier(
     id: 'qiAmplifier',
     name: '내공 증폭기',
-    roleSummary: '인접(195) 다른 계통 포탑의 화력·연사·사거리를 대폭 증폭 및 내공 충전 (자체 살상력 낮음)',
+    roleSummary: '인접(195) 다른 계통 포탑의 화력·연사·사거리를 증폭 및 문파 무공 발동·내공 충전',
     tierNames: ['1형 기운 공명석', '2형 문파 가속 주입기', '3형 회심 폭주 진법', '4형 기명 천하 사방진'],
     baseCooldownSec: 1.28,
     baseDamage: 2.2,
@@ -102,7 +102,7 @@ enum LauncherType {
   /// 전장 내 이미 배치된 발사대 수에 비례하여 증가하는 체증 건설 비용!
   /// (초중반 무지성 포탑 도배를 +14⚡씩 강하게 억제하되, 10~14초소 대협곡 확장이 가능하도록 최대 +70⚡ 상한 적용)
   int progressiveBuildCost(int existingLauncherCount) =>
-      buildCostTokens + (existingLauncherCount.clamp(0, 20) * 14).clamp(0, 70);
+      buildCostTokens + (existingLauncherCount.clamp(0, 20) * 14).clamp(0, 98);
 
   /// 승급 단계(1~5형)에 따른 기본 유효 사거리 (단당 +6%만 정밀 확장하여 초소 위치 전략성 유지!).
   double effectiveBaseRange(int tier) =>

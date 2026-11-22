@@ -99,7 +99,7 @@ enum SpiritBeast {
     unlockElixirs: 16,
     baseCooldownSec: 10.5,
     defaultCondition: AutoTriggerCondition.heavyOrBoss,
-    skillSummary: '황금 용이 길목을 휩쓸며 수호 알 4발 일제 투하 + 적중 일반 변이체 즉시 연쇄 박살!',
+    skillSummary: '황금 용이 길목을 휩쓸며 수호 알 4발 일제 투하 + 체력 55% 이하 일반 변이체 즉시 연쇄 박살!',
     battleCry: '크아아앙—! 황금 용린의 심판이다!',
     colorHex: 0xFFFFB703,
   );

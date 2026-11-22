@@ -2688,5 +2688,112 @@ void main() {
       );
       expect(pMax.supportTokens, equals(2));
     });
+
+    test('v1.0.0+28 회귀 검증: 기둥 뒤 오폭 차단 · t정렬 다중 관통 · ★5형 합체 돌림판 +1 · 본진 피격 ★3 차단 · 미래 시계 오차 복구 · 호송 버프 실시간 차감', () {
+      // 1) 45일 초과 먼 미래 오차 복구 vs 5일 단기 역행 치팅 차단 구분
+      final pClock = PlayerProgress();
+      final rDrift = pClock.meditateOnce(
+        hitGoldenRing: true,
+        rng: Random(1),
+        todayKey: '2028-03-01',
+      );
+      expect(rDrift.wasEnlightenmentBonus, isTrue);
+      // 45일 이상 미래 오차를 현재('2026-11-22')로 되돌렸을 때 당일 중복 보상은 막되 기준일을 재정렬하고 다음 날('2026-11-23')부터 정상 회복!
+      final rRollbackToday = pClock.meditateOnce(
+        hitGoldenRing: true,
+        rng: Random(2),
+        todayKey: '2026-11-22',
+      );
+      expect(rRollbackToday.wasEnlightenmentBonus, isFalse);
+      final rRecoveredNextDay = pClock.meditateOnce(
+        hitGoldenRing: true,
+        rng: Random(3),
+        todayKey: '2026-11-23',
+      );
+      expect(rRecoveredNextDay.wasEnlightenmentBonus, isTrue);
+      // 단, 일일 10회 소진 후 5일 전('2026-11-18') 단기 시계 되돌리기 치팅은 여전히 엄격 차단!
+      pClock.meditateBatch(count: 10, hitGoldenRing: true, rng: Random(4), todayKey: '2026-11-23');
+      final rBackCheat = pClock.meditateOnce(
+        hitGoldenRing: true,
+        rng: Random(5),
+        todayKey: '2026-11-18',
+      );
+      expect(rBackCheat.wasEnlightenmentBonus, isFalse);
+
+      // 2) 호송 보급 버프 실시간 차감 (전투 진입 즉시 소모되어 재시작 무한 악용 차단)
+      final pConvoy = PlayerProgress(
+        convoySupplyBuffBattles: 1,
+        highestClearedGlobalStage: 30,
+        tokens: 2000,
+        unlockedStones: {StoneMaterial.cheongok, StoneMaterial.onok},
+      );
+      pConvoy.activePreset.primaryStone = StoneMaterial.onok;
+      // 상위 수호석을 장착한 상태에서도 추천 일괄 강화가 중간 등급 수호석을 건너뛰지 않고 해금함!
+      final batchLogs = pConvoy.upgradeRecommendedBatch(maxSteps: 6);
+      expect(batchLogs, isNotEmpty);
+      expect(pConvoy.unlockedStones.contains(StoneMaterial.hyeoncheol), isTrue);
+
+      final simConv = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(3, 1),
+        difficulty: DefenseDifficulty.normal,
+        progress: pConvoy,
+        seed: 71,
+      );
+      expect(pConvoy.convoySupplyBuffBattles, equals(0));
+      expect(simConv.buildSummary().convoyBuffConsumedRealtime, isTrue);
+
+      // 3) 기둥 차단(Swept Pillar) · t정렬 관통 · 4→5형 합체 돌림판 +1 · 본진 피격 시 ★3 차단
+      simConv.mutants.clear();
+      simConv.projectiles.clear();
+      final pil = simConv.chapter.pillars.first;
+      final shieldedM = ActiveMutant(
+        uid: 9901,
+        kind: MutantKind.swarmRat,
+        laneIndex: 0,
+        waypoints: <Vec2>[pil.center + const Vec2(0, -40)],
+        pos: pil.center + const Vec2(0, -40),
+        maxHp: 300,
+        speed: 0,
+      );
+      simConv.mutants.add(shieldedM);
+      simConv.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'pillar_test',
+          sourceLabel: '기둥차단',
+          pos: pil.center + const Vec2(0, 40),
+          vel: const Vec2(0, -2400),
+          material: StoneMaterial.cheongok,
+          shape: StoneShape.flat,
+          damage: 200,
+          knockback: 0,
+          critChance: 0,
+          colorHex: 0xFFFFFFFF,
+          maxTravelDist: 250,
+        )..bouncesLeft = 0,
+      );
+      simConv.step(1 / 60);
+      expect(shieldedM.hp, equals(300));
+
+      simConv.fieldTokens = 2000;
+      simConv.placeLauncherInBattle(0, LauncherType.rapid);
+      simConv.placeLauncherInBattle(1, LauncherType.rapid);
+      simConv.step(3.0);
+      for (int u = 0; u < 3; u++) {
+        simConv.upgradeLauncherAtSlot(0);
+        simConv.upgradeLauncherAtSlot(1);
+        simConv.step(1.5);
+      }
+      final spinsBefore = simConv.rouletteSpinsAvailable;
+      expect(simConv.mergeLauncherAtSlot(0), isTrue);
+      expect(simConv.launcherAtSlot(0)?.tier, equals(5));
+      expect(simConv.rouletteSpinsAvailable, equals(spinsBefore + 1));
+
+      simConv.isFinished = true;
+      simConv.isVictory = true;
+      simConv.towerTookDamage = true;
+      final sumDamaged = simConv.buildSummary();
+      expect(sumDamaged.stars, lessThan(3));
+      expect(() => sumDamaged.contributions.clear(), throwsUnsupportedError);
+    });
   });
 }

@@ -609,7 +609,7 @@ class NightBattlePainter extends CustomPainter {
       );
     }
 
-    // 내공 1칸 이상 충전 시 단전 기운(fx_qi.webp) 소용돌이 광륜
+    // 내공 1칸 이상 충전 시 단전 기운(fx_qi.webp) 소용돌이 광륜 (생사경 4칸까지 부드럽게 증폭!)
     if (sim.qiBars >= 1.0 && sprites.fxQi != null) {
       _drawSpriteCentered(
         canvas,
@@ -618,7 +618,7 @@ class NightBattlePainter extends CustomPainter {
         width: r * 2.85,
         height: r * 2.85,
         rotationRad: -sim.elapsedSec * 1.15,
-        opacity: (0.20 + 0.14 * sim.qiBars).clamp(0.0, 0.65),
+        opacity: (0.18 + 0.12 * sim.qiBars).clamp(0.0, 0.72),
       );
     }
 
@@ -2188,87 +2188,93 @@ class NightBattlePainter extends CustomPainter {
             12.2,
             withBg: true,
           );
-        } else if (m.carapacePlatesLeft > 0 && m.maxCarapacePlates > 0) {
-          final armorR = halfVisualH * 0.64 + 8.0;
-          final segSweep = (2 * pi / m.maxCarapacePlates) - 0.24;
-          for (int s = 0; s < m.maxCarapacePlates; s++) {
-            final intact = s < m.carapacePlatesLeft;
-            final startA = sim.elapsedSec * 0.85 + s * (2 * pi / m.maxCarapacePlates);
-            canvas.drawArc(
-              Rect.fromCircle(center: bodyCenter, radius: armorR),
-              startA,
-              segSweep,
-              false,
+        } else {
+          if (m.carapacePlatesLeft > 0 && m.maxCarapacePlates > 0) {
+            final armorR = halfVisualH * 0.64 + 8.0;
+            final segSweep = (2 * pi / m.maxCarapacePlates) - 0.24;
+            for (int s = 0; s < m.maxCarapacePlates; s++) {
+              final intact = s < m.carapacePlatesLeft;
+              final startA = sim.elapsedSec * 0.85 + s * (2 * pi / m.maxCarapacePlates);
+              canvas.drawArc(
+                Rect.fromCircle(center: bodyCenter, radius: armorR),
+                startA,
+                segSweep,
+                false,
+                Paint()
+                  ..color = intact
+                      ? (m.currentPhase >= 3
+                          ? const Color(0xEEFF006E)
+                          : const Color(0xEEC77DFF))
+                      : const Color(0x33ADB5BD)
+                  ..style = PaintingStyle.stroke
+                  ..strokeCap = StrokeCap.round
+                  ..strokeWidth = intact ? 4.6 : 1.6,
+              );
+            }
+          }
+
+          if (m.hasActiveWeakPoint) {
+            // 빛나는 회전 정밀 타격 과녁(🎯 약점 — 장갑판 또는 타수 마갑 활성 시 상시 표시!)
+            final wp = Offset(m.weakSpotWorldPos.x, m.weakSpotWorldPos.y);
+            final wpPulse = 1.0 + sin(sim.elapsedSec * 10.5) * 0.16;
+            final retR = 14.5 * wpPulse;
+            canvas.drawCircle(
+              wp,
+              retR + 4,
+              Paint()..color = const Color(0x44FFD166),
+            );
+            canvas.drawCircle(
+              wp,
+              retR,
               Paint()
-                ..color = intact
-                    ? (m.currentPhase >= 3
-                        ? const Color(0xEEFF006E)
-                        : const Color(0xEEC77DFF))
-                    : const Color(0x33ADB5BD)
+                ..color = const Color(0xFFFFD166)
                 ..style = PaintingStyle.stroke
-                ..strokeCap = StrokeCap.round
-                ..strokeWidth = intact ? 4.6 : 1.6,
+                ..strokeWidth = 2.6,
+            );
+            canvas.drawCircle(
+              wp,
+              4.5,
+              Paint()..color = const Color(0xFFFF0054),
+            );
+            for (int k = 0; k < 4; k++) {
+              final a = k * (pi / 2);
+              canvas.drawLine(
+                wp + Offset(cos(a) * (retR - 4), sin(a) * (retR - 4)),
+                wp + Offset(cos(a) * (retR + 5), sin(a) * (retR + 5)),
+                Paint()
+                  ..color = const Color(0xFFFFD166)
+                  ..strokeWidth = 2.2
+                  ..strokeCap = StrokeCap.round,
+              );
+            }
+            _paintMiniText(
+              canvas,
+              '🎯약점',
+              wp + const Offset(0, -20),
+              const Color(0xFFFFD166),
+              9.8,
+              withBg: true,
             );
           }
 
-          // 빛나는 회전 정밀 타격 과녁(🎯 약점) 표시!
-          final wp = Offset(m.weakSpotWorldPos.x, m.weakSpotWorldPos.y);
-          final wpPulse = 1.0 + sin(sim.elapsedSec * 10.5) * 0.16;
-          final retR = 14.5 * wpPulse;
-          canvas.drawCircle(
-            wp,
-            retR + 4,
-            Paint()..color = const Color(0x44FFD166),
-          );
-          canvas.drawCircle(
-            wp,
-            retR,
-            Paint()
-              ..color = const Color(0xFFFFD166)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 2.6,
-          );
-          canvas.drawCircle(
-            wp,
-            4.5,
-            Paint()..color = const Color(0xFFFF0054),
-          );
-          for (int k = 0; k < 4; k++) {
-            final a = k * (pi / 2);
-            canvas.drawLine(
-              wp + Offset(cos(a) * (retR - 4), sin(a) * (retR - 4)),
-              wp + Offset(cos(a) * (retR + 5), sin(a) * (retR + 5)),
+          if (m.groggyExposeTimer > 0) {
+            canvas.drawCircle(
+              bodyCenter,
+              halfVisualH * 0.68 + 6,
               Paint()
-                ..color = const Color(0xFFFFD166)
-                ..strokeWidth = 2.2
-                ..strokeCap = StrokeCap.round,
+                ..color = const Color(0xAAFFD166)
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 2.8,
+            );
+            _paintMiniText(
+              canvas,
+              '💥무방비 ×1.85!',
+              bodyCenter + Offset(0, halfVisualH * 0.68 + 14),
+              const Color(0xFFFFD166),
+              10.4,
+              withBg: true,
             );
           }
-          _paintMiniText(
-            canvas,
-            '🎯약점',
-            wp + const Offset(0, -20),
-            const Color(0xFFFFD166),
-            9.8,
-            withBg: true,
-          );
-        } else if (m.groggyExposeTimer > 0) {
-          canvas.drawCircle(
-            bodyCenter,
-            halfVisualH * 0.68 + 6,
-            Paint()
-              ..color = const Color(0xAAFFD166)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 2.8,
-          );
-          _paintMiniText(
-            canvas,
-            '💥무방비 ×1.85!',
-            bodyCenter + Offset(0, halfVisualH * 0.68 + 14),
-            const Color(0xFFFFD166),
-            10.4,
-            withBg: true,
-          );
         }
       }
 

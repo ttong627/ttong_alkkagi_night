@@ -241,6 +241,8 @@ PlayerProgress _buildChapterAppropriateProfile(int ch) {
 
 ({
   BattleSummary summary,
+  bool finishedNaturally,
+  bool towerDamaged,
   double durationSec,
   int minShieldPct,
   int minTowerPct,
@@ -258,7 +260,7 @@ PlayerProgress _buildChapterAppropriateProfile(int ch) {
   required DefenseDifficulty difficulty,
   required int seed,
   bool allowConsumablesAndSupport = true,
-  double maxSimDurationSec = 480.0,
+  double maxSimDurationSec = 540.0,
 }) {
   final sim = DefenseBattleSim(
     stage: stage,
@@ -271,6 +273,8 @@ PlayerProgress _buildChapterAppropriateProfile(int ch) {
   );
 
   const dt = 1.0 / 30.0;
+  // 인간 반응 속도(0.5초 = 2Hz, 15프레임 간격)로 조작 수행 — 30Hz 전지전능 프레임 봇 배제!
+  const humanDecisionStride = 15;
   final maxSteps = (maxSimDurationSec / dt).round();
   double minShieldRatio = 1.0;
   double minTowerRatio = 1.0;
@@ -282,81 +286,120 @@ PlayerProgress _buildChapterAppropriateProfile(int ch) {
   final usedPills = <TacticalConsumable>{};
 
   for (int step = 0; step < maxSteps && !sim.isFinished; step++) {
-    // 1) 돌파 비급 선택 (우선순위 기반 수동 선택)
-    if (sim.pendingPerkChoices.isNotEmpty) {
-      final pick = sim.recommendedPerkChoice() ?? sim.pendingPerkChoices.first;
-      sim.chooseRoguePerk(pick);
-    }
+    final isHumanActionTick = step % humanDecisionStride == 0;
 
-    // 2) 마기 침식 포탑 즉시 터치 정화
-    for (final l in sim.launchers) {
-      if (l.isCorrupted) {
-        if (sim.cleanseLauncherAtSlot(l.slotIndex)) {
-          cleansedOnce = true;
-        }
-        break;
+    if (isHumanActionTick) {
+      // 1) 돌파 비급 선택 (0.5초 인간 인지 주기)
+      if (sim.pendingPerkChoices.isNotEmpty) {
+        final pick = sim.recommendedPerkChoice() ?? sim.pendingPerkChoices.first;
+        sim.chooseRoguePerk(pick);
       }
-    }
 
-    // 3) 운명 돌림판 가동
-    if (sim.rouletteSpinsAvailable > 0 && sim.mutants.length >= 3) {
-      if (sim.spinDestinyRoulette() != null) {
-        rouletteOnce = true;
-      }
-    }
-
-    // 4) 전방 암석 개척 & 편성된 진법(preferredBuildTypeForSlot) 기반 정직한 축조·승급·연성 합체!
-    final nextSlot = sim.nextRecommendedSlotIndex();
-    if (nextSlot != null) {
-      final slot = sim.mountSlotByIndex(nextSlot)!;
-      if (!sim.isSlotExcavated(nextSlot)) {
-        if (sim.fieldTokens >= sim.excavationCostForSlot(slot)) {
-          sim.excavateSlotInBattle(nextSlot);
-        }
-      } else {
-        if (stage.stageNumber == 3 &&
-            sim.launchers.isEmpty &&
-            sim.fieldTokens >= sim.currentLuckySummonCost) {
-          sim.quickLuckySummonNextPad();
-        } else {
-          sim.quickDirectBuildNextPad();
-        }
-      }
-    } else {
-      // 모든 거점이 채워졌을 때: 실시간 전군 강화 → 저단계 포탑 장별 배율 승급 → 4형 쌍 연성 합체(5형 신기)!
-      sim.upgradeLiveFirepower();
-      sim.upgradeLiveReload();
-      sim.upgradeLiveRange();
-      if (sim.shieldHp < sim.shieldMaxHpDynamic * 0.78) {
-        sim.upgradeLiveBarrier();
-      }
+      // 2) 마기 침식 포탑 정화 (회당 1기)
       for (final l in sim.launchers) {
-        if (l.tier < 4 && !l.isConstructing && sim.fieldTokens >= sim.upgradeCostForLauncher(l)) {
-          sim.upgradeLauncherAtSlot(l.slotIndex);
+        if (l.isCorrupted) {
+          if (sim.cleanseLauncherAtSlot(l.slotIndex)) {
+            cleansedOnce = true;
+          }
           break;
         }
       }
-      final mergePair = sim.findAnyMergePair();
-      if (mergePair != null &&
-          sim.fieldTokens >= sim.mergeCostForSlot(mergePair.$1) + 95) {
-        final lA = sim.launcherAtSlot(mergePair.$1);
-        if (lA != null && (lA.tier >= 3 || !mergedOnce)) {
-          if (sim.mergeLauncherAtSlot(mergePair.$1)) {
-            mergedOnce = true;
+
+      // 3) 운명 돌림판 가동
+      if (sim.rouletteSpinsAvailable > 0 && sim.mutants.length >= 3) {
+        if (sim.spinDestinyRoulette() != null) {
+          rouletteOnce = true;
+        }
+      }
+
+      // 4) 전방 암석 개척 & 편성된 진법(preferredBuildTypeForSlot) 기반 축조·승급·연성 합체!
+      final nextSlot = sim.nextRecommendedSlotIndex();
+      if (nextSlot != null) {
+        final slot = sim.mountSlotByIndex(nextSlot)!;
+        if (!sim.isSlotExcavated(nextSlot)) {
+          if (sim.fieldTokens >= sim.excavationCostForSlot(slot)) {
+            sim.excavateSlotInBattle(nextSlot);
+          }
+        } else {
+          if (stage.stageNumber == 3 &&
+              sim.launchers.isEmpty &&
+              sim.fieldTokens >= sim.currentLuckySummonCost) {
+            sim.quickLuckySummonNextPad();
+          } else {
+            sim.quickDirectBuildNextPad();
+          }
+        }
+      } else {
+        // 모든 거점이 채워졌을 때: 실시간 전군 강화 → 저단계 포탑 장별 배율 승급 → 4형 쌍 연성 합체(5형 신기)!
+        sim.upgradeLiveFirepower();
+        sim.upgradeLiveReload();
+        sim.upgradeLiveRange();
+        if (sim.shieldHp < sim.shieldMaxHpDynamic * 0.78) {
+          sim.upgradeLiveBarrier();
+        }
+        for (final l in sim.launchers) {
+          if (l.tier < 4 && !l.isConstructing && sim.fieldTokens >= sim.upgradeCostForLauncher(l)) {
+            sim.upgradeLauncherAtSlot(l.slotIndex);
+            break;
+          }
+        }
+        final mergePair = sim.findAnyMergePair();
+        if (mergePair != null &&
+            sim.fieldTokens >= sim.mergeCostForSlot(mergePair.$1) + 95) {
+          final lA = sim.launcherAtSlot(mergePair.$1);
+          if (lA != null && (lA.tier >= 3 || !mergedOnce)) {
+            if (sim.mergeLauncherAtSlot(mergePair.$1)) {
+              mergedOnce = true;
+            }
+          }
+        }
+      }
+
+      // 5) 다단 변이 보스 약점 정밀 저격 (0.5초 인지 주기 + 정상 쿨타임 준수!)
+      if (sim.isPrecisionStrikeReady) {
+        final boss = sim.activeMultiPhaseBoss;
+        if (boss != null && boss.hasActiveWeakPoint) {
+          sim.firePrecisionStrikeAt(boss.weakSpotWorldPos, targetBossUid: boss.uid);
+        }
+      }
+
+      // 7) 여유 구간 다음 물결 조기 호출 보너스 검증 (각 스테이지 2물결에서 1회)
+      if (sim.currentWaveIndex == 1 &&
+          sim.canCallNextWaveEarly &&
+          sim.shieldHp > sim.shieldMaxHpDynamic * 0.82 &&
+          stage.globalIndex < 900) {
+        sim.callNextWaveEarly();
+      }
+
+      // 8) 보스전 및 위기 상황에서 전술 비약 3종 실전 사용
+      if (allowConsumablesAndSupport) {
+        if (sim.qiBars < sim.maxQiBars - 0.5 &&
+            stage.isBossStage &&
+            (p.consumables[TacticalConsumable.qiSurgePill] ?? 0) > 0 &&
+            !usedPills.contains(TacticalConsumable.qiSurgePill)) {
+          if (sim.activateConsumable(TacticalConsumable.qiSurgePill)) {
+            usedPills.add(TacticalConsumable.qiSurgePill);
+          }
+        }
+        if ((sim.shieldHp < sim.shieldMaxHpDynamic * 0.88 ||
+                sim.cropsHealth < 0.98) &&
+            (p.consumables[TacticalConsumable.guardianRepairSeal] ?? 0) > 0 &&
+            !usedPills.contains(TacticalConsumable.guardianRepairSeal)) {
+          if (sim.activateConsumable(TacticalConsumable.guardianRepairSeal)) {
+            usedPills.add(TacticalConsumable.guardianRepairSeal);
+          }
+        }
+        if (sim.activeMultiPhaseBoss != null &&
+            (p.consumables[TacticalConsumable.auroraCritCharm] ?? 0) > 0 &&
+            !usedPills.contains(TacticalConsumable.auroraCritCharm)) {
+          if (sim.activateConsumable(TacticalConsumable.auroraCritCharm)) {
+            usedPills.add(TacticalConsumable.auroraCritCharm);
           }
         }
       }
     }
 
-    // 5) 다단 변이 보스 약점 정밀 저격 (정상 쿨타임 준수!)
-    if (sim.isPrecisionStrikeReady) {
-      final boss = sim.activeMultiPhaseBoss;
-      if (boss != null && boss.phaseTransitionTimer <= 0) {
-        sim.firePrecisionStrikeAt(boss.weakSpotWorldPos);
-      }
-    }
-
-    // 6) 쿨타임 치팅(centralFireTimer=0) 없이 실제 장전 완료(isCentralReadyToFire) 시에만 수동 기물 사격!
+    // 6) 9초 간격 장전 완료 시 수동 기물 사격
     if (step % 270 == 90 && sim.launchers.isNotEmpty && sim.isCentralReadyToFire) {
       Vec2 aimPt = sim.powerTarget.center;
       if (sim.treasureGoblin != null && sim.treasureGoblin!.alive) {
@@ -375,40 +418,6 @@ PlayerProgress _buildChapterAppropriateProfile(int ch) {
         manualFiredOnce = true;
       }
       if (sim.centralManualMode) sim.toggleCentralManualMode();
-    }
-
-    // 7) 여유 구간 다음 물결 조기 호출 보너스 검증 (각 스테이지 2물결에서 1회)
-    if (sim.currentWaveIndex == 1 &&
-        sim.canCallNextWaveEarly &&
-        sim.shieldHp > sim.shieldMaxHpDynamic * 0.82 &&
-        stage.globalIndex < 900) {
-      sim.callNextWaveEarly();
-    }
-
-    // 8) 보스전 및 위기 상황에서 전술 비약 3종 실전 사용
-    if (allowConsumablesAndSupport) {
-      if (sim.qiBars < 1.0 &&
-          stage.isBossStage &&
-          (p.consumables[TacticalConsumable.qiSurgePill] ?? 0) > 0 &&
-          !usedPills.contains(TacticalConsumable.qiSurgePill)) {
-        if (sim.activateConsumable(TacticalConsumable.qiSurgePill)) {
-          usedPills.add(TacticalConsumable.qiSurgePill);
-        }
-      }
-      if (sim.shieldHp < sim.shieldMaxHpDynamic * 0.55 &&
-          (p.consumables[TacticalConsumable.guardianRepairSeal] ?? 0) > 0 &&
-          !usedPills.contains(TacticalConsumable.guardianRepairSeal)) {
-        if (sim.activateConsumable(TacticalConsumable.guardianRepairSeal)) {
-          usedPills.add(TacticalConsumable.guardianRepairSeal);
-        }
-      }
-      if (sim.activeMultiPhaseBoss != null &&
-          (p.consumables[TacticalConsumable.auroraCritCharm] ?? 0) > 0 &&
-          !usedPills.contains(TacticalConsumable.auroraCritCharm)) {
-        if (sim.activateConsumable(TacticalConsumable.auroraCritCharm)) {
-          usedPills.add(TacticalConsumable.auroraCritCharm);
-        }
-      }
     }
 
     sim.step(dt);
@@ -430,12 +439,15 @@ PlayerProgress _buildChapterAppropriateProfile(int ch) {
   final summary = sim.buildSummary();
   return (
     summary: summary,
+    finishedNaturally: sim.isFinished,
+    towerDamaged: sim.towerTookDamage,
     durationSec: sim.elapsedSec,
     minShieldPct: (minShieldRatio.clamp(0.0, 1.0) * 100).round(),
     minTowerPct: (minTowerRatio.clamp(0.0, 1.0) * 100).round(),
     bossMaxHitShield: bossMaxShieldSeen,
     precisionHits: sim.precisionHitCount,
-    activeContribKeys: summary.contributions.map((c) => c.key).toSet(),
+    activeContribKeys:
+        summary.contributions.where((c) => c.totalDamage > 0).map((c) => c.key).toSet(),
     mergedInBattle: mergedOnce || sim.mergeEvolutionCount > 0,
     manualShotFired: manualFiredOnce,
     cleansedTower: cleansedOnce,
@@ -587,7 +599,247 @@ List<String> _runAdversarialEdgeChecks() {
   if (!sim7.mukhyeonTriggered || nearFortEnemy.knockbackVel.y <= 0) {
     throw StateError('제7장 북단 성채 묵현 난입 남방 밀침 실패!');
   }
-  notes.add('PASS [역방향/방패] 제7장 북단 성채 묵현 남방 밀침 · 뼈방패 야차 전후방 판정 · 14동료 능동 스킬 확인');
+  // [검증 7] 기둥 뒤 적 오폭 차단(Swept Pillar Occlusion) · 관통탄 전열→후열 t정렬 · ★3 무흠결 판정 · 4→5형 합체 돌림판 지급 검증!
+  final pPhys = PlayerProgress(highestClearedGlobalStage: 111, unlockedStones: StoneMaterial.values.toSet());
+  final physSim = DefenseBattleSim(
+    stage: CampaignCatalog.stageAt(1, 2),
+    difficulty: DefenseDifficulty.normal,
+    progress: pPhys,
+    seed: 101,
+    allowSerendipity: false,
+  );
+  physSim.mutants.clear();
+  physSim.projectiles.clear();
+  final pil = physSim.chapter.pillars.first;
+  final behindEnemy = ActiveMutant(
+    uid: 8801,
+    kind: MutantKind.swarmRat,
+    laneIndex: 0,
+    waypoints: <Vec2>[pil.center + const Vec2(0, -42)],
+    pos: pil.center + const Vec2(0, -42),
+    maxHp: 500,
+    speed: 0,
+  );
+  physSim.mutants.add(behindEnemy);
+  physSim.projectiles.add(
+    ActiveStoneProjectile(
+      sourceKey: 'test_pillar',
+      sourceLabel: '기둥차단검증',
+      pos: pil.center + const Vec2(0, 42),
+      vel: const Vec2(0, -2400),
+      material: StoneMaterial.cheongok,
+      shape: StoneShape.flat,
+      damage: 200,
+      knockback: 10,
+      critChance: 0.0,
+      colorHex: 0xFFFFFFFF,
+      pierceLeft: 0,
+      maxTravelDist: 300,
+    )..bouncesLeft = 0,
+  );
+  physSim.step(1 / 60);
+  if (behindEnemy.hp < 500) {
+    throw StateError('기둥에 막혀 소멸해야 할 무도탄(bounces=0) 투사체가 기둥 뒤 적을 관통 타격함!');
+  }
+
+  // 관통 1회 투사체가 한 스텝에 앞(y=480)·뒤(y=430) 2마리를 지날 때 전열부터 순서대로 모두 타격하는지 검증!
+  physSim.mutants.clear();
+  physSim.projectiles.clear();
+  final backM = ActiveMutant(
+    uid: 8802,
+    kind: MutantKind.ironBoar,
+    laneIndex: 0,
+    waypoints: const <Vec2>[Vec2(200, 430)],
+    pos: const Vec2(200, 430),
+    maxHp: 1000,
+    speed: 0,
+  );
+  final frontM = ActiveMutant(
+    uid: 8803,
+    kind: MutantKind.ironBoar,
+    laneIndex: 0,
+    waypoints: const <Vec2>[Vec2(200, 480)],
+    pos: const Vec2(200, 480),
+    maxHp: 1000,
+    speed: 0,
+  );
+  // 역순 삽입에도 t 정렬로 frontM -> backM 모두 피격되어야 함!
+  physSim.mutants.addAll([frontM, backM]);
+  physSim.projectiles.add(
+    ActiveStoneProjectile(
+      sourceKey: 'test_pierce',
+      sourceLabel: '관통정렬검증',
+      pos: const Vec2(200, 510),
+      vel: const Vec2(0, -6000),
+      material: StoneMaterial.geumgang,
+      shape: StoneShape.flat,
+      damage: 150,
+      knockback: 0,
+      critChance: 0.0,
+      colorHex: 0xFFFFFFFF,
+      pierceLeft: 1,
+      maxTravelDist: 300,
+    )..bouncesLeft = 0,
+  );
+  physSim.step(1 / 60);
+  if (frontM.hp >= 1000 || backM.hp >= 1000) {
+    throw StateError('단일 서브스텝 다중 관통 누락 발생: front=${frontM.hp}, back=${backM.hp}');
+  }
+
+  // 4형 2기 합체 -> ★5형 태초 신기 진화 시 돌림판 +1 지급 검증 & 본진 피격 시 ★3 차단 검증!
+  physSim.fieldTokens = 2000;
+  physSim.placeLauncherInBattle(0, LauncherType.rapid);
+  physSim.placeLauncherInBattle(1, LauncherType.rapid);
+  physSim.step(3.0);
+  for (int u = 0; u < 3; u++) {
+    physSim.upgradeLauncherAtSlot(0);
+    physSim.upgradeLauncherAtSlot(1);
+    physSim.step(1.5);
+  }
+  final spinsBefore5 = physSim.rouletteSpinsAvailable;
+  if (!physSim.mergeLauncherAtSlot(0) ||
+      physSim.launcherAtSlot(0)?.tier != 5 ||
+      physSim.rouletteSpinsAvailable != spinsBefore5 + 1) {
+    throw StateError('4형 2기 → ★5형 합체 시 돌림판 +1 보너스 미지급!');
+  }
+  physSim.isFinished = true;
+  physSim.isVictory = true;
+  physSim.towerTookDamage = true;
+  if (physSim.buildSummary().stars >= 3) {
+    throw StateError('본진 수호탑이 직접 피해를 입었는데 ★3 만점이 부여됨!');
+  }
+  notes.add('PASS [물리/판정] 기둥 뒤 적 오폭 차단 · 관통 t정렬 다중타격 · ★5형 합체 돌림판 +1 · 본진피격 시 ★3 차단 검증');
+
+  // [검증 8] 14인 동료 전원 · 5종 영수 전원 · 13종 수호석 · 3모양 · 4문파 내공 실전 기여도 100% 검증!
+  final rosterP = PlayerProgress(
+    highestClearedGlobalStage: 111,
+    realmIndex: 7,
+    openedMeridianStep: 10,
+    centralGuardianLevel: 20,
+    unlockedStones: StoneMaterial.values.toSet(),
+  );
+  for (final b in SpiritBeast.values) {
+    rosterP.beastLevels[b] = 6;
+  }
+  for (final h in CompanionHero.values) {
+    rosterP.companionLevels[h] = 6;
+  }
+  for (final lt in LauncherType.values) {
+    rosterP.launcherPermanentLevels[lt] = 15;
+  }
+
+  final verifiedHeroes = <CompanionHero>{};
+  for (final hero in CompanionHero.values) {
+    final pr = rosterP.activePreset;
+    pr.companions = [hero];
+    pr.companionConditions[hero] = AutoTriggerCondition.anyEnemyInRange;
+    final hSim = DefenseBattleSim(
+      stage: CampaignCatalog.stageAt(6, 5),
+      difficulty: DefenseDifficulty.normal,
+      progress: rosterP,
+      seed: 400 + hero.index,
+      allowSupportTokens: false,
+    );
+    hSim.fieldTokens = 400;
+    hSim.placeLauncherInBattle(0, LauncherType.rapid);
+    hSim.placeLauncherInBattle(1, LauncherType.heavy);
+    hSim.qiBars = rosterP.maxQiBars;
+    if (hero == CompanionHero.sinseung || hero == CompanionHero.mukhyeon) {
+      hSim.shieldHp = hSim.shieldMaxHpDynamic * 0.30;
+      hSim.cropsHealth = 0.70;
+    }
+    for (int s = 0; s < 900 && !hSim.isFinished; s++) {
+      if (hero == CompanionHero.mukhyeon && s == 120) {
+        hSim.shieldHp = min(hSim.shieldHp, hSim.shieldMaxHpDynamic * 0.30);
+      }
+      hSim.step(1 / 30);
+    }
+    final key = 'hero_${hero.id}';
+    final contributed = hSim.buildSummary().contributions.any((c) => c.key == key && c.totalDamage > 0);
+    if (!contributed) {
+      throw StateError('동료 [${hero.name}] ($key) 실전 기여도 0 발생!');
+    }
+    verifiedHeroes.add(hero);
+  }
+
+  final verifiedBeasts = <SpiritBeast>{};
+  for (final beast in SpiritBeast.values) {
+    final pr = rosterP.activePreset;
+    pr.equippedBeast = beast;
+    pr.beastCondition = AutoTriggerCondition.anyEnemyInRange;
+    final bSim = DefenseBattleSim(
+      stage: CampaignCatalog.stageAt(5, 4),
+      difficulty: DefenseDifficulty.normal,
+      progress: rosterP,
+      seed: 500 + beast.index,
+      allowSupportTokens: false,
+    );
+    bSim.fieldTokens = 400;
+    bSim.placeLauncherInBattle(0, LauncherType.rapid);
+    if (beast == SpiritBeast.geumgangTurtle) {
+      bSim.shieldHp = bSim.shieldMaxHpDynamic * 0.50;
+    }
+    for (int s = 0; s < 750 && !bSim.isFinished; s++) {
+      bSim.step(1 / 30);
+    }
+    final bKey = beast == SpiritBeast.geumgangTurtle ? 'beast_geumgang' : 'beast_${beast.id}';
+    final contributed = bSim.buildSummary().contributions.any((c) => c.key == bKey && c.totalDamage > 0);
+    if (!contributed) {
+      throw StateError('영수 [${beast.name}] ($bKey) 실전 기여도 0 발생!');
+    }
+    verifiedBeasts.add(beast);
+  }
+
+  for (int i = 0; i < StoneMaterial.values.length; i++) {
+    final stone = StoneMaterial.values[i];
+    final shape = StoneShape.values[i % StoneShape.values.length];
+    final sect = SectTechnique.values[i % SectTechnique.values.length];
+    rosterP.activePreset
+      ..primaryStone = stone
+      ..primaryShape = shape
+      ..sectTechnique = sect;
+    final sSim = DefenseBattleSim(
+      stage: CampaignCatalog.stageAt(3, 2),
+      difficulty: DefenseDifficulty.normal,
+      progress: rosterP,
+      seed: 600 + i,
+      allowSupportTokens: false,
+    );
+    sSim.fieldTokens = 300;
+    sSim.placeLauncherInBattle(0, LauncherType.qiAmplifier);
+    sSim.placeLauncherInBattle(1, LauncherType.rapid);
+    sSim.qiBars = 2.5;
+    for (int s = 0; s < 360 && !sSim.isFinished; s++) {
+      sSim.step(1 / 30);
+    }
+    _assertFiniteArena(sSim, '수호석검증_${stone.name}');
+  }
+
+  // 무한혈전 1장 테마 vs 10장 테마 체력 곡선 동일성(142배 편차 차단) 검증!
+  final endCh1 = DefenseBattleSim(
+    stage: EndlessWaveBuilder.buildEndlessStage(chapterTheme: 1, waveCount: 10),
+    difficulty: DefenseDifficulty.normal,
+    progress: rosterP,
+    seed: 701,
+  );
+  final endCh10 = DefenseBattleSim(
+    stage: EndlessWaveBuilder.buildEndlessStage(chapterTheme: 10, waveCount: 10),
+    difficulty: DefenseDifficulty.normal,
+    progress: rosterP,
+    seed: 701,
+  );
+  for (int s = 0; s < 150; s++) {
+    endCh1.step(1 / 30);
+    endCh10.step(1 / 30);
+  }
+  final ch1Rat = endCh1.mutants.where((m) => m.kind == MutantKind.swarmRat).firstOrNull;
+  final ch10Rat = endCh10.mutants.where((m) => m.kind == MutantKind.swarmRat).firstOrNull;
+  if (ch1Rat == null || ch10Rat == null || (ch10Rat.maxHp / ch1Rat.maxHp - 1.0).abs() > 0.05) {
+    throw StateError('무한혈전 장 테마 간 체력 편차 잔존: ch1=${ch1Rat?.maxHp}, ch10=${ch10Rat?.maxHp}');
+  }
+  notes.add(
+    'PASS [전수검증] 14동료(${verifiedHeroes.length}/14)·5영수(${verifiedBeasts.length}/5)·13수호석·3모양·4문파비기 실전 기여 & 무한혈전 전 테마 공정 스케일링 확인',
+  );
 
   return notes;
 }
@@ -595,7 +847,7 @@ List<String> _runAdversarialEdgeChecks() {
 void main() {
   final sw = Stopwatch()..start();
   stdout.writeln('=======================================================================');
-  stdout.writeln(' [수호알까기 v1.0.0+27] 무치팅·비노가다 전 구간(1-1~10-10) & 3난이도·무한100물결 적대적 점검');
+  stdout.writeln(' [수호알까기 v1.0.0+28] 인간반응(2Hz)·무치팅 전 구간(1-1~10-10) & 3난이도·무한100물결 적대적 점검');
   stdout.writeln('=======================================================================');
 
   // 1부: 적대적 엣지케이스 & 물리/보안 불변식 검증
@@ -716,16 +968,20 @@ void main() {
         difficultyId: DefenseDifficulty.normal.id,
         supportAlreadyDeductedInSim: res.summary.supportDeductedRealtime,
         bossElixirAlreadyIncluded: res.summary.bossElixirIncluded,
+        convoyBuffAlreadyConsumed: res.summary.convoyBuffConsumedRealtime,
       );
 
       _runBetweenBattleGrowth(player, rng, todayKey, casualBreaths: 2);
 
       if (res.summary.victory) {
+        if (!res.finishedNaturally) {
+          throw StateError('${stage.code} 시간 초과 상태에서 승리로 오판정됨!');
+        }
         if (attempts == 1) firstTryWins++;
         wonSummary = res.summary;
         wonDur = res.durationSec;
         wonMinShield = res.minShieldPct;
-        wonMinTower = res.minTowerPct;
+        wonMinTower = res.towerDamaged ? min(99, res.minTowerPct) : res.minTowerPct;
         wonBossShield = res.bossMaxHitShield;
         wonPrecHits = res.precisionHits;
         break;
@@ -763,6 +1019,7 @@ void main() {
         difficultyId: DefenseDifficulty.normal.id,
         supportAlreadyDeductedInSim: farmRes.summary.supportDeductedRealtime,
         bossElixirAlreadyIncluded: farmRes.summary.bossElixirIncluded,
+        convoyBuffAlreadyConsumed: farmRes.summary.convoyBuffConsumedRealtime,
       );
       _runBetweenBattleGrowth(player, rng, todayKey, casualBreaths: 3);
     }
@@ -888,18 +1145,19 @@ void main() {
     difficultyId: DefenseDifficulty.normal.id,
     supportAlreadyDeductedInSim: freshEndlessRun.summary.supportDeductedRealtime,
     bossElixirAlreadyIncluded: freshEndlessRun.summary.bossElixirIncluded,
+    convoyBuffAlreadyConsumed: freshEndlessRun.summary.convoyBuffConsumedRealtime,
   );
 
-  // (B) 만렙 종결 계정(생사경 + 10경맥 + 전 포탑 35단 + 신기연마 40단 + 영약공명 30단 + 13단 태초석)으로 100물결 완전 정복 검증!
+  // (B) 숙련 엔드게임 계정(생사경 + 10경맥 + 전 포탑 30단 + 신기연마 32단 + 영약공명 28단 + 13단 태초석)으로 100물결 완전 정복 검증!
   final masterAccount = PlayerProgress(
-    tokens: 5000,
-    elixirs: 500,
+    tokens: 3000,
+    elixirs: 300,
     supportTokens: 4,
     realmIndex: 7,
     openedMeridianStep: 10,
-    centralGuardianLevel: 40,
-    forgeMasteryLevel: 45,
-    elixirResonanceLevel: 35,
+    centralGuardianLevel: 32,
+    forgeMasteryLevel: 32,
+    elixirResonanceLevel: 28,
     highestClearedGlobalStage: 111,
     unlockedStones: StoneMaterial.values.toSet(),
     consumables: {
@@ -907,10 +1165,10 @@ void main() {
     },
   );
   for (final lt in LauncherType.values) {
-    masterAccount.launcherPermanentLevels[lt] = 35;
+    masterAccount.launcherPermanentLevels[lt] = 30;
   }
   for (final cs in CoreStatType.values) {
-    masterAccount.coreStatLevels[cs] = 25;
+    masterAccount.coreStatLevels[cs] = 22;
   }
   for (final b in SpiritBeast.values) {
     masterAccount.beastLevels[b] = 10;
@@ -923,21 +1181,22 @@ void main() {
     p: masterAccount,
     stage: endlessStage,
     difficulty: DefenseDifficulty.normal,
-    seed: 202700,
-    maxSimDurationSec: 2400.0,
+    seed: 202800,
+    maxSimDurationSec: 3600.0,
   );
-  if (!masterEndlessNormal.summary.victory ||
+  if (!masterEndlessNormal.finishedNaturally ||
+      !masterEndlessNormal.summary.victory ||
       masterEndlessNormal.summary.wavesClearedCount < 100) {
     throw StateError(
-      '만렙 종결 계정 무한혈전 100물결 완주 미달성: ${masterEndlessNormal.summary.wavesClearedCount}/100물결',
+      '숙련 엔드게임 계정 무한혈전 100물결 완주 미달성: finished=${masterEndlessNormal.finishedNaturally}, ${masterEndlessNormal.summary.wavesClearedCount}/100물결',
     );
   }
   final masterEndlessNightmare = _playStageLikeSkilledHuman(
     p: masterAccount,
     stage: endlessStage,
     difficulty: DefenseDifficulty.nightmare,
-    seed: 202701,
-    maxSimDurationSec: 2400.0,
+    seed: 202801,
+    maxSimDurationSec: 3600.0,
   );
 
   // 최종 성장 계정으로 악몽(Nightmare) 10-10 보스 진검 검증
@@ -986,15 +1245,21 @@ void main() {
     throw StateError('영수($ownedBeasts/5) 또는 동료($ownedHeroes/14) 전종 합류 미달성!');
   }
 
+  if (allUsedConsumables.length < TacticalConsumable.values.length) {
+    throw StateError(
+      '전술 비약 3종 실전 사용 검증 미달: ${allUsedConsumables.length}/${TacticalConsumable.values.length}',
+    );
+  }
+
   final avgSerendip =
       records.map((r) => r.serendipities).reduce((a, b) => a + b) / records.length;
 
   // 장별 통계 집계 및 보고서 작성
   final buf = StringBuffer()
     ..writeln('================================================================================')
-    ..writeln(' 수호알까기 · 탄지무림 심야기습 v1.0.0+27 — 무치팅·비노가다 전 구간 & 3난이도·무한100물결 적대적 점검표')
+    ..writeln(' 수호알까기 · 탄지무림 심야기습 v1.0.0+28 — 인간반응(2Hz)·무치팅 전 구간 & 3난이도·무한100물결 적대적 점검표')
     ..writeln('================================================================================')
-    ..writeln('• 시작 조건 : 신규 계정 PlayerProgress() · 추가 단전 노가다 0회 · 수동 탄지 쿨타임 초기화 치팅 0회')
+    ..writeln('• 시작 조건 : 신규 계정 PlayerProgress() · 인간 반응 주기(0.5초/2Hz) · 추가 단전 노가다 0회 · 쿨타임 치팅 0회')
     ..writeln('• 캠페인 완주 : 총 111 / 111 관문 정화 완료! (1트 클리어 $firstTryWins/111 · 총 시도 $totalAttempts회 · 관문당 평균 기연 ${avgSerendip.toStringAsFixed(1)}회)')
     ..writeln('• 3난이도 변별 : 쉬움 ${diffWins[DefenseDifficulty.easy]}/111승(★3 ${diffThreeStars[DefenseDifficulty.easy]}, 최저방어막 ${easyAvgSh.toStringAsFixed(1)}%) > 보통 ${diffWins[DefenseDifficulty.normal]}/111승(★3 ${diffThreeStars[DefenseDifficulty.normal]}, 최저방어막 ${normAvgSh.toStringAsFixed(1)}%) > 악몽 ${diffWins[DefenseDifficulty.nightmare]}/111승(★3 ${diffThreeStars[DefenseDifficulty.nightmare]}, 최저방어막 ${nightAvgSh.toStringAsFixed(1)}%)')
     ..writeln('• 무한 100물결 : 막 10-10 클리어 계정 돌파=${freshEndlessRun.summary.wavesClearedCount}물결 · 종결 계정 보통=${masterEndlessNormal.summary.wavesClearedCount}/100물결 완주(PASS!) · 종결 계정 악몽=${masterEndlessNightmare.summary.wavesClearedCount}/100물결')
@@ -1036,10 +1301,14 @@ void main() {
 
   final reportText = buf.toString();
   stdout.writeln(reportText);
-  final outReport = File('../../docs/전구간_완전플레이_적대적점검_보고서.txt');
-  outReport.parent.createSync(recursive: true);
-  outReport.writeAsStringSync(reportText);
-  stdout.writeln(
-    '완료 (${(sw.elapsedMilliseconds / 1000).toStringAsFixed(1)}초) -> ${outReport.path}',
-  );
+  try {
+    final outReport = File('../../docs/전구간_완전플레이_적대적점검_보고서.txt');
+    outReport.parent.createSync(recursive: true);
+    outReport.writeAsStringSync(reportText);
+    stdout.writeln(
+      '완료 (${(sw.elapsedMilliseconds / 1000).toStringAsFixed(1)}초) -> ${outReport.path}',
+    );
+  } on FileSystemException {
+    stdout.writeln('완료 (${(sw.elapsedMilliseconds / 1000).toStringAsFixed(1)}초) [읽기 전용 환경]');
+  }
 }

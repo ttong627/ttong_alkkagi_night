@@ -273,6 +273,7 @@ class ActiveStoneProjectile {
     this.homingTargetUid,
     this.executesLowHpNormal = false,
     this.splitsShadowOnHit = false,
+    this.alreadySplitPerk = false,
     int extraBounces = 0,
   }) : bouncesLeft = shape.maxBounces + extraBounces;
 
@@ -305,9 +306,10 @@ class ActiveStoneProjectile {
   final int? lockedWeakBossUid;
   final bool fromWeakCrackerMount;
   final double? freezeDurationOverride;
-  final int? homingTargetUid;
+  int? homingTargetUid;
   final bool executesLowHpNormal;
   bool splitsShadowOnHit;
+  bool alreadySplitPerk = false;
 
   /// 발사대·비기 계통별 고유 탄알·내공 외형 식별자 (`'rapidBolt'` | `'heavyMeteor'` | `'curveChakram'` | `'frostCrystal'` | `'qiBagua'` | `'sectSword'` | `'sectFist'` | `'sectTaiji'` | `'eogiUltimate'` | `'precisionLance'` | `'stoneDefault'`).
   final String projectileStyle;
@@ -329,11 +331,16 @@ class GoldenSupplyToad {
 
 /// 장치·동료별 전투 기여도 항목.
 class ContributionEntry {
-  ContributionEntry({required this.key, required this.label});
+  ContributionEntry({
+    required this.key,
+    required this.label,
+    this.totalDamage = 0,
+    this.kills = 0,
+  });
   final String key;
   final String label;
-  double totalDamage = 0;
-  int kills = 0;
+  double totalDamage;
+  int kills;
 }
 
 /// 전투 종료 요약 보고서.
@@ -358,6 +365,8 @@ class BattleSummary {
     this.encounteredMutants = const {},
     this.supportDeductedRealtime = false,
     this.bossElixirIncluded = false,
+    this.convoyBuffConsumedRealtime = false,
+    this.towerTookDamage = false,
   });
 
   final bool victory;
@@ -379,6 +388,8 @@ class BattleSummary {
   final Set<MutantKind> encounteredMutants;
   final bool supportDeductedRealtime;
   final bool bossElixirIncluded;
+  final bool convoyBuffConsumedRealtime;
+  final bool towerTookDamage;
 }
 
 class _PendingSpawn {
@@ -516,6 +527,8 @@ class DefenseBattleSim {
   double cropsHealth = 1.0;
   double livestockHealth = 1.0;
   bool villageTookDamage = false;
+  bool towerTookDamage = false;
+  bool _convoyBuffConsumedRealtime = false;
 
   /// 현장 건설 기력(⚡ · 초소 건설/승급 전용) 및 정산 누적 보상.
   int fieldTokens = 0;
@@ -530,12 +543,16 @@ class DefenseBattleSim {
   double get maxQiBars => progress.maxQiBars;
   double _autoEogiCooldown = 0.0;
   bool _encoreEogiReserved = false;
+  double _qiBurstSynergyTimer = 0.0;
   double _fireBurstCooldown = 0.0;
+  Vec2? _lastFireBurstPos;
   BattleSummary? _cachedSummary;
   double jeonggakHasteTimer = 0.0;
   double _jeonggakHasteMult = 1.45;
   double cheonghakBuffTimer = 0.0;
   double auroraCritTimer = 0.0;
+  double seolhwaFrostShieldTimer = 0.0;
+  double mukhyeonCooldownTimer = 0.0;
 
   /// 연쇄 타격 콤보 및 광폭 탄지 무쌍(피버 타임) 상태.
   int comboCount = 0;
@@ -631,31 +648,41 @@ class DefenseBattleSim {
   /// 개별 길목 초소(ActiveLauncher)의 현재 유효 사거리 (5종 지형 보너스 + 장별 특색 + 계통 고유 사거리 + 승급 + 인접 증폭기 + 실시간 사거리업 반영).
   double effectiveLauncherRange(ActiveLauncher l) {
     final ch4WatchtowerBoost =
-        (chapter.number == 4 && l.terrainType == MountTerrainType.highWatchtower) ? 1.14 : 1.0;
+        (chapter.number == 4 && l.terrainType == MountTerrainType.highWatchtower) ? 1.24 : 1.0;
     double mult = l.terrainType.rangeMult *
         ch4WatchtowerBoost *
         liveRangeMultiplier *
         (1.0 + progress.corePrecisionBonus * 0.30);
     if (l.type != LauncherType.qiAmplifier) {
       final ch5AmpMult = chapter.number == 5 ? 1.35 : 1.0;
+      int ampRangeStacks = 0;
       for (final other in launchers) {
-        final auraR = 185.0 * (other.terrainType == MountTerrainType.spiritSpring ? 1.25 : 1.0);
+        final auraR = 195.0 * (other.terrainType == MountTerrainType.spiritSpring ? 1.25 : 1.0);
         if (other != l &&
             !other.isConstructing &&
             other.type == LauncherType.qiAmplifier &&
             other.pos.distanceTo(l.pos) <= auraR) {
           mult += (0.14 + other.tier * 0.02) * ch5AmpMult;
-          break;
+          ampRangeStacks++;
+          if (ampRangeStacks >= 2) break;
         }
       }
     }
     return (l.type.effectiveBaseRange(l.tier) * mult).clamp(116.0, 365.0);
   }
 
-  /// 빈 초소 선택·미리보기 시 표시할 예정 유효 사거리 (지형 특성 사거리 보너스 즉시 반영).
-  double previewSlotRange(LauncherMountSlot slot) =>
-      (slot.recommendedType.baseRangePx * slot.terrainType.rangeMult * liveRangeMultiplier)
-          .clamp(116.0, 325.0);
+  /// 빈 초소 선택·미리보기 시 표시할 예정 유효 사거리 (편성 병종 + 지형 특성 + 4장 망루 보너스 즉시 반영).
+  double previewSlotRange(LauncherMountSlot slot) {
+    final pType = preferredBuildTypeForSlot(slot);
+    final ch4Watch =
+        (chapter.number == 4 && slot.terrainType == MountTerrainType.highWatchtower) ? 1.24 : 1.0;
+    return (pType.baseRangePx *
+            slot.terrainType.rangeMult *
+            ch4Watch *
+            liveRangeMultiplier *
+            (1.0 + progress.corePrecisionBonus * 0.30))
+        .clamp(116.0, 365.0);
+  }
 
   /// 길이 아닌 옆숲·땅굴 비정규 침투 기습 타이머 및 출몰 카운트!
   double infiltrationTimer = 8.8;
@@ -772,7 +799,12 @@ class DefenseBattleSim {
     shieldHp = shieldMaxHpDynamic;
     towerHp = centralSpec.coreMaxHp;
 
-    final buffMult = progress.convoySupplyBuffBattles > 0 ? 1.20 : 1.0;
+    final hasConvoyBuff = progress.convoySupplyBuffBattles > 0;
+    if (hasConvoyBuff && allowSupportTokens && !autoBuildForSimVerify) {
+      progress.convoySupplyBuffBattles = max(0, progress.convoySupplyBuffBattles - 1);
+      _convoyBuffConsumedRealtime = true;
+    }
+    final buffMult = hasConvoyBuff ? 1.20 : 1.0;
     fieldTokens = (stage.startingFieldTokens * buffMult).round();
     qiBars = (progress.realm.startQiBars + progress.meridianStartQiBonus).clamp(0.0, maxQiBars);
 
@@ -1306,6 +1338,9 @@ class DefenseBattleSim {
     serendipityCount++;
 
     final isMythic5 = target.tier >= 5;
+    if (isMythic5) {
+      rouletteSpinsAvailable++;
+    }
     pendingSounds.add(SoundCue.serendipityJackpot);
     screenShakeTimer = max(screenShakeTimer, isMythic5 ? 0.38 : 0.25);
     screenShakeIntensity = max(screenShakeIntensity, isMythic5 ? 6.8 : 4.8);
@@ -1329,7 +1364,7 @@ class DefenseBattleSim {
       FloatingCallout(
         pos: target.pos + const Vec2(0, -24),
         text: isMythic5
-            ? '🌟 태초 신기 강림!! ★5형 ${target.type.name} 초월 각성!!'
+            ? '🌟 태초 신기 강림!! ★5형 ${target.type.name} 각성 + 🎰돌림판 개방!!'
             : '☯️ 합치기 각성 진화!! ${target.tier}형 ${target.type.name} 탄생!',
         colorHex: 0xFFFFD166,
         isBigBanner: true,
@@ -1338,14 +1373,16 @@ class DefenseBattleSim {
     return true;
   }
 
-  /// 배치된 발사대 조합에 따른 실시간 무림 진법 시너지 연결선 계산!
+  /// 배치된 발사대 조합에 따른 실시간 무림 진법 시너지 연결선 계산! (축조 완료된 포탑끼리만 발동!)
   List<ActiveSynergyLink> get activeSynergyLinks {
     if (launchers.length < 2) return const [];
     final links = <ActiveSynergyLink>[];
     for (int i = 0; i < launchers.length; i++) {
+      final a = launchers[i];
+      if (a.isConstructing) continue;
       for (int j = i + 1; j < launchers.length; j++) {
-        final a = launchers[i];
         final b = launchers[j];
+        if (b.isConstructing) continue;
         final maxLinkDist =
             (a.type == b.type || (a.slotIndex <= 1 && b.slotIndex <= 1)) ? 680.0 : 460.0;
         if (a.pos.distanceTo(b.pos) > maxLinkDist) continue;
@@ -1375,6 +1412,7 @@ class DefenseBattleSim {
             ),
           );
         } else if (a.type == b.type) {
+          final canMergeNow = a.tier == b.tier && a.tier < 5;
           links.add(
             ActiveSynergyLink(
               slotA: a.slotIndex,
@@ -1382,7 +1420,7 @@ class DefenseBattleSim {
               posA: a.pos,
               posB: b.pos,
               synergyName: '쌍성 공명진',
-              bonusSummary: '합치기 가능 · 공속 +18%',
+              bonusSummary: canMergeNow ? '합치기 가능 · 공속 +18%' : '쌍성 가속 · 공속 +18%',
               colorHex: 0xFFFFD166,
             ),
           );
@@ -1691,9 +1729,9 @@ class DefenseBattleSim {
     fieldTokens -= liveBarrierCost;
     liveBarrierLv++;
     manualResonanceTimer = max(manualResonanceTimer, 8.0);
-    shieldMaxHpDynamic *= 1.20;
-    shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.42);
-    towerHp = min(centralSpec.coreMaxHp, towerHp + centralSpec.coreMaxHp * 0.35);
+    shieldMaxHpDynamic *= 1.18;
+    shieldHp = min(shieldMaxHpDynamic, shieldHp + centralSpec.shieldMaxHp * 0.28);
+    towerHp = min(centralSpec.coreMaxHp, towerHp + centralSpec.coreMaxHp * 0.25);
     granaryHealth = min(1.0, granaryHealth + 0.30);
     cropsHealth = min(1.0, cropsHealth + 0.30);
     livestockHealth = min(1.0, livestockHealth + 0.30);
@@ -1753,7 +1791,7 @@ class DefenseBattleSim {
 
   /// 플레이어가 3장의 돌파 비급 중 1장을 선택해 즉시 적용!
   bool chooseRoguePerk(RoguePerk perk) {
-    if (!pendingPerkChoices.contains(perk)) return false;
+    if (isFinished || !pendingPerkChoices.contains(perk)) return false;
     pendingPerkChoices.clear();
     perkChoiceTimer = 0.0;
     activePerks[perk] = (activePerks[perk] ?? 0) + 1;
@@ -1907,7 +1945,7 @@ class DefenseBattleSim {
 
   /// 보스의 빛나는 약점 과녁(🎯)을 전장에서 직접 터치하여 정밀 파갑 신궁탄 즉시 발사!
   /// (수동 모드로 미리 전환하지 않아도 즉시 격발되며, 약점 정타 시 외각 장갑판 1겹 파쇄 + 고정 피해!)
-  bool firePrecisionStrikeAt(Vec2 targetArenaPos) {
+  bool firePrecisionStrikeAt(Vec2 targetArenaPos, {int? targetBossUid}) {
     if (!isPrecisionStrikeReady) return false;
     final reloadScale = 1.0 + liveReloadLv * 0.12;
     precisionStrikeCooldown = precisionStrikeIntervalSec / reloadScale;
@@ -1916,13 +1954,23 @@ class DefenseBattleSim {
 
     final origin = towerPos;
     ActiveMutant? lockedBoss;
-    double bestWeakDist = 88.0;
-    for (final m in mutants) {
-      if (m.totalPhases <= 1 || m.phaseTransitionTimer > 0) continue;
-      final dWeak = targetArenaPos.distanceTo(m.weakSpotWorldPos);
-      if (dWeak <= bestWeakDist) {
-        bestWeakDist = dWeak;
-        lockedBoss = m;
+    if (targetBossUid != null) {
+      for (final m in mutants) {
+        if (m.uid == targetBossUid && m.totalPhases > 1 && m.phaseTransitionTimer <= 0) {
+          lockedBoss = m;
+          break;
+        }
+      }
+    }
+    if (lockedBoss == null) {
+      double bestWeakDist = 88.0;
+      for (final m in mutants) {
+        if (m.totalPhases <= 1 || m.phaseTransitionTimer > 0) continue;
+        final dWeak = targetArenaPos.distanceTo(m.weakSpotWorldPos);
+        if (dWeak <= bestWeakDist) {
+          bestWeakDist = dWeak;
+          lockedBoss = m;
+        }
       }
     }
 
@@ -1947,7 +1995,10 @@ class DefenseBattleSim {
 
     final stone = preset.primaryStone;
     final shape = preset.primaryShape;
-    const shotSpeed = 1040.0;
+    final boulderStacks = perkStacks(RoguePerk.giantBoulder);
+    final frostStacks = perkStacks(RoguePerk.frostNova);
+    final ricochetStacks = perkStacks(RoguePerk.ricochetMaster);
+    final shotSpeed = 1040.0 * shape.speedFactor;
     final baseDmg = centralSpec.baseDamage *
         1.45 *
         (1.0 + liveFirepowerLv * 0.15) *
@@ -1955,6 +2006,7 @@ class DefenseBattleSim {
         stone.damageMultiplier *
         progress.realm.powerMult *
         (1.0 + progress.meridianLauncherDmgBonus);
+    final radiusScale = (1.0 + boulderStacks * 0.38).clamp(1.0, 2.0);
 
     if (projectiles.length >= 180) {
       projectiles.removeAt(0);
@@ -1968,17 +2020,23 @@ class DefenseBattleSim {
         material: stone,
         shape: shape,
         damage: baseDmg,
-        knockback: 92.0 * stone.knockbackMultiplier,
-        critChance: 0.65,
+        knockback: 92.0 *
+            stone.knockbackMultiplier *
+            shape.knockbackFactor *
+            (1.0 + progress.meridianKnockbackBonus) *
+            (1.0 + boulderStacks * 0.55),
+        critChance: (0.65 + shape.critBonus + progress.meridianCritBonus).clamp(0.65, 1.0),
         colorHex: 0xFFFFD166,
-        radius: 12.2,
+        radius: 12.2 * radiusScale,
         pierceLeft: 2,
         aoeSplashRadius: 34.0,
+        freezesOnHit: stone == StoneMaterial.hancheol || frostStacks > 0,
+        slowsOnHit: stone == StoneMaterial.banseok || stone == StoneMaterial.bingbaek,
         ignoresShield: true,
         isPrecisionShot: true,
         precisionTargetPos: targetArenaPos,
         lockedWeakBossUid: lockedBoss?.uid,
-        extraBounces: chapter.number == 5 ? 2 : 0,
+        extraBounces: (chapter.number == 5 ? 2 : 0) + ricochetStacks * 2,
         maxTravelDist: 1680.0,
         projectileStyle: 'precisionLance',
       ),
@@ -2016,7 +2074,7 @@ class DefenseBattleSim {
     return sanitizeManualAimAngle(rawAngleRad);
   }
 
-  /// 수동 탄지 도탄 궤적 예측선 계산 (현재 수동 유효 사거리 한계선 및 벽면·기둥 1회 반사 반영).
+  /// 수동 탄지 도탄 궤적 예측선 계산 (현재 수동 유효 사거리·수호 알 모양·회전 정다각형 기둥 실제 법선 반사 반영!).
   List<Vec2> previewCentralManualRay(double rawAngleRad, {double? maxDist}) {
     final angle = sanitizeAimAngleForChapter(rawAngleRad);
     final origin = towerPos;
@@ -2024,6 +2082,10 @@ class DefenseBattleSim {
     Vec2 dir = Vec2(cos(angle), sin(angle)).normalized;
     final pts = <Vec2>[origin];
     double rem = maxDist ?? effectiveCentralManualRange;
+    final maxBounces = preset.primaryShape.maxBounces +
+        2 +
+        (chapter.number == 5 ? 2 : 0) +
+        perkStacks(RoguePerk.ricochetMaster) * 2;
     int bounces = 0;
 
     const stepLen = 8.0;
@@ -2044,7 +2106,7 @@ class DefenseBattleSim {
       if (next.x <= 16.0 || next.x >= CampaignCatalog.arenaWidth - 16.0) {
         final hit = Vec2(next.x.clamp(16.0, CampaignCatalog.arenaWidth - 16.0), next.y);
         pts.add(hit);
-        if (bounces >= 1) break;
+        if (bounces >= maxBounces) break;
         bounces++;
         dir = Vec2(-dir.x, dir.y).normalized;
         cur = hit;
@@ -2052,15 +2114,19 @@ class DefenseBattleSim {
       }
 
       bool hitPillar = false;
-      for (final pillar in chapter.pillars) {
-        final toP = next - pillar.center;
-        if (toP.length <= pillar.radius + 7.5) {
-          final n = toP.normalized;
-          final hit = pillar.center + n * (pillar.radius + 8.0);
+      for (int pIdx = 0; pIdx < chapter.pillars.length; pIdx++) {
+        final pillar = chapter.pillars[pIdx];
+        final angleOffset = pIdx < pillarAngles.length ? pillarAngles[pIdx] : 0.0;
+        final (closestEdgePt, n, distEdge) =
+            _closestPointOnRotatedPolygon(pillar, angleOffset, next);
+        if (distEdge <= 8.5) {
+          final hit = closestEdgePt + n * 9.0;
           pts.add(hit);
-          if (bounces < 1) {
+          if (bounces < maxBounces) {
             final dot = dir.x * n.x + dir.y * n.y;
-            dir = (dir - n * (2 * dot)).normalized;
+            if (dot < 0) {
+              dir = (dir - n * (2 * dot)).normalized;
+            }
             cur = hit;
             bounces++;
             hitPillar = true;
@@ -2120,9 +2186,11 @@ class DefenseBattleSim {
     }
 
     if (qiBars >= 2.95) {
-      qiBars = 0.0;
+      final hadFourBars = qiBars >= 3.95;
+      qiBars = max(0.0, qiBars - 3.0);
       _encoreEogiReserved = false;
-      final count = progress.realm.eogieoseokCount + 4;
+      _qiBurstSynergyTimer = max(_qiBurstSynergyTimer, 2.5);
+      final count = progress.realm.eogieoseokCount + 4 + (hadFourBars ? 2 : 0);
       screenShakeTimer = max(screenShakeTimer, 0.26);
       screenShakeIntensity = max(screenShakeIntensity, 5.2);
       callouts.add(
@@ -2162,6 +2230,7 @@ class DefenseBattleSim {
           preRolledSerendipity: rolledEogiSeren,
         );
       }
+      _tryFireNalssaendolAcornWithCentral();
       return true;
     }
 
@@ -2171,6 +2240,7 @@ class DefenseBattleSim {
         (1.0 + progress.meridianLauncherDmgBonus); // 수동 직접 탄지 초장거리 파쇄 주포!
     if (qiBars >= 1.0 && !_encoreEogiReserved) {
       qiBars -= 1.0;
+      _qiBurstSynergyTimer = max(_qiBurstSynergyTimer, 2.5);
       sectTech = preset.sectTechnique;
       dmgMult *= 1.35;
       _spawnShockwaveRing(
@@ -2205,11 +2275,14 @@ class DefenseBattleSim {
         angleRad: angle + wing,
         baseDamage: centralSpec.baseDamage * dmgMult * 0.56,
         speed: 495,
-        pierceBonus: 2,
+        pierceBonus: 1,
         aoeRadius: 0,
         knockbackScale: 1.10,
         preRolledSerendipity: rolledManualSeren,
       );
+    }
+    if (preset.equippedBeast == SpiritBeast.nalssaendol) {
+      beastCooldown = 0.0;
     }
     return true;
   }
@@ -2330,27 +2403,7 @@ class DefenseBattleSim {
       ),
     );
 
-    if (sectTech == SectTechnique.shadowClone && projectiles.length < 180) {
-      final cloneAngle = angleRad + 0.16;
-      projectiles.add(
-        ActiveStoneProjectile(
-          sourceKey: 'central_tower',
-          sourceLabel: '중앙 기명 수호탑 (수동 분신탄)',
-          pos: origin,
-          vel: Vec2(cos(cloneAngle) * finalSpeed, sin(cloneAngle) * finalSpeed),
-          material: stone,
-          shape: shape,
-          damage: finalDamage * 0.80,
-          knockback: finalKnock * 0.85,
-          critChance: critChance,
-          colorHex: 0xFFC77DFF,
-          radius: 8.8 * radiusScale,
-          pierceLeft: max(0, pierce - 1),
-          extraBounces: 1 + ch5ExtraBounce + ricochetStacks * 2,
-          maxTravelDist: effectiveCentralManualRange * 1.15,
-        ),
-      );
-    }
+    // 영월살문 분신 쌍영탄은 명중 순간에 2갈래로 갈라진다(발사 시 중복 분신 생성 제거).
   }
 
   double _scoutSpawnProgressForLane(int laneIdx, int scoutOrder) {
@@ -2466,7 +2519,7 @@ class DefenseBattleSim {
 
   /// 거점 발사대 수동/자동 실시간 버전 승급 (1형 → 4형 · 1.15초 단조 공정!).
   bool upgradeLauncherInBattle(int launcherIndex) {
-    if (launcherIndex < 0 || launcherIndex >= launchers.length) return false;
+    if (isFinished || launcherIndex < 0 || launcherIndex >= launchers.length) return false;
     final l = launchers[launcherIndex];
     if (l.tier >= 4 || l.isConstructing) return false;
     final cost = upgradeCostForLauncher(l);
@@ -2499,6 +2552,7 @@ class DefenseBattleSim {
     switch (item) {
       case TacticalConsumable.qiSurgePill:
         qiBars = maxQiBars;
+        _qiBurstSynergyTimer = max(_qiBurstSynergyTimer, 2.5);
         pendingSounds.add(SoundCue.serendipityJackpot);
         bursts.add(FxBurst(pos: shieldCenter, colorHex: 0xFF34D399, maxRadius: 62));
         callouts.add(
@@ -2546,6 +2600,7 @@ class DefenseBattleSim {
 
   /// 플레이어가 원할 때 즉시 또는 위기 조건 시 자동으로 「무림수호단 출두야~~!!」 발동!
   bool triggerSupportChuldu({bool isFreeEncore = false}) {
+    if (isFinished) return false;
     if (!isFreeEncore) {
       if (supportChargesLeft <= 0 || progress.supportTokens <= 0) return false;
       supportChargesLeft--;
@@ -2606,16 +2661,19 @@ class DefenseBattleSim {
       }
       final outVec = m.pos - shieldCenter;
       final outDir = outVec.length > 1.0 ? outVec.normalized : const Vec2(0, -1);
-      final dmg = m.kind.isBoss
-          ? m.currentMaxHp * (isCritChuldu ? 0.58 : 0.40)
-          : m.maxHp * 3.0;
+      final meridianMult = 1.0 + progress.meridianLauncherDmgBonus;
+      final knockMult = 1.0 + progress.meridianKnockbackBonus;
+      final dmg = (m.kind.isBoss
+              ? m.currentMaxHp * (isCritChuldu ? 0.58 : 0.40)
+              : m.maxHp * 3.0) *
+          meridianMult;
       _applyDamageToMutant(
         m,
         dmg,
         sourceKey: 'support_chuldu',
         sourceLabel: '무림수호단 출두',
         knockDir: outDir,
-        knockForce: 190,
+        knockForce: 190 * knockMult,
         isCritical: true,
       );
       if (isCritChuldu) {
@@ -2659,10 +2717,10 @@ class DefenseBattleSim {
     return true;
   }
 
-  /// 물리 진행 (1배~4배 고속 배속에서도 탄알 터널링·궤도 이탈이 0건이 되도록 1/60초 이하 미세 분할 연산).
+  /// 물리 진행 (1배~4배 고속 배속에서도 탄알 터널링·궤도 이탈이 0건이 되도록 1/60초 이하 최대 16분할 연산).
   void step(double dt) {
     if (isFinished || !dt.isFinite || dt <= 0) return;
-    final subSteps = ((dt - 1e-9) / (1.0 / 60.0)).ceil().clamp(1, 8);
+    final subSteps = ((dt - 1e-9) / (1.0 / 60.0)).ceil().clamp(1, 16);
     final subDt = dt / subSteps;
     for (int s = 0; s < subSteps && !isFinished; s++) {
       _stepSingle(subDt);
@@ -2679,6 +2737,15 @@ class DefenseBattleSim {
     }
     if (_autoChulduCooldown > 0) {
       _autoChulduCooldown = max(0.0, _autoChulduCooldown - dt);
+    }
+    if (_qiBurstSynergyTimer > 0) {
+      _qiBurstSynergyTimer = max(0.0, _qiBurstSynergyTimer - dt);
+    }
+    if (seolhwaFrostShieldTimer > 0) {
+      seolhwaFrostShieldTimer = max(0.0, seolhwaFrostShieldTimer - dt);
+    }
+    if (mukhyeonCooldownTimer > 0) {
+      mukhyeonCooldownTimer = max(0.0, mukhyeonCooldownTimer - dt);
     }
     if (_fireBurstCooldown > 0) {
       _fireBurstCooldown = max(0.0, _fireBurstCooldown - dt);
@@ -2918,12 +2985,14 @@ class DefenseBattleSim {
                 launchers.length >= min(4, activeMounts.length) &&
                 fieldTokens >= 95));
     if (allowAutoUpgNow) {
+      final hasPendingPad = nextRecommendedSlotIndex() != null;
+      final reserveForBuild = autoBuildForSimVerify ? 0 : (hasPendingPad ? 55 : 0);
       ActiveLauncher? bestCandidate;
       int bestCost = 999999;
       for (final l in launchers) {
         if (l.tier < 4 && !l.isConstructing) {
-          final c = l.type.inBattleUpgradeCost(l.tier);
-          if (fieldTokens >= c && c < bestCost) {
+          final c = upgradeCostForLauncher(l);
+          if (fieldTokens - c >= reserveForBuild && c < bestCost) {
             bestCost = c;
             bestCandidate = l;
           }
@@ -2959,9 +3028,9 @@ class DefenseBattleSim {
     _stepWaveSpawning(dt);
     _stepOffPathInfiltrators(dt);
     _stepMutants(dt);
+    _stepSpiritBeastAndCompanions(dt);
     _stepCentralGuardian(dt);
     _stepPathLaunchers(dt);
-    _stepSpiritBeastAndCompanions(dt);
     _stepSupportAutoTrigger();
     _stepProjectiles(dt);
     _stepBountyQuests();
@@ -3068,7 +3137,7 @@ class DefenseBattleSim {
       wavesClearedCount = completedWaveCnt;
     }
 
-    if (pendingFreeEncoreChuldu && mutants.length >= 3) {
+    if (pendingFreeEncoreChuldu && mutants.isNotEmpty) {
       pendingFreeEncoreChuldu = false;
       triggerSupportChuldu(isFreeEncore: true);
     }
@@ -3216,7 +3285,11 @@ class DefenseBattleSim {
     final eliteFactor = stage.chapterNumber >= 5 ? 1.02 : 0.92;
     final maxHp =
         kind.baseHp * kind.swarmHpFactor * chScale * ch1Ease * difficulty.hpMult * eliteFactor;
-    final spd = kind.speed * (isAirborne ? 2.05 : (isTunnel ? 1.78 : 1.92)) * difficulty.speedMult;
+    final ch7DesertHaste = chapter.number == 7 ? 1.08 : 1.0;
+    final spd = kind.speed *
+        (isAirborne ? 2.05 : (isTunnel ? 1.78 : 1.92)) *
+        ch7DesertHaste *
+        difficulty.speedMult;
 
     final m = ActiveMutant(
       uid: _nextMutantUid++,
@@ -3292,21 +3365,24 @@ class DefenseBattleSim {
     final baseCh = _chapterMonsterHpCurve[chIdx];
     if (stage.globalIndex >= 900) {
       final w = max(0, waveIdx);
+      const endlessBase = 142.0;
       if (w <= 15) {
-        return baseCh * (1.0 + w * 0.14);
+        return endlessBase * (1.0 + w * 0.135);
       }
-      // 16~100물결: 종결 수호신 계정이 실제로 100물결 정복에 도전할 수 있는 정교한 우상향 다항 곡선!
-      return baseCh * (1.0 + w * 0.14 + pow(w - 15, 1.38).toDouble() * 0.085);
+      // 16~100물결: 막 10-10을 깬 계정은 중후반(40~85물결)에서 한계를 느끼고, 엔드게임 연마 계정이 100물결을 정복하는 곡선!
+      return endlessBase * (1.0 + w * 0.135 + pow(w - 15, 1.33).toDouble() * 0.062);
     }
     return baseCh * (1.0 + (stage.stageNumber - 1) * 0.058);
   }
 
   double _mutantAttackScaleForWave(int waveIdx) {
-    double chMult = 1.0 +
-        (stage.chapterNumber - 1) * 0.50 +
-        (stage.chapterNumber >= 6 ? (stage.chapterNumber - 5) * 0.44 : 0.0);
+    double chMult = stage.globalIndex >= 900
+        ? 7.4
+        : (1.0 +
+            (stage.chapterNumber - 1) * 0.50 +
+            (stage.chapterNumber >= 6 ? (stage.chapterNumber - 5) * 0.44 : 0.0));
     if (stage.globalIndex >= 900 && waveIdx > 15) {
-      chMult *= 1.0 + (waveIdx - 15) * 0.048;
+      chMult *= 1.0 + (waveIdx - 15) * 0.033;
     }
     final diffMult = switch (difficulty) {
       DefenseDifficulty.easy => 0.80,
@@ -3331,7 +3407,9 @@ class DefenseBattleSim {
     }
 
     final chScale = _monsterHpScaleForWave(item.waveIndex);
-    final ch1Ease = stage.chapterNumber == 1 ? (item.kind.isBoss ? 0.76 : 0.96) : 1.0;
+    final ch1Ease = (stage.chapterNumber == 1 && stage.globalIndex < 900)
+        ? (item.kind.isBoss ? 0.76 : 0.96)
+        : 1.0;
     final maxHp = item.kind.baseHp *
         item.kind.swarmHpFactor *
         chScale *
@@ -3442,6 +3520,12 @@ class DefenseBattleSim {
       if (m.contactHitCooldown > 0) m.contactHitCooldown = max(0, m.contactHitCooldown - dt);
       if (m.altarHitFlashTimer > 0) m.altarHitFlashTimer = max(0, m.altarHitFlashTimer - dt);
 
+      // ★ 완전 빙결(freezeTimer > 0) 중인 변이체는 약점 회전·넉백·이동·독안개·포효·타격까지 100% 동결된다!
+      if (m.freezeTimer > 0) {
+        m.knockbackVel = const Vec2(0, 0);
+        continue;
+      }
+
       if (m.totalPhases > 1) {
         final spinDir = m.uid.isEven ? 1.0 : -1.0;
         final spinSpeed = m.currentPhase >= 3 ? 1.78 : 1.18;
@@ -3463,7 +3547,7 @@ class DefenseBattleSim {
         m.knockbackVel = const Vec2(0, 0);
       }
 
-      // 낭떠러지 장외 & 절벽 걸침 35%(제8장 현측 바다 50%!) 뽀록 판정! (공중 비행 변이 및 보스는 절벽 추락 면역!)
+      // 낭떠러지 장외 & 절벽 걸침 35%(제8장 현측 바다 50% + 묵객 먹물 감속 시 +18%!) 뽀록 판정! (공중 비행 변이 및 보스는 절벽 추락 면역!)
       final canFallOffCliff = !m.kind.isBoss &&
           !m.kind.isFlying &&
           (stage.chapterNumber <= 2 ||
@@ -3471,7 +3555,8 @@ class DefenseBattleSim {
               (m.kind != MutantKind.ironBoar && m.kind != MutantKind.shieldYacha) ||
               m.hp <= m.maxHp * 0.65);
       final cliffInnerRatio = chapter.number == 8 ? 0.78 : 0.68;
-      final cliffEdgeDropProb = chapter.number == 8 ? 0.50 : 0.35;
+      final inkBonus = m.slowTimer > 0 ? 0.18 : 0.0;
+      final cliffEdgeDropProb = ((chapter.number == 8 ? 0.50 : 0.35) + inkBonus).clamp(0.0, 0.85);
       bool fellOff = false;
       for (int cliffIdx = 0; cliffIdx < chapter.cliffs.length; cliffIdx++) {
         final cliff = chapter.cliffs[cliffIdx];
@@ -3522,6 +3607,12 @@ class DefenseBattleSim {
             colorHex: 0xFF80ED99,
           ),
         );
+        if (preset.primaryStone == StoneMaterial.onok &&
+            towerHp > 0 &&
+            launchers.any((e) => !e.isConstructing)) {
+          final healRatio = stage.globalIndex >= 900 ? 0.011 : 0.022;
+          shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * healRatio);
+        }
         _rewardMutantKill(m, bonusTokenMult: 1.5, sourceKey: 'cliff_pporok', sourceLabel: '절벽 추락 뽀록');
         mutants.removeAt(i);
         continue;
@@ -3594,11 +3685,11 @@ class DefenseBattleSim {
         if (m.groggyExposeTimer > 0) {
           gaitMult *= 0.68;
         }
-        // 100타·1,000타 타수 실드가 남은 최종 페이즈에서 체력이 바닥나면 마갑 버티기(집중 연타 세례 구간) 전환!
+        // 100타·1,000타 타수 실드가 남은 최종 페이즈에서 체력이 바닥나면 마갑 돌진(0.45배속 유지 — 제자리 무한 정지 방지!) 전환!
         if (m.currentPhase >= m.totalPhases &&
             m.hitShieldLeft > 0 &&
             m.hp <= m.currentMaxHp * 0.15) {
-          gaitMult *= 0.22;
+          gaitMult *= 0.45;
         }
         if (m.dashBurstTimer > 0) {
           gaitMult *= m.kind == MutantKind.swiftShadowBoss ? 1.55 : 1.32;
@@ -3614,8 +3705,8 @@ class DefenseBattleSim {
         // Catmull-Rom 곡선 경로 및 90° 직각 미궁 경로 정밀 주시(Look-Ahead Pure Pursuit)!
         if (m.waypoints.isNotEmpty) {
           final isOrtho = chapter.isOrthogonalLabyrinth && !m.kind.isFlying && !m.isInfiltrator;
-          final reachDist = isOrtho ? 12.0 : 32.0;
-          final dotDist = isOrtho ? 24.0 : 56.0;
+          final reachDist = isOrtho ? 5.5 : 32.0;
+          final dotDist = isOrtho ? 9.0 : 56.0;
           int wpIdx = m.waypointIndex.clamp(0, m.waypoints.length - 1);
           while (wpIdx + 1 < m.waypoints.length) {
             final curWp = m.waypoints[wpIdx];
@@ -3634,7 +3725,7 @@ class DefenseBattleSim {
           }
           m.waypointIndex = wpIdx;
 
-          final lookIdx = min(wpIdx + (isOrtho ? 1 : 2), m.waypoints.length - 1);
+          final lookIdx = min(wpIdx + (isOrtho ? 0 : 2), m.waypoints.length - 1);
           Vec2 targetPt = m.waypoints[lookIdx];
           final rawForward = (targetPt - m.pos);
           final baseDir = rawForward.length > 1e-4 ? rawForward.normalized : const Vec2(0, 1);
@@ -3656,8 +3747,8 @@ class DefenseBattleSim {
 
           Vec2 steerDir = (targetPt - m.pos).normalized;
 
-          // 대규모 무리 겹침 방지 소프트 분리력 (물결처럼 자연스럽게 퍼지며 전진)
-          if (!m.kind.isBoss && mutants.length > 1) {
+          // 대규모 무리 겹침 방지 소프트 분리력 (90도 직각 미궁에서는 벽 모서리 이탈 방지)
+          if (!isOrtho && !m.kind.isBoss && mutants.length > 1) {
             Vec2 sep = const Vec2(0, 0);
             int checks = 0;
             for (final other in mutants) {
@@ -3684,11 +3775,11 @@ class DefenseBattleSim {
             }
           }
 
-          final desiredVel = steerDir * effectiveSpeed;
-          final velBlend = min(1.0, dt * 13.5);
-          if (m.smoothVel.length < 1.0) {
+          final desiredVel = (isOrtho ? baseDir : steerDir) * effectiveSpeed;
+          if (isOrtho || m.smoothVel.length < 1.0) {
             m.smoothVel = desiredVel;
           } else {
+            final velBlend = min(1.0, dt * 13.5);
             m.smoothVel = Vec2(
               m.smoothVel.x + (desiredVel.x - m.smoothVel.x) * velBlend,
               m.smoothVel.y + (desiredVel.y - m.smoothVel.y) * velBlend,
@@ -3720,10 +3811,10 @@ class DefenseBattleSim {
         villageTookDamage = true;
       }
 
-      // 제2장 이상 중간보스·대수괴 마기 포효 충격파 (체력 60% 이하 또는 본진 반경 540px 진입 시 1회 외곽 결계 진동 압박!)
+      // 제2장 이상 또는 무한혈전(globalIndex >= 900) 중간보스·대수괴 마기 포효 충격파!
       if (!m.roarShockUsed &&
           m.kind.isBoss &&
-          stage.chapterNumber >= 2 &&
+          (stage.chapterNumber >= 2 || stage.globalIndex >= 900) &&
           (m.hp <= m.currentMaxHp * 0.60 || distToCenter <= 540.0) &&
           shieldHp > shieldMaxHpDynamic * 0.22) {
         m.roarShockUsed = true;
@@ -3733,7 +3824,8 @@ class DefenseBattleSim {
           DefenseDifficulty.normal => 1.0,
           DefenseDifficulty.nightmare => 1.48,
         };
-        final shockDmg = shieldMaxHpDynamic * baseRatio * diffScale;
+        final frostDr = seolhwaFrostShieldTimer > 0 ? 0.75 : 1.0;
+        final shockDmg = shieldMaxHpDynamic * baseRatio * diffScale * frostDr;
         shieldHp = max(shieldMaxHpDynamic * 0.18, shieldHp - shockDmg);
         screenShakeTimer = max(screenShakeTimer, 0.26);
         screenShakeIntensity = max(screenShakeIntensity, m.kind.isMidBoss ? 4.4 : 6.5);
@@ -3761,6 +3853,7 @@ class DefenseBattleSim {
       final phaseAttackMult = 1.0 + (m.currentPhase - 1) * 0.22;
       final carapaceRamMult = m.carapacePlatesLeft > 0 ? 1.48 : 1.0;
       final atkScale = m.attackScaleSnapshot > 0 ? m.attackScaleSnapshot : _mutantAttackScale;
+      final frostShieldDr = seolhwaFrostShieldTimer > 0 ? 0.75 : 1.0;
       // 외곽 기공 방어막 충돌 처리 (외각 장갑이 깨지지 않은 다단 변이 보스는 결계를 1.48배로 부수며 밀침 저항!)
       if (shieldHp > 0 &&
           m.contactHitCooldown <= 0 &&
@@ -3769,7 +3862,7 @@ class DefenseBattleSim {
         m.altarHitFlashTimer = 0.85;
         shieldHp = max(
           0,
-          shieldHp - m.kind.attackPower * phaseAttackMult * carapaceRamMult * atkScale,
+          shieldHp - m.kind.attackPower * phaseAttackMult * carapaceRamMult * atkScale * frostShieldDr,
         );
         m.attackAnimTimer = 1.0;
         if (m.kind.toughnessRating >= 4 || m.kind == MutantKind.crimsonBreakerBoss) {
@@ -3807,22 +3900,27 @@ class DefenseBattleSim {
           screenShakeIntensity = max(screenShakeIntensity, 3.8);
         }
 
-        // 초보자가 화면을 익히는 동안 즉사하지 않도록 1회 한정 호신 반발 빙결 충격파 발동 (끝까지 방치 시 재돌파되어 100% 함락!)
-        if (!_emergencyRepulseUsed && shieldHp <= shieldMaxHpDynamic * 0.38) {
+        // 1회 한정 호신 반발 빙결 충격파 발동 (난이도별 차등 회복 · 방치 시 100% 함락!)
+        if (!_emergencyRepulseUsed && shieldHp <= shieldMaxHpDynamic * 0.32) {
           _emergencyRepulseUsed = true;
-          shieldHp = max(shieldHp, shieldMaxHpDynamic * 0.78);
+          final repulseRefill = switch (difficulty) {
+            DefenseDifficulty.easy => 0.55,
+            DefenseDifficulty.normal => 0.38,
+            DefenseDifficulty.nightmare => 0.24,
+          };
+          shieldHp = max(shieldHp, shieldMaxHpDynamic * repulseRefill);
           for (final nearM in mutants) {
             if (nearM.pos.distanceTo(shieldCenter) <= 420.0) {
               final rawRep = nearM.pos - shieldCenter;
               final repDir = rawRep.length > 1e-3 ? rawRep.normalized : const Vec2(0, -1);
               nearM.knockbackVel = repDir * 420.0;
-              nearM.freezeTimer = max(nearM.freezeTimer, 1.9);
+              nearM.freezeTimer = max(nearM.freezeTimer, 1.6);
             }
           }
           bursts.add(FxBurst(pos: shieldCenter, colorHex: 0xFFFF595E, maxRadius: 112, isTriangleShatter: true));
           callouts.add(
             FloatingCallout(
-              pos: const Vec2(320, 520),
+              pos: shieldCenter + const Vec2(0, -76),
               text: '🚨 비상 결계 반발! 지금 즉시 초소를 소환하세요!',
               colorHex: 0xFFFFD166,
               ttlSec: 2.6,
@@ -3850,7 +3948,8 @@ class DefenseBattleSim {
         // 방어막이 깨진 상태에서 중앙 자동 보호 장치 직접 타격 → attackPower 비례 피해!
         m.contactHitCooldown = 0.22;
         m.altarHitFlashTimer = 0.85;
-        towerHp = max(0, towerHp - m.kind.attackPower * 0.95 * phaseAttackMult * atkScale);
+        towerTookDamage = true;
+        towerHp = max(0, towerHp - m.kind.attackPower * 0.95 * phaseAttackMult * atkScale * frostShieldDr);
         m.attackAnimTimer = 1.0;
         final ecoHit = (0.05 + m.kind.attackPower * 0.0012).clamp(0.05, 0.14);
         granaryHealth = (granaryHealth - ecoHit).clamp(0.0, 1.0);
@@ -3915,6 +4014,8 @@ class DefenseBattleSim {
     // 초소가 단 1곳도 없고 수동 조준도 안 하는 방치 상태에서는 약한 경계 단발만 발사(도탄·범위 없음 → 100% 함락!)
     if (!isFormationActive) {
       final rawDir = (target.pos - origin).normalized;
+      final guardCultMult =
+          progress.realm.powerMult * (1.0 + progress.meridianLauncherDmgBonus);
       projectiles.add(
         ActiveStoneProjectile(
           sourceKey: 'central_tower',
@@ -3923,9 +4024,9 @@ class DefenseBattleSim {
           vel: rawDir * 300.0,
           material: StoneMaterial.cheongok,
           shape: StoneShape.flat,
-          damage: centralSpec.baseDamage * 0.25,
-          knockback: 14.0,
-          critChance: 0.0,
+          damage: centralSpec.baseDamage * 0.25 * guardCultMult,
+          knockback: 14.0 * (1.0 + progress.meridianKnockbackBonus),
+          critChance: progress.meridianCritBonus.clamp(0.0, 0.35),
           colorHex: 0xFF72EFDD,
           radius: 6.5,
           pierceLeft: 0,
@@ -3937,11 +4038,14 @@ class DefenseBattleSim {
     }
 
     // 길목 초소가 1곳 이상 가동되어 진법이 연결되었을 때만 자동 어기어석·흡성탄지 발동!
-    if (launchers.isNotEmpty && qiBars >= 2.95 && _autoEogiCooldown <= 0) {
+    final activeTowers = launchers.where((e) => !e.isConstructing).toList();
+    if (activeTowers.isNotEmpty && qiBars >= 2.95 && _autoEogiCooldown <= 0) {
       qiBars = max(0.0, qiBars - 3.0);
       _encoreEogiReserved = false;
       _autoEogiCooldown = 5.2;
+      _qiBurstSynergyTimer = max(_qiBurstSynergyTimer, 2.5);
       _fireAutoEogieoseok(target);
+      _tryFireNalssaendolAcornWithCentral();
       return;
     }
 
@@ -3949,10 +4053,11 @@ class DefenseBattleSim {
         progress.realm.powerMult * (1.0 + progress.meridianLauncherDmgBonus);
 
     if (!_encoreEogiReserved &&
-        launchers.isNotEmpty &&
+        activeTowers.isNotEmpty &&
         qiBars >= 2.0 &&
         _countMutantsNear(target.pos, 80) >= 4) {
       qiBars -= 1.5;
+      _qiBurstSynergyTimer = max(_qiBurstSynergyTimer, 2.0);
       _spawnStoneShot(
         sourceKey: 'central_tower',
         sourceLabel: '중앙 기명 수호탑 (흡성탄지)',
@@ -3964,12 +4069,14 @@ class DefenseBattleSim {
         aoeRadius: 72,
         maxTravelDist: effectiveCentralAutoRange * 1.25,
       );
+      _tryFireNalssaendolAcornWithCentral();
       return;
     }
 
     bool useSectTech = false;
-    if (!_encoreEogiReserved && launchers.isNotEmpty && qiBars >= 1.0) {
+    if (!_encoreEogiReserved && activeTowers.isNotEmpty && qiBars >= 1.0) {
       qiBars -= 1.0;
+      _qiBurstSynergyTimer = max(_qiBurstSynergyTimer, 2.0);
       useSectTech = true;
     }
 
@@ -3985,13 +4092,40 @@ class DefenseBattleSim {
       sectTech: useSectTech ? preset.sectTechnique : null,
       maxTravelDist: effectiveCentralAutoRange * 1.18,
     );
+    _tryFireNalssaendolAcornWithCentral();
+  }
+
+  /// 영수 날쌘돌이 장착되어 있을 때 중앙 수호탑 탄지마다 도토리 보조탄을 동시 연사!
+  void _tryFireNalssaendolAcornWithCentral() {
+    if (!isFormationActive || mutants.isEmpty) return;
+    if (preset.equippedBeast != SpiritBeast.nalssaendol) return;
+    final lv = progress.beastLevels[SpiritBeast.nalssaendol] ?? 0;
+    if (lv <= 0) return;
+    final allyMaxR = (278.0 * liveRangeMultiplier).clamp(268.0, 385.0);
+    final target = _pickMostThreateningMutant(shieldCenter, maxRange: max(allyMaxR, effectiveCentralAutoRange));
+    if (target == null) return;
+    final allyMult = (1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45) *
+        (1.0 + progress.elixirResonanceBonus) *
+        (1.0 + progress.meridianLauncherDmgBonus);
+    final power =
+        centralSpec.baseDamage * (1.15 + lv * 0.18) * progress.realm.powerMult * allyMult;
+    _spawnStoneShot(
+      sourceKey: 'beast_nalssaendol',
+      sourceLabel: '영수 날쌘돌 (동반 도토리탄)',
+      origin: shieldCenter + const Vec2(-36, -12),
+      target: target,
+      baseDamage: power,
+      speed: 385,
+      maxTravelDist: max(allyMaxR, effectiveCentralAutoRange) * 1.18,
+    );
   }
 
   void _fireAutoEogieoseok(ActiveMutant primaryTarget) {
     final origin = towerPos;
-    final distinctTypes = launchers.map((e) => e.type).toSet().length;
+    final activeTowers = launchers.where((e) => !e.isConstructing).toList();
+    final distinctTypes = activeTowers.map((e) => e.type).toSet().length;
     final monoPenalty =
-        (stage.chapterNumber >= 4 && launchers.length >= 3 && distinctTypes <= 1) ? 0.46 : 1.0;
+        (stage.chapterNumber >= 4 && activeTowers.length >= 3 && distinctTypes <= 1) ? 0.46 : 1.0;
     final centralCultivationMult =
         progress.realm.powerMult * (1.0 + progress.meridianLauncherDmgBonus);
     final count = progress.realm.eogieoseokCount + 1;
@@ -4070,15 +4204,17 @@ class DefenseBattleSim {
         liveReloadMult;
 
     final links = activeSynergyLinks;
-    final distinctTypes = launchers.map((e) => e.type).toSet().length;
-    final hasNonAmpTower = launchers.any((e) => e.type != LauncherType.qiAmplifier);
-    final monoOverload = stage.chapterNumber >= 4 && launchers.length >= 3 && distinctTypes <= 1;
+    final activeTowers = launchers.where((e) => !e.isConstructing).toList();
+    final distinctTypes = activeTowers.map((e) => e.type).toSet().length;
+    final hasNonAmpTower = activeTowers.any((e) => e.type != LauncherType.qiAmplifier);
+    final monoOverload = stage.chapterNumber >= 4 && activeTowers.length >= 3 && distinctTypes <= 1;
     final ch6DiversityBoost = (chapter.number == 6 && distinctTypes >= 3) ? 1.20 : 1.0;
     final typeDiversityMult = monoOverload
         ? 0.45
         : (distinctTypes >= 4 ? 1.72 : (distinctTypes >= 3 ? 1.42 : 1.0)) * ch6DiversityBoost;
     // 실시간 화력업 및 과녁 배율은 _spawnStoneShot에서 일괄 곱해지므로 중복 제곱 증폭 차단!
     final fiveElemBonus = typeDiversityMult;
+    final taijiQiGainMult = preset.sectTechnique == SectTechnique.taiji ? 1.25 : 1.0;
 
     int ampQiCount = 0;
     for (final l in launchers) {
@@ -4115,14 +4251,13 @@ class DefenseBattleSim {
         }
       }
 
-      // 내공 증폭기는 자기 자신이나 다른 증폭기는 증폭하지 않고, 주변 다른 계통 포탑만 강력히 증폭(최대 2중첩 · 제5장 +35% 과부하)!
+      // 내공 증폭기는 자기 자신이나 다른 증폭기는 증폭하지 않고, 주변 다른 계통 포탑만 강력히 증폭(반경 195px · 최대 2중첩 · 제5장 +35% 과부하)!
       if (l.type != LauncherType.qiAmplifier) {
         final ch5AmpMult = chapter.number == 5 ? 1.35 : 1.0;
         int ampStacks = 0;
-        for (final other in launchers) {
-          final auraR = 185.0 * (other.terrainType == MountTerrainType.spiritSpring ? 1.25 : 1.0);
+        for (final other in activeTowers) {
+          final auraR = 195.0 * (other.terrainType == MountTerrainType.spiritSpring ? 1.25 : 1.0);
           if (other != l &&
-              !other.isConstructing &&
               other.type == LauncherType.qiAmplifier &&
               other.pos.distanceTo(l.pos) <= auraR) {
             ampReload += (0.20 + other.tier * 0.06) * ch5AmpMult;
@@ -4134,7 +4269,7 @@ class DefenseBattleSim {
         }
       }
 
-      final ch10QiMult = chapter.number == 10 ? 1.30 : 1.0;
+      final ch10QiMult = (chapter.number == 10 ? 1.30 : 1.0) * taijiQiGainMult;
       if (l.type == LauncherType.qiAmplifier && hasNonAmpTower && ampQiCount < 2) {
         ampQiCount++;
         final springBoost = l.terrainType == MountTerrainType.spiritSpring ? 1.85 : 1.0;
@@ -4262,6 +4397,7 @@ class DefenseBattleSim {
           fromWeakCrackerMount: l.terrainType.cracksBossWeakPoint &&
               (l.type == LauncherType.heavy || l.type == LauncherType.curveSpin),
           projectileStyle: projStyle,
+          sectTech: l.type == LauncherType.qiAmplifier ? preset.sectTechnique : null,
           preRolledSerendipity: rolledVolleySeren,
         );
       }
@@ -4285,8 +4421,16 @@ class DefenseBattleSim {
       beastCooldown -= dt;
       final canCastBeast = beast == SpiritBeast.geumgangTurtle
           ? (shieldHp < shieldMaxHpDynamic * 0.92 || hasTargetInAllyRange)
-          : hasTargetInAllyRange;
-      if (beastCooldown <= 0 && canCastBeast && _checkConditionMet(preset.beastCondition)) {
+          : (beast == SpiritBeast.nalssaendol
+              ? (centralManualMode && hasTargetInAllyRange)
+              : hasTargetInAllyRange);
+      if (beastCooldown <= 0 &&
+          canCastBeast &&
+          _checkConditionMet(
+            preset.beastCondition,
+            allowWithoutEnemies: beast == SpiritBeast.geumgangTurtle,
+            maxRange: allyMaxR,
+          )) {
         beastCooldown = beast.baseCooldownSec * cdFactor;
         _executeSpiritBeast(beast, beastLv);
 
@@ -4308,25 +4452,39 @@ class DefenseBattleSim {
       companionCooldowns[hero] = (companionCooldowns[hero]! - dt);
       final cond = preset.companionConditions[hero] ?? hero.defaultCondition;
       final canCastHero = switch (hero) {
-        CompanionHero.jeonggak => launchers.isNotEmpty && mutants.isNotEmpty,
+        CompanionHero.jeonggak => launchers.any((e) => !e.isConstructing) && mutants.isNotEmpty,
         CompanionHero.sinseung => shieldHp < shieldMaxHpDynamic * 0.95 ||
             cropsHealth < 0.96 ||
             livestockHealth < 0.96 ||
             granaryHealth < 0.96,
         _ => hasTargetInAllyRange,
       };
-      if (companionCooldowns[hero]! <= 0 && canCastHero && _checkConditionMet(cond)) {
+      final qiRechargeHeroReady = (hero == CompanionHero.cheongmyeong ||
+              hero == CompanionHero.chwiseon) &&
+          cond == AutoTriggerCondition.qiFullBurst &&
+          qiBars < 1.5 &&
+          hasTargetInAllyRange;
+      if (companionCooldowns[hero]! <= 0 &&
+          canCastHero &&
+          (qiRechargeHeroReady ||
+              _checkConditionMet(
+                cond,
+                allowWithoutEnemies: hero == CompanionHero.sinseung,
+                maxRange: allyMaxR,
+              ))) {
         companionCooldowns[hero] = hero.cooldownSec * cdFactor;
-        _executeCompanionSkill(hero, progress.companionLevels[hero] ?? 1);
+        _executeCompanionSkill(hero, progress.companionLevels[hero] ?? 1, triggerCond: cond);
       }
     }
 
-    if (!mukhyeonTriggered &&
-        launchers.isNotEmpty &&
+    // 동료 묵현 위기 난입: 26초 재사용 대기로 장기전·무한혈전에서도 결계 위기마다 든든히 재개입!
+    if (mukhyeonCooldownTimer <= 0 &&
+        (launchers.isNotEmpty || elapsedSec >= 6.0) &&
         (progress.companionLevels[CompanionHero.mukhyeon] ?? 0) > 0 &&
         shieldHp <= shieldMaxHpDynamic * 0.35 &&
         mutants.isNotEmpty) {
       mukhyeonTriggered = true;
+      mukhyeonCooldownTimer = 26.0 * cdFactor.clamp(0.45, 1.0);
       final mukLv = (progress.companionLevels[CompanionHero.mukhyeon] ?? 1).clamp(1, 10);
       shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.25);
       callouts.add(
@@ -4360,30 +4518,78 @@ class DefenseBattleSim {
     }
   }
 
-  bool _checkConditionMet(AutoTriggerCondition cond) {
-    if (mutants.isEmpty) return false;
+  bool _checkConditionMet(
+    AutoTriggerCondition cond, {
+    bool allowWithoutEnemies = false,
+    double maxRange = 9999.0,
+  }) {
+    if (mutants.isEmpty && !allowWithoutEnemies) return false;
     switch (cond) {
       case AutoTriggerCondition.anyEnemyInRange:
-        return true;
+        return allowWithoutEnemies ||
+            mutants.any(
+              (m) => m.phaseTransitionTimer <= 0 && m.pos.distanceTo(shieldCenter) <= maxRange,
+            );
       case AutoTriggerCondition.denseCluster:
-        return mutants.any((m) => _countMutantsNear(m.pos, 155.0) >= 4);
+        return mutants.any(
+          (m) =>
+              m.phaseTransitionTimer <= 0 &&
+              m.pos.distanceTo(shieldCenter) <= maxRange &&
+              _countMutantsNear(m.pos, 155.0) >= 4,
+        );
       case AutoTriggerCondition.heavyOrBoss:
         return mutants.any(
           (m) =>
-              m.kind.isBoss ||
-              m.kind == MutantKind.ironBoar ||
-              m.kind == MutantKind.shieldYacha,
+              m.phaseTransitionTimer <= 0 &&
+              m.pos.distanceTo(shieldCenter) <= maxRange &&
+              (m.kind.isBoss ||
+                  m.kind == MutantKind.ironBoar ||
+                  m.kind == MutantKind.shieldYacha),
         );
       case AutoTriggerCondition.shieldCrisis:
         return shieldHp <= shieldMaxHpDynamic * 0.60;
       case AutoTriggerCondition.qiFullBurst:
-        return qiBars >= 2.95;
+        return qiBars >= 2.95 || _qiBurstSynergyTimer > 0;
     }
+  }
+
+  ActiveMutant? _pickConditionMatchedTarget(
+    AutoTriggerCondition? cond,
+    double maxRange,
+  ) {
+    if (cond == AutoTriggerCondition.denseCluster) {
+      ActiveMutant? bestCluster;
+      int bestCount = 0;
+      for (final m in mutants) {
+        if (m.phaseTransitionTimer > 0 || m.pos.distanceTo(shieldCenter) > maxRange) continue;
+        final cnt = _countMutantsNear(m.pos, 155.0);
+        if (cnt > bestCount) {
+          bestCount = cnt;
+          bestCluster = m;
+        }
+      }
+      if (bestCluster != null && bestCount >= 3) return bestCluster;
+    } else if (cond == AutoTriggerCondition.heavyOrBoss) {
+      ActiveMutant? bestHeavy;
+      double bestDist = 999999;
+      for (final m in mutants) {
+        if (m.phaseTransitionTimer > 0 || m.pos.distanceTo(shieldCenter) > maxRange) continue;
+        if (m.kind.isBoss || m.kind == MutantKind.ironBoar || m.kind == MutantKind.shieldYacha) {
+          final d = m.pos.distanceTo(shieldCenter);
+          if (d < bestDist) {
+            bestDist = d;
+            bestHeavy = m;
+          }
+        }
+      }
+      if (bestHeavy != null) return bestHeavy;
+    }
+    return _pickMostThreateningMutant(shieldCenter, maxRange: maxRange);
   }
 
   void _executeSpiritBeast(SpiritBeast beast, int lv) {
     final allyMaxR = (278.0 * liveRangeMultiplier).clamp(268.0, 385.0);
-    final target = _pickMostThreateningMutant(shieldCenter, maxRange: allyMaxR);
+    final target = _pickConditionMatchedTarget(preset.beastCondition, allyMaxR);
     if (target == null && beast != SpiritBeast.geumgangTurtle) return;
     _spawnShockwaveRing(
       shieldCenter,
@@ -4412,15 +4618,30 @@ class DefenseBattleSim {
         );
         break;
       case SpiritBeast.geumgangTurtle:
-        if (shieldHp > 0) {
-          shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * (0.16 + lv * 0.015));
-        }
+        final turtleHeal = shieldMaxHpDynamic * (0.16 + lv * 0.015);
+        shieldHp = min(
+          shieldMaxHpDynamic,
+          shieldHp > 0 ? (shieldHp + turtleHeal) : (turtleHeal * 0.70),
+        );
+        final turtleContrib = _contribMap.putIfAbsent(
+          'beast_geumgang',
+          () => ContributionEntry(key: 'beast_geumgang', label: '영수 금강 (결계 수호)'),
+        );
+        turtleContrib.totalDamage += turtleHeal;
         pendingSounds.add(SoundCue.shieldWave);
-        for (final m in mutants) {
+        for (final m in List<ActiveMutant>.from(mutants)) {
           if (m.pos.distanceTo(shieldCenter) < 195) {
             final rawDir = m.pos - shieldCenter;
-            m.knockbackVel =
-                (rawDir.length > 1e-3 ? rawDir.normalized : const Vec2(0, -1)) * 150;
+            final pushDir = rawDir.length > 1e-3 ? rawDir.normalized : const Vec2(0, -1);
+            _applyDamageToMutant(
+              m,
+              power * 0.65,
+              sourceKey: 'beast_geumgang',
+              sourceLabel: '영수 금강 (현무 파동)',
+              knockDir: pushDir,
+              knockForce: 165.0,
+              isCritical: false,
+            );
           }
         }
         break;
@@ -4458,7 +4679,7 @@ class DefenseBattleSim {
             .where((m) => m.pos.distanceTo(shieldCenter) <= allyMaxR)
             .toList();
         final pool = inRange.isNotEmpty ? inRange : <ActiveMutant>[target!];
-        final execRatio = (0.35 + lv * 0.025).clamp(0.35, 0.60);
+        const execRatio = 0.55;
         int executed = 0;
         for (final cand in List<ActiveMutant>.from(inRange)) {
           if (!cand.kind.isBoss &&
@@ -4500,9 +4721,13 @@ class DefenseBattleSim {
     }
   }
 
-  void _executeCompanionSkill(CompanionHero hero, int lv) {
+  void _executeCompanionSkill(
+    CompanionHero hero,
+    int lv, {
+    AutoTriggerCondition? triggerCond,
+  }) {
     final allyMaxR = (278.0 * liveRangeMultiplier).clamp(268.0, 385.0);
-    final target = _pickMostThreateningMutant(shieldCenter, maxRange: allyMaxR);
+    final target = _pickConditionMatchedTarget(triggerCond, allyMaxR);
     final isBuffOnly = hero == CompanionHero.jeonggak || hero == CompanionHero.sinseung;
     if (target == null && !isBuffOnly) return;
     final allyMult = (1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45) *
@@ -4551,6 +4776,13 @@ class DefenseBattleSim {
         break;
       case CompanionHero.cheongmyeong:
         qiBars = (qiBars + 0.65 + lv * 0.04).clamp(0.0, maxQiBars);
+        // 마기 침식된 아군 초소 1기 즉시 정화!
+        for (final l in launchers) {
+          if (l.isCorrupted) {
+            cleanseLauncherAtSlot(l.slotIndex);
+            break;
+          }
+        }
         _spawnStoneShot(
           sourceKey: key,
           sourceLabel: label,
@@ -4558,7 +4790,8 @@ class DefenseBattleSim {
           target: target!,
           baseDamage: baseDmg * 1.15,
           speed: 360,
-          maxTravelDist: allyMaxR * 1.15,
+          homingTargetUid: target.uid,
+          maxTravelDist: allyMaxR * 1.18,
         );
         break;
       case CompanionHero.bandal:
@@ -4569,30 +4802,72 @@ class DefenseBattleSim {
           target: target!,
           baseDamage: baseDmg * 1.20,
           speed: 330,
-          aoeRadius: 58,
+          aoeRadius: 68,
           oilsOnHit: true,
           maxTravelDist: allyMaxR * 1.15,
         );
         break;
       case CompanionHero.gurumi:
-        for (final spread in [-0.24, 0.24]) {
-          _spawnStoneShot(
-            sourceKey: key,
-            sourceLabel: label,
-            origin: shieldCenter + const Vec2(32, -8),
-            target: target!,
-            baseDamage: baseDmg * 0.95,
-            speed: 380,
-            spreadAngleRad: spread,
-            extraBouncesBonus: 2,
-            maxTravelDist: allyMaxR * 1.15,
+        final originGurumi = shieldCenter + const Vec2(32, -8);
+        TerrainPillar? nearPillar;
+        double bestPD = allyMaxR * 1.12;
+        for (final pil in chapter.pillars) {
+          final pd = pil.center.distanceTo(originGurumi);
+          if (pd <= bestPD) {
+            bestPD = pd;
+            nearPillar = pil;
+          }
+        }
+        if (nearPillar != null) {
+          // 지형 기둥을 정확히 조준해 어부지리 도탄 2연타 유도!
+          final aimPillar = ActiveMutant(
+            uid: -9901,
+            kind: MutantKind.swarmRat,
+            laneIndex: 0,
+            waypoints: <Vec2>[nearPillar.center],
+            pos: nearPillar.center,
+            maxHp: 1.0,
+            speed: 0.0,
+            lateralSeed: 0.0,
           );
+          for (final spread in [-0.08, 0.08]) {
+            _spawnStoneShot(
+              sourceKey: key,
+              sourceLabel: label,
+              origin: originGurumi,
+              target: aimPillar,
+              baseDamage: baseDmg * 1.05,
+              speed: 410,
+              spreadAngleRad: spread,
+              extraBouncesBonus: 3,
+              maxTravelDist: allyMaxR * 1.38,
+            );
+          }
+        } else {
+          for (final spread in [-0.24, 0.24]) {
+            _spawnStoneShot(
+              sourceKey: key,
+              sourceLabel: label,
+              origin: originGurumi,
+              target: target!,
+              baseDamage: baseDmg * 0.98,
+              speed: 385,
+              spreadAngleRad: spread,
+              extraBouncesBonus: 3,
+              maxTravelDist: allyMaxR * 1.25,
+            );
+          }
         }
         break;
       case CompanionHero.jeonggak:
         _jeonggakHasteMult =
             (1.38 + lv * 0.03 + progress.elixirResonanceBonus * 0.20).clamp(1.40, 2.05);
         jeonggakHasteTimer = 4.5 + lv * 0.32;
+        final jeongEntry = _contribMap.putIfAbsent(
+          key,
+          () => ContributionEntry(key: key, label: '$label (기관 가속)'),
+        );
+        jeongEntry.totalDamage += centralSpec.baseDamage * 1.2 * lv;
         callouts.add(
           FloatingCallout(
             pos: shieldCenter + const Vec2(0, -40),
@@ -4635,15 +4910,16 @@ class DefenseBattleSim {
           target: target!,
           baseDamage: baseDmg * 1.25,
           speed: 335,
-          aoeRadius: 62,
-          knockbackScale: 1.7,
+          aoeRadius: 68,
+          knockbackScale: 1.85,
           slowsOnHit: true,
           maxTravelDist: allyMaxR * 1.15,
         );
         break;
       case CompanionHero.seolhwa:
+        seolhwaFrostShieldTimer = 4.5;
         if (shieldHp > 0) {
-          shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.08);
+          shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.10);
         }
         _spawnStoneShot(
           sourceKey: key,
@@ -4652,9 +4928,9 @@ class DefenseBattleSim {
           target: target!,
           baseDamage: baseDmg * 1.30,
           speed: 345,
-          aoeRadius: 64,
+          aoeRadius: 72,
           freezesOnHit: true,
-          freezeDurationOverride: 1.6,
+          freezeDurationOverride: 1.65,
           maxTravelDist: allyMaxR * 1.15,
         );
         break;
@@ -4689,9 +4965,9 @@ class DefenseBattleSim {
             sourceLabel: label,
             origin: shieldCenter + Vec2((i - 1) * 16.0, -10),
             target: tgt,
-            baseDamage: baseDmg * 0.92,
+            baseDamage: baseDmg * 0.95,
             speed: 415,
-            extraCrit: 0.25,
+            extraCrit: 1.0,
             ignoresShield: true,
             homingTargetUid: tgt.uid,
             maxTravelDist: allyMaxR * 1.22,
@@ -4702,14 +4978,20 @@ class DefenseBattleSim {
         final resonanceScale = 1.0 + progress.elixirResonanceBonus * 0.35;
         final shieldHealRatio = (0.18 + lv * 0.016) * resonanceScale;
         final ecoHeal = 0.24 + lv * 0.024;
+        final healedAmt = shieldMaxHpDynamic * shieldHealRatio;
         if (shieldHp > 0) {
-          shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * shieldHealRatio);
+          shieldHp = min(shieldMaxHpDynamic, shieldHp + healedAmt);
         } else {
-          shieldHp = min(shieldMaxHpDynamic, shieldMaxHpDynamic * (shieldHealRatio * 0.65));
+          shieldHp = min(shieldMaxHpDynamic, healedAmt * 0.65);
         }
         granaryHealth = min(1.0, granaryHealth + ecoHeal);
         cropsHealth = min(1.0, cropsHealth + ecoHeal);
         livestockHealth = min(1.0, livestockHealth + ecoHeal);
+        final sinEntry = _contribMap.putIfAbsent(
+          key,
+          () => ContributionEntry(key: key, label: '$label (생기 정화)'),
+        );
+        sinEntry.totalDamage += healedAmt;
         pendingSounds.add(SoundCue.shieldWave);
         break;
       case CompanionHero.mukhyeon:
@@ -4732,7 +5014,7 @@ class DefenseBattleSim {
 
   void _stepSupportAutoTrigger() {
     // 초소를 단 1곳도 짓지 않고 방치할 때는 지원패가 저절로 소비·발동되지 않음!
-    if (launchers.isEmpty ||
+    if (!launchers.any((e) => !e.isConstructing) ||
         !allowSupportTokens ||
         supportChargesLeft <= 0 ||
         _autoChulduCooldown > 0 ||
@@ -4740,7 +5022,7 @@ class DefenseBattleSim {
       return;
     }
     final shieldRatio = shieldMaxHpDynamic > 0 ? shieldHp / shieldMaxHpDynamic : 0.0;
-    if (shieldRatio <= preset.supportTriggerShieldRatio && mutants.length >= 2) {
+    if (shieldRatio <= preset.supportTriggerShieldRatio) {
       if (triggerSupportChuldu()) {
         _autoChulduCooldown = 3.5;
       }
@@ -4826,17 +5108,17 @@ class DefenseBattleSim {
     String resolvedStyle = projectileStyle;
     if (sectTech == SectTechnique.swordQi) {
       pierce += 3;
-      resolvedStyle = 'sectSword';
+      if (projectileStyle == 'stoneDefault') resolvedStyle = 'sectSword';
     }
     if (sectTech == SectTechnique.ironFist) {
       splash = max(splash, 58.0);
-      resolvedStyle = 'sectFist';
+      if (projectileStyle == 'stoneDefault') resolvedStyle = 'sectFist';
     }
     if (sectTech == SectTechnique.taiji) {
       curve = curve == 0 ? 1.35 : curve * 1.4;
       bypassShield = true;
       qiBars = (qiBars + 0.25 * (chapter.number == 10 ? 1.30 : 1.0)).clamp(0.0, maxQiBars);
-      resolvedStyle = 'sectTaiji';
+      if (projectileStyle == 'stoneDefault') resolvedStyle = 'sectTaiji';
     }
 
     final liveDmgBoost = (1.0 + liveFirepowerLv * 0.15) * powerTarget.damageMultiplier;
@@ -4851,14 +5133,16 @@ class DefenseBattleSim {
         (1.0 + progress.meridianKnockbackBonus) *
         (stone == StoneMaterial.uncheol ? 1.25 : 1.0) *
         (stone == StoneMaterial.yongrin ? 1.35 : 1.0);
-    final critChance = (0.10 +
-            shape.critBonus +
-            progress.meridianCritBonus +
-            extraCrit +
-            (feverTimer > 0 ? 0.35 : 0.0) +
-            (cheonghakBuffTimer > 0 ? 0.10 : 0.0) +
-            (stone == StoneMaterial.geumgang ? 0.08 : 0.0))
-        .clamp(0.05, 0.88);
+    final critChance = extraCrit >= 0.99
+        ? 1.0
+        : (0.10 +
+                shape.critBonus +
+                progress.meridianCritBonus +
+                extraCrit +
+                (feverTimer > 0 ? 0.35 : 0.0) +
+                (cheonghakBuffTimer > 0 ? 0.10 : 0.0) +
+                (stone == StoneMaterial.geumgang ? 0.08 : 0.0))
+            .clamp(0.05, 0.88);
     final radiusScale =
         (1.0 + boulderStacks * 0.38).clamp(1.0, 2.0) * (feverTimer > 0 ? 1.16 : 1.0);
     final baseRadius = resolvedStyle == 'heavyMeteor'
@@ -4911,28 +5195,7 @@ class DefenseBattleSim {
         splitsShadowOnHit: sectTech == SectTechnique.shadowClone,
       ),
     );
-
-    if (sectTech == SectTechnique.shadowClone && projectiles.length < 180) {
-      final cloneAngle = baseAngle + 0.18;
-      projectiles.add(
-        ActiveStoneProjectile(
-          sourceKey: sourceKey,
-          sourceLabel: '$sourceLabel (분신탄)',
-          pos: origin,
-          vel: Vec2(cos(cloneAngle) * finalSpeed, sin(cloneAngle) * finalSpeed),
-          material: stone,
-          shape: shape,
-          damage: finalDamage * 0.78,
-          knockback: finalKnock * 0.85,
-          critChance: critChance,
-          colorHex: 0xFFC77DFF,
-          radius: 8.2 * radiusScale,
-          extraBounces: ch5ExtraBounce + ricochetStacks * 2 + extraBouncesBonus,
-          maxTravelDist: maxTravelDist,
-          projectileStyle: 'qiBagua',
-        ),
-      );
-    }
+    // 영월살문 분신 쌍영탄은 명중 순간에 2갈래로 분열된다(발사 시 중복 분신 생성 제거).
   }
 
   static double _distSegmentToPoint(Vec2 a, Vec2 b, Vec2 p) {
@@ -4945,24 +5208,71 @@ class DefenseBattleSim {
     return closest.distanceTo(p);
   }
 
-  static (double surfaceR, Vec2 normal) _polygonSurfaceAndNormal(
+  /// 선분 [a, b]와 중심 center · 반경 r 원의 최초 충돌 시각 t ∈ [0.0, 1.0] 반환 (비충돌 시 null).
+  static double? _segmentCircleHitParam(Vec2 a, Vec2 b, Vec2 center, double r) {
+    if (a.distanceTo(center) <= r) return 0.0;
+    final d = b - a;
+    final aCoeff = d.x * d.x + d.y * d.y;
+    if (aCoeff <= 1e-8) return null;
+    final f = a - center;
+    final bCoeff = 2.0 * (f.x * d.x + f.y * d.y);
+    final cCoeff = (f.x * f.x + f.y * f.y) - r * r;
+    final disc = bCoeff * bCoeff - 4.0 * aCoeff * cCoeff;
+    if (disc < 0) return null;
+    final root = sqrt(disc);
+    final t1 = (-bCoeff - root) / (2.0 * aCoeff);
+    if (t1 >= 0.0 && t1 <= 1.0) return t1;
+    final t2 = (-bCoeff + root) / (2.0 * aCoeff);
+    if (t2 >= 0.0 && t2 <= 1.0) return 0.0;
+    return null;
+  }
+
+  /// 회전 정다각형 기둥의 실제 N개 변에 대한 최단 수직 거리·접점·외향 법선 정밀 산출!
+  static (Vec2 closestPt, Vec2 normal, double dist) _closestPointOnRotatedPolygon(
     TerrainPillar pillar,
     double angleOffset,
-    Vec2 rel,
+    Vec2 pt,
   ) {
     final nSides = pillar.sides.clamp(3, 12);
-    final sector = 2.0 * pi / nSides;
-    final rawTheta = atan2(rel.y, rel.x);
-    double local = (rawTheta - angleOffset) % (2.0 * pi);
-    if (local < 0) local += 2.0 * pi;
-    final faceIdx = (local / sector).floor().clamp(0, nSides - 1);
-    final midLocal = (faceIdx + 0.5) * sector;
-    final delta = local - midLocal;
-    final cosHalf = cos(sector * 0.5);
-    final cosDelta = max(0.25, cos(delta));
-    final surfaceR = pillar.radius * (cosHalf / cosDelta);
-    final normalAngle = angleOffset + midLocal;
-    return (surfaceR, Vec2(cos(normalAngle), sin(normalAngle)));
+    final verts = List<Vec2>.generate(nSides, (k) {
+      final th = angleOffset + (2.0 * pi * k / nSides);
+      return Vec2(
+        pillar.center.x + cos(th) * pillar.radius,
+        pillar.center.y + sin(th) * pillar.radius,
+      );
+    });
+    Vec2 bestClosest = verts.first;
+    Vec2 bestNormal = const Vec2(0, -1);
+    double minDist = double.infinity;
+    bool insideAll = true;
+
+    for (int k = 0; k < nSides; k++) {
+      final v0 = verts[k];
+      final v1 = verts[(k + 1) % nSides];
+      final midAngle = angleOffset + ((k + 0.5) * 2.0 * pi / nSides);
+      final faceNormal = Vec2(cos(midAngle), sin(midAngle));
+      final relToV0 = pt - v0;
+      if (relToV0.x * faceNormal.x + relToV0.y * faceNormal.y > 0) {
+        insideAll = false;
+      }
+      final edge = v1 - v0;
+      final edgeLenSq = edge.x * edge.x + edge.y * edge.y;
+      final t = edgeLenSq > 1e-6
+          ? ((relToV0.x * edge.x + relToV0.y * edge.y) / edgeLenSq).clamp(0.0, 1.0)
+          : 0.0;
+      final candClosest = Vec2(v0.x + edge.x * t, v0.y + edge.y * t);
+      final d = candClosest.distanceTo(pt);
+      if (d < minDist) {
+        minDist = d;
+        bestClosest = candClosest;
+        bestNormal = faceNormal;
+      }
+    }
+
+    if (insideAll) {
+      return (bestClosest, bestNormal, 0.0);
+    }
+    return (bestClosest, bestNormal, minDist);
   }
 
   void _stepProjectiles(double dt) {
@@ -4976,10 +5286,16 @@ class DefenseBattleSim {
         continue;
       }
 
+      final remMaxDist = p.maxTravelDist - p.traveledDist;
+      if (remMaxDist <= 1e-4) {
+        projectiles.removeAt(i);
+        continue;
+      }
+
       if (p.trail.length >= 9) p.trail.removeAt(0);
       p.trail.add(p.pos);
 
-      // 정밀 파갑탄(약점 추적) 또는 검황 어검탄(호밍 유도) 궤적 정밀 유도!
+      // 정밀 파갑탄(약점 추적) · 검황/청명 유도탄(타깃 사망 시 생존 보스·독오라·근접 표적 즉시 재획득!) · 태극 유인 궤적 유도!
       if (p.isPrecisionShot && p.lockedWeakBossUid != null) {
         for (final bm in mutants) {
           if (bm.uid == p.lockedWeakBossUid && bm.phaseTransitionTimer <= 0) {
@@ -4991,76 +5307,288 @@ class DefenseBattleSim {
           }
         }
       } else if (p.homingTargetUid != null) {
+        ActiveMutant? liveHoming;
         for (final hm in mutants) {
           if (hm.uid == p.homingTargetUid && hm.phaseTransitionTimer <= 0) {
-            final desired = (hm.pos - p.pos).normalized * p.vel.length;
-            final blend = min(1.0, dt * 9.5);
-            p.vel = Vec2(
-              p.vel.x + (desired.x - p.vel.x) * blend,
-              p.vel.y + (desired.y - p.vel.y) * blend,
-            ).normalized *
-                p.vel.length;
+            liveHoming = hm;
             break;
           }
+        }
+        if (liveHoming == null && mutants.isNotEmpty) {
+          double bestScore = -999999;
+          for (final cand in mutants) {
+            if (cand.phaseTransitionTimer > 0 || p.hitMutantIds.contains(cand.uid)) continue;
+            final d = cand.pos.distanceTo(p.pos);
+            if (d > 260.0) continue;
+            final s = (cand.kind.isBoss ? 500.0 : 0.0) +
+                (cand.kind.poisonAura ? 220.0 : 0.0) -
+                d;
+            if (s > bestScore) {
+              bestScore = s;
+              liveHoming = cand;
+            }
+          }
+          p.homingTargetUid = liveHoming?.uid;
+        }
+        if (liveHoming != null) {
+          final desired = (liveHoming.pos - p.pos).normalized * p.vel.length;
+          final blend = min(1.0, dt * 10.5);
+          p.vel = Vec2(
+            p.vel.x + (desired.x - p.vel.x) * blend,
+            p.vel.y + (desired.y - p.vel.y) * blend,
+          ).normalized *
+              p.vel.length;
+        }
+      } else if (p.projectileStyle == 'sectTaiji' && mutants.isNotEmpty) {
+        ActiveMutant? nearTgt;
+        double nearD = 185.0;
+        for (final cand in mutants) {
+          if (cand.phaseTransitionTimer > 0 || p.hitMutantIds.contains(cand.uid)) continue;
+          final d = cand.pos.distanceTo(p.pos);
+          if (d < nearD) {
+            nearD = d;
+            nearTgt = cand;
+          }
+        }
+        if (nearTgt != null) {
+          final desired = (nearTgt.pos - p.pos).normalized * p.vel.length;
+          final blend = min(1.0, dt * 5.2);
+          p.vel = Vec2(
+            p.vel.x + (desired.x - p.vel.x) * blend,
+            p.vel.y + (desired.y - p.vel.y) * blend,
+          ).normalized *
+              p.vel.length;
+        } else if (p.spinCurve.abs() > 0.05) {
+          final perp = Vec2(-p.vel.y, p.vel.x).normalized;
+          p.vel = p.vel + perp * (p.spinCurve * 95.0 * dt);
         }
       } else if (p.spinCurve.abs() > 0.05) {
         final perp = Vec2(-p.vel.y, p.vel.x).normalized;
         p.vel = p.vel + perp * (p.spinCurve * 95.0 * dt);
       }
 
+      // 남은 최대 사거리만큼 이동 벡터를 먼저 클램프하고 충돌 검사를 끝낸 뒤 소멸 판정!
       final prevPos = p.pos;
-      final stepDelta = p.vel * dt;
-      p.pos = p.pos + stepDelta;
-      p.traveledDist += stepDelta.length;
-      if (p.traveledDist >= p.maxTravelDist) {
-        projectiles.removeAt(i);
-        continue;
-      }
+      final rawStep = p.vel * dt;
+      final rawLen = rawStep.length;
+      final clampedStep =
+          (rawLen > remMaxDist && rawLen > 1e-6) ? rawStep * (remMaxDist / rawLen) : rawStep;
+      Vec2 nextPos = prevPos + clampedStep;
+      p.traveledDist += clampedStep.length;
 
-      // 1) ×2→×3 진화 배율 복제 마법진 통과 시 알이 2개 또는 3개(폭주 시!)로 복제 증식!
-      if (!p.clonedByGate &&
-          !p.isPrecisionShot &&
-          projectiles.length + spawnedClones.length < 180 &&
-          p.pos.distanceTo(cloneGate.center) <= cloneGate.radius + p.radius * 0.5) {
-        p.clonedByGate = true;
-        p.maxTravelDist = max(p.maxTravelDist, min(465.0, p.maxTravelDist + 64.0));
-        cloneGate.pulseAnim = 1.0;
-        cloneSplitCount++;
-        final isTriple = cloneGate.tripleOverdriveTimer > 0;
-        if (!isTriple) {
-          cloneGate.passCharge++;
-          if (cloneGate.passCharge >= 10) {
-            cloneGate.passCharge = 0;
-            cloneGate.tripleOverdriveTimer = 8.0;
-            pendingSounds.add(SoundCue.serendipityJackpot);
-            callouts.add(
-              FloatingCallout(
-                pos: cloneGate.center + const Vec2(0, -24),
-                text: '🔥 배율 관문 진화!! 8초간 [×3 삼류 폭주진] 가동!!',
-                colorHex: 0xFFFF6B35,
-                isBigBanner: true,
-              ),
-            );
+      // 0) 장벽·회전 정다각형 기둥 선행 Swept 차단 & 반사 도탄 분할 (기둥 뒤 기물·적 오폭 원천 차단!)
+      bool stoppedByObstacle = false;
+      bool outOfBounds = false;
+      final segments = <(Vec2, Vec2)>[];
+
+      Vec2 curStart = prevPos;
+      Vec2 curEnd = nextPos;
+
+      if (!p.isPrecisionShot && chapter.pillars.isNotEmpty) {
+        for (int pIdx = 0; pIdx < chapter.pillars.length; pIdx++) {
+          final pillar = chapter.pillars[pIdx];
+          if (_distSegmentToPoint(curStart, curEnd, pillar.center) >
+              pillar.radius + p.radius + 4.0) {
+            continue;
+          }
+          final angleOffset = pIdx < pillarAngles.length ? pillarAngles[pIdx] : 0.0;
+          double? hitFrac;
+          Vec2? hitClosest;
+          Vec2? hitNormal;
+          for (int sub = 1; sub <= 4; sub++) {
+            final s = sub / 4.0;
+            final samplePt = curStart + (curEnd - curStart) * s;
+            final (closestPt, faceNormal, distEdge) =
+                _closestPointOnRotatedPolygon(pillar, angleOffset, samplePt);
+            final dotIn = p.vel.x * faceNormal.x + p.vel.y * faceNormal.y;
+            if (distEdge <= p.radius && dotIn < 0) {
+              hitFrac = s;
+              hitClosest = closestPt;
+              hitNormal = faceNormal;
+              break;
+            }
+          }
+          if (hitFrac != null && hitClosest != null && hitNormal != null) {
+            final bouncePt = hitClosest + hitNormal * (p.radius + 1.5);
+            segments.add((curStart, bouncePt));
+            if (p.bouncesLeft <= 0) {
+              p.pos = bouncePt;
+              bursts.add(FxBurst(pos: bouncePt, colorHex: 0xFFFFD166, maxRadius: 16));
+              stoppedByObstacle = true;
+            } else {
+              final dot = p.vel.x * hitNormal.x + p.vel.y * hitNormal.y;
+              final reflected = (p.vel - hitNormal * (2.0 * dot)).normalized;
+              final matBounce = 0.62 + p.material.restitution * 0.36;
+              final newSpd = min(680.0, p.vel.length * pillar.restitutionBoost * matBounce);
+              p.vel = reflected * newSpd;
+              p.bouncesLeft--;
+              p.bouncedOffObstacle = true;
+              p.ignoresShield = true;
+              p.maxTravelDist = max(p.maxTravelDist, min(485.0, p.maxTravelDist + 56.0));
+              bursts.add(FxBurst(pos: bouncePt, colorHex: 0xFFFFD166, maxRadius: 22));
+
+              // [비급: 뇌전 연쇄탄] 기둥 도탄 시 주변 변이 최대 3체에 번개 사슬 피해!
+              final lightningStacks = perkStacks(RoguePerk.chainLightning);
+              if (lightningStacks > 0 && mutants.isNotEmpty) {
+                int chained = 0;
+                Vec2 chainFrom = bouncePt;
+                for (final other in List<ActiveMutant>.from(mutants)) {
+                  if (other.phaseTransitionTimer > 0) continue;
+                  if (other.pos.distanceTo(chainFrom) <= 125.0) {
+                    if (lightningArcs.length < 24) {
+                      lightningArcs.add(LightningArcFx(from: chainFrom, to: other.pos));
+                    }
+                    _applyDamageToMutant(
+                      other,
+                      p.damage * (0.45 + (lightningStacks - 1) * 0.25),
+                      sourceKey: p.sourceKey,
+                      sourceLabel: '뇌전 연쇄탄 (기둥 도탄)',
+                      knockDir: (other.pos - chainFrom).normalized,
+                      knockForce: 26.0,
+                      isCritical: false,
+                      fullArmorIgnore: true,
+                      chainDepth: 2,
+                    );
+                    chainFrom = other.pos;
+                    chained++;
+                    if (chained >= 3) break;
+                  }
+                }
+              }
+
+              final remAfterBounce = (1.0 - hitFrac) * clampedStep.length;
+              curStart = bouncePt;
+              curEnd = bouncePt + reflected * remAfterBounce;
+            }
+            break;
           }
         }
-        final spd = p.vel.length;
-        final baseA = atan2(p.vel.y, p.vel.x);
-        if (isTriple) {
-          for (final offA in const [-0.17, 0.17]) {
-            final a = baseA + offA;
+      }
+
+      if (!stoppedByObstacle) {
+        if (curEnd.x < 16.0 || curEnd.x > CampaignCatalog.arenaWidth - 16.0) {
+          final wallX = curEnd.x.clamp(16.0, CampaignCatalog.arenaWidth - 16.0);
+          final dx = curEnd.x - curStart.x;
+          final tWall = dx.abs() > 1e-5 ? ((wallX - curStart.x) / dx).clamp(0.0, 1.0) : 1.0;
+          final wallHit = Vec2(wallX, curStart.y + (curEnd.y - curStart.y) * tWall);
+          segments.add((curStart, wallHit));
+          if (p.bouncesLeft > 0) {
+            final keep = p.material.bounceKeep;
+            p.vel = Vec2(-p.vel.x * keep, p.vel.y * keep);
+            p.bouncesLeft--;
+            p.bouncedOffObstacle = true;
+            p.ignoresShield = true;
+            p.maxTravelDist = max(p.maxTravelDist, min(485.0, p.maxTravelDist + 56.0));
+            final remAfterWall = (1.0 - tWall) * curStart.distanceTo(curEnd);
+            final postWall = wallHit + p.vel.normalized * remAfterWall;
+            segments.add((wallHit, postWall));
+            p.pos = postWall;
+          } else {
+            p.pos = wallHit;
+            stoppedByObstacle = true;
+          }
+        } else {
+          segments.add((curStart, curEnd));
+          p.pos = curEnd;
+        }
+      }
+
+      if (p.pos.y < 10.0 || p.pos.y > CampaignCatalog.arenaHeight - 10.0) {
+        outOfBounds = true;
+      }
+
+      bool consumed = false;
+      for (final (segA, segB) in segments) {
+        if (consumed) break;
+
+        // 1) ×2→×3 진화 배율 복제 마법진 선분 통과 판정 (유도·즉결·분신·기피격 목록 완전 보존!)
+        if (!p.clonedByGate &&
+            !p.isPrecisionShot &&
+            projectiles.length + spawnedClones.length < 180 &&
+            _distSegmentToPoint(segA, segB, cloneGate.center) <=
+                cloneGate.radius + p.radius * 0.5) {
+          p.clonedByGate = true;
+          p.maxTravelDist = max(p.maxTravelDist, min(485.0, p.maxTravelDist + 64.0));
+          cloneGate.pulseAnim = 1.0;
+          cloneSplitCount++;
+          final isTriple = cloneGate.tripleOverdriveTimer > 0;
+          if (!isTriple) {
+            cloneGate.passCharge++;
+            if (cloneGate.passCharge >= 10) {
+              cloneGate.passCharge = 0;
+              cloneGate.tripleOverdriveTimer = 8.0;
+              pendingSounds.add(SoundCue.serendipityJackpot);
+              callouts.add(
+                FloatingCallout(
+                  pos: cloneGate.center + const Vec2(0, -24),
+                  text: '🔥 배율 관문 진화!! 8초간 [×3 삼류 폭주진] 가동!!',
+                  colorHex: 0xFFFF6B35,
+                  isBigBanner: true,
+                ),
+              );
+            }
+          }
+          final spd = p.vel.length;
+          final baseA = atan2(p.vel.y, p.vel.x);
+          final spawnPos = cloneGate.center;
+          if (isTriple) {
+            for (final offA in const [-0.17, 0.17]) {
+              final a = baseA + offA;
+              spawnedClones.add(
+                ActiveStoneProjectile(
+                  sourceKey: p.sourceKey,
+                  sourceLabel: '${p.sourceLabel} (×3폭주)',
+                  pos: spawnPos,
+                  vel: Vec2(cos(a) * spd, sin(a) * spd),
+                  material: p.material,
+                  shape: p.shape,
+                  damage: p.damage * 0.90,
+                  knockback: p.knockback * 0.90,
+                  critChance: p.critChance,
+                  colorHex: 0xFFFF6B35,
+                  radius: p.radius * 0.96,
+                  spinCurve: p.spinCurve,
+                  pierceLeft: p.pierceLeft,
+                  aoeSplashRadius: p.aoeSplashRadius,
+                  pullsEnemies: p.pullsEnemies,
+                  freezesOnHit: p.freezesOnHit,
+                  slowsOnHit: p.slowsOnHit,
+                  oilsOnHit: p.oilsOnHit,
+                  ignoresShield: p.ignoresShield,
+                  isGiantCritSerendipity: p.isGiantCritSerendipity,
+                  fromWeakCrackerMount: p.fromWeakCrackerMount,
+                  freezeDurationOverride: p.freezeDurationOverride,
+                  homingTargetUid: p.homingTargetUid,
+                  executesLowHpNormal: p.executesLowHpNormal,
+                  splitsShadowOnHit: p.splitsShadowOnHit,
+                  alreadySplitPerk: p.alreadySplitPerk,
+                  clonedByGate: true,
+                  splitChild: p.splitChild,
+                  maxTravelDist: max(125.0, p.maxTravelDist - p.traveledDist + 48.0),
+                  projectileStyle: p.projectileStyle,
+                )
+                  ..bouncesLeft = p.bouncesLeft
+                  ..bouncedOffObstacle = p.bouncedOffObstacle
+                  ..hitMutantIds.addAll(p.hitMutantIds),
+              );
+            }
+            bursts.add(FxBurst(pos: cloneGate.center, colorHex: 0xFFFF6B35, maxRadius: 36));
+          } else {
+            p.vel = Vec2(cos(baseA - 0.14) * spd, sin(baseA - 0.14) * spd);
+            final twinA = baseA + 0.14;
             spawnedClones.add(
               ActiveStoneProjectile(
                 sourceKey: p.sourceKey,
-                sourceLabel: '${p.sourceLabel} (×3폭주)',
-                pos: p.pos,
-                vel: Vec2(cos(a) * spd, sin(a) * spd),
+                sourceLabel: '${p.sourceLabel} (×2복제)',
+                pos: spawnPos,
+                vel: Vec2(cos(twinA) * spd, sin(twinA) * spd),
                 material: p.material,
                 shape: p.shape,
-                damage: p.damage * 0.90,
+                damage: p.damage * 0.88,
                 knockback: p.knockback * 0.90,
                 critChance: p.critChance,
-                colorHex: 0xFFFF6B35,
-                radius: p.radius * 0.96,
+                colorHex: 0xFF72EFDD,
+                radius: p.radius * 0.95,
                 spinCurve: p.spinCurve,
                 pierceLeft: p.pierceLeft,
                 aoeSplashRadius: p.aoeSplashRadius,
@@ -5072,296 +5600,204 @@ class DefenseBattleSim {
                 isGiantCritSerendipity: p.isGiantCritSerendipity,
                 fromWeakCrackerMount: p.fromWeakCrackerMount,
                 freezeDurationOverride: p.freezeDurationOverride,
+                homingTargetUid: p.homingTargetUid,
+                executesLowHpNormal: p.executesLowHpNormal,
+                splitsShadowOnHit: p.splitsShadowOnHit,
+                alreadySplitPerk: p.alreadySplitPerk,
                 clonedByGate: true,
                 splitChild: p.splitChild,
                 maxTravelDist: max(125.0, p.maxTravelDist - p.traveledDist + 48.0),
                 projectileStyle: p.projectileStyle,
               )
                 ..bouncesLeft = p.bouncesLeft
-                ..bouncedOffObstacle = p.bouncedOffObstacle,
+                ..bouncedOffObstacle = p.bouncedOffObstacle
+                ..hitMutantIds.addAll(p.hitMutantIds),
+            );
+            bursts.add(FxBurst(pos: cloneGate.center, colorHex: 0xFF72EFDD, maxRadius: 30));
+          }
+        }
+
+        // 1-B) 🎯 화력 증폭 과녁패 적중 판정
+        if (!p.hitMutantIds.contains(-777) &&
+            _distSegmentToPoint(segA, segB, powerTarget.center) <=
+                powerTarget.radius + p.radius * 0.6) {
+          p.hitMutantIds.add(-777);
+          final prevStacks = powerTarget.powerStacks;
+          powerTarget.powerStacks = (powerTarget.powerStacks + 1).clamp(1, 6);
+          powerTarget.decayTimer = 11.0;
+          powerTarget.pulseAnim = 1.0;
+          bursts.add(FxBurst(pos: powerTarget.center, colorHex: 0xFFFFD166, maxRadius: 26));
+          if (powerTarget.powerStacks > prevStacks) {
+            fieldTokens += 2;
+            callouts.add(
+              FloatingCallout(
+                pos: powerTarget.center + const Vec2(0, -18),
+                text: '🎯 전군 화력 +${powerTarget.bonusPercent}% 증폭!',
+                colorHex: 0xFFFFD166,
+              ),
             );
           }
-          bursts.add(FxBurst(pos: cloneGate.center, colorHex: 0xFFFF6B35, maxRadius: 36));
-        } else {
-          p.vel = Vec2(cos(baseA - 0.14) * spd, sin(baseA - 0.14) * spd);
-          final twinA = baseA + 0.14;
-          spawnedClones.add(
-            ActiveStoneProjectile(
-              sourceKey: p.sourceKey,
-              sourceLabel: '${p.sourceLabel} (×2복제)',
-              pos: p.pos,
-              vel: Vec2(cos(twinA) * spd, sin(twinA) * spd),
-              material: p.material,
-              shape: p.shape,
-              damage: p.damage * 0.88,
-              knockback: p.knockback * 0.90,
-              critChance: p.critChance,
-              colorHex: 0xFF72EFDD,
-              radius: p.radius * 0.95,
-              spinCurve: p.spinCurve,
-              pierceLeft: p.pierceLeft,
-              aoeSplashRadius: p.aoeSplashRadius,
-              pullsEnemies: p.pullsEnemies,
-              freezesOnHit: p.freezesOnHit,
-              slowsOnHit: p.slowsOnHit,
-              oilsOnHit: p.oilsOnHit,
-              ignoresShield: p.ignoresShield,
-              isGiantCritSerendipity: p.isGiantCritSerendipity,
-              fromWeakCrackerMount: p.fromWeakCrackerMount,
-              freezeDurationOverride: p.freezeDurationOverride,
-              clonedByGate: true,
-              splitChild: p.splitChild,
-              maxTravelDist: max(125.0, p.maxTravelDist - p.traveledDist + 48.0),
-              projectileStyle: p.projectileStyle,
-            )
-              ..bouncesLeft = p.bouncesLeft
-              ..bouncedOffObstacle = p.bouncedOffObstacle,
-          );
-          bursts.add(FxBurst(pos: cloneGate.center, colorHex: 0xFF72EFDD, maxRadius: 30));
         }
-      }
 
-      // 1-B) 🎯 화력 증폭 과녁패 적중 판정 (맞힐수록 +10% → +60% 전군 화력 급상승, 최대치 미만일 때 기력 +2⚡!)
-      if (!p.hitMutantIds.contains(-777) &&
-          _distSegmentToPoint(prevPos, p.pos, powerTarget.center) <=
-              powerTarget.radius + p.radius * 0.6) {
-        p.hitMutantIds.add(-777);
-        final prevStacks = powerTarget.powerStacks;
-        powerTarget.powerStacks = (powerTarget.powerStacks + 1).clamp(1, 6);
-        powerTarget.decayTimer = 11.0;
-        powerTarget.pulseAnim = 1.0;
-        bursts.add(FxBurst(pos: powerTarget.center, colorHex: 0xFFFFD166, maxRadius: 26));
-        if (powerTarget.powerStacks > prevStacks) {
-          fieldTokens += 2;
-          callouts.add(
-            FloatingCallout(
-              pos: powerTarget.center + const Vec2(0, -18),
-              text: '🎯 전군 화력 +${powerTarget.bonusPercent}% 증폭!',
-              colorHex: 0xFFFFD166,
-            ),
-          );
-        }
-      }
-
-      // 2) 심야 화약통 유폭 판정 (대폭발 범위 피해 + 건설 기력 구슬 +16⚡!)
-      for (final keg in powderKegs) {
-        if (keg.intact && _distSegmentToPoint(prevPos, p.pos, keg.pos) <= 18.0 + p.radius) {
-          keg.intact = false;
-          keg.respawnTimer = 14.0;
-          powderKegsDetonated++;
-          const kegBonusQi = 16;
-          fieldTokens += kegBonusQi;
-          _spawnFlyingQiOrb(keg.pos, kegBonusQi, colorHex: 0xFFF77F00);
-          pendingSounds.add(SoundCue.criticalShatter);
-          screenShakeTimer = max(screenShakeTimer, 0.28);
-          screenShakeIntensity = max(screenShakeIntensity, 5.6);
-          bursts.add(
-            FxBurst(
-              pos: keg.pos,
+        // 2) 심야 화약통 유폭 판정
+        for (final keg in powderKegs) {
+          if (keg.intact && _distSegmentToPoint(segA, segB, keg.pos) <= 18.0 + p.radius) {
+            keg.intact = false;
+            keg.respawnTimer = 14.0;
+            powderKegsDetonated++;
+            const kegBonusQi = 16;
+            fieldTokens += kegBonusQi;
+            _spawnFlyingQiOrb(keg.pos, kegBonusQi, colorHex: 0xFFF77F00);
+            pendingSounds.add(SoundCue.criticalShatter);
+            screenShakeTimer = max(screenShakeTimer, 0.28);
+            screenShakeIntensity = max(screenShakeIntensity, 5.6);
+            bursts.add(
+              FxBurst(
+                pos: keg.pos,
+                colorHex: 0xFFFF6B35,
+                maxRadius: 94,
+                ttlSec: 0.48,
+                durationSec: 0.48,
+                isTriangleShatter: true,
+              ),
+            );
+            callouts.add(
+              FloatingCallout(
+                pos: keg.pos + const Vec2(0, -18),
+                text: '🧨 화약통 대폭발!! (+$kegBonusQi⚡ 기력!)',
+                colorHex: 0xFFFF6B35,
+                isBigBanner: true,
+              ),
+            );
+            final kegMult = chapter.number == 2 ? 1.45 : 1.0;
+            final blastDmg =
+                (52.0 + stage.chapterNumber * 20.0) * kegMult * progress.realm.powerMult;
+            _spawnShockwaveRing(
+              keg.pos,
+              maxRadius: 108.0,
               colorHex: 0xFFFF6B35,
-              maxRadius: 94,
-              ttlSec: 0.48,
-              durationSec: 0.48,
-              isTriangleShatter: true,
-            ),
-          );
-          callouts.add(
-            FloatingCallout(
-              pos: keg.pos + const Vec2(0, -18),
-              text: '🧨 화약통 대폭발!! (+$kegBonusQi⚡ 기력!)',
-              colorHex: 0xFFFF6B35,
-              isBigBanner: true,
-            ),
-          );
-          final kegMult = chapter.number == 2 ? 1.45 : 1.0;
-          final blastDmg =
-              (52.0 + stage.chapterNumber * 20.0) * kegMult * progress.realm.powerMult;
-          _spawnShockwaveRing(
-            keg.pos,
-            maxRadius: 108.0,
-            colorHex: 0xFFFF6B35,
-            secondaryColorHex: 0xFFFFD166,
-            style: 'heavyCrater',
-            durationSec: 0.44,
-          );
-          for (final m in List<ActiveMutant>.from(mutants)) {
-            if (m.pos.distanceTo(keg.pos) <= 94.0) {
-              _applyDamageToMutant(
-                m,
-                blastDmg,
-                sourceKey: 'powder_keg',
-                sourceLabel: '심야 화약통 유폭',
-                knockDir: (m.pos - keg.pos).normalized,
-                knockForce: 150.0,
-                isCritical: true,
-                halfArmorPenetration: true,
-              );
-            }
-          }
-        }
-      }
-
-      // 3) 황금 보물 도깨비 타격 & 처치 대박 보상! (탄당 1회 피격으로 프레임 중첩 중복 타격 방지!)
-      if (treasureGoblin != null &&
-          treasureGoblin!.alive &&
-          !p.hitMutantIds.contains(-888) &&
-          _distSegmentToPoint(prevPos, p.pos, treasureGoblin!.pos) <= 20.0 + p.radius) {
-        p.hitMutantIds.add(-888);
-        final g = treasureGoblin!;
-        g.hitFlashTimer = 1.0;
-        g.hp -= p.damage * 1.25;
-        bursts.add(FxBurst(pos: g.pos, colorHex: 0xFFFFD166, maxRadius: 28));
-        if (g.hp <= 0) {
-          g.alive = false;
-          const gobQi = 34;
-          fieldTokens += gobQi;
-          earnedPermanentTokens += 35;
-          _spawnFlyingQiOrb(g.pos, gobQi);
-          pendingSounds.add(SoundCue.serendipityJackpot);
-          screenShakeTimer = max(screenShakeTimer, 0.30);
-          screenShakeIntensity = max(screenShakeIntensity, 5.2);
-          callouts.add(
-            FloatingCallout(
-              pos: g.pos + const Vec2(0, -18),
-              text: '👹 보물 도깨비 토벌 대박!! +$gobQi⚡ 기력 & 비급 획득!',
-              colorHex: 0xFFFFD166,
-              isBigBanner: true,
-            ),
-          );
-          _queuePerkRoll();
-        }
-      }
-
-      // 좌우 담장 반사 도탄
-      if (p.pos.x < 16 || p.pos.x > CampaignCatalog.arenaWidth - 16) {
-        if (p.bouncesLeft > 0) {
-          p.pos = Vec2(p.pos.x.clamp(16.0, CampaignCatalog.arenaWidth - 16.0), p.pos.y);
-          p.vel = Vec2(-p.vel.x * p.material.bounceKeep, p.vel.y * p.material.bounceKeep);
-          p.bouncesLeft--;
-          p.bouncedOffObstacle = true;
-          p.ignoresShield = true;
-          p.maxTravelDist = max(p.maxTravelDist, min(465.0, p.maxTravelDist + 56.0));
-        } else {
-          projectiles.removeAt(i);
-          continue;
-        }
-      }
-      if (p.pos.y < 10 || p.pos.y > CampaignCatalog.arenaHeight - 10) {
-        projectiles.removeAt(i);
-        continue;
-      }
-
-      // 회전 다각형 기둥 실제 정다각형 면 법선 가속 반발 도탄 & 뇌전 연쇄탄 발동! (정밀 파갑탄은 상공 직사로 통과!)
-      bool stoppedByPillar = false;
-      for (int pIdx = 0; !p.isPrecisionShot && pIdx < chapter.pillars.length; pIdx++) {
-        final pillar = chapter.pillars[pIdx];
-        final toP = p.pos - pillar.center;
-        final dist = toP.length;
-        if (dist > pillar.radius + p.radius + 4.0) continue;
-        final angleOffset = pIdx < pillarAngles.length ? pillarAngles[pIdx] : 0.0;
-        final (polySurfaceR, faceNormal) =
-            _polygonSurfaceAndNormal(pillar, angleOffset, toP.length > 1e-4 ? toP : const Vec2(0, -1));
-        if (dist <= polySurfaceR + p.radius) {
-          if (p.bouncesLeft <= 0) {
-            bursts.add(FxBurst(pos: p.pos, colorHex: 0xFFFFD166, maxRadius: 16));
-            stoppedByPillar = true;
-            break;
-          }
-          final n = (toP.x * faceNormal.x + toP.y * faceNormal.y) >= 0
-              ? faceNormal
-              : toP.normalized;
-          final dot = p.vel.x * n.x + p.vel.y * n.y;
-          final reflected = dot < 0 ? (p.vel - n * (2 * dot)) : toP.normalized * p.vel.length;
-          p.vel = reflected.normalized * min(680.0, p.vel.length * pillar.restitutionBoost * 0.94);
-          final pushDir = toP.length > 1e-4 ? toP.normalized : n;
-          p.pos = pillar.center + pushDir * (polySurfaceR + p.radius + 2.0);
-          p.bouncesLeft--;
-          p.bouncedOffObstacle = true;
-          p.ignoresShield = true;
-          p.maxTravelDist = max(p.maxTravelDist, min(465.0, p.maxTravelDist + 56.0));
-          bursts.add(FxBurst(pos: p.pos, colorHex: 0xFFFFD166, maxRadius: 22));
-
-          // [비급: 뇌전 연쇄탄] 기둥에 부딪힐 때도 주변 변이 최대 3체에게 번개 사슬 피해!
-          final lightningStacks = perkStacks(RoguePerk.chainLightning);
-          if (lightningStacks > 0 && mutants.isNotEmpty) {
-            int chained = 0;
-            Vec2 chainFrom = p.pos;
-            for (final other in List<ActiveMutant>.from(mutants)) {
-              if (other.phaseTransitionTimer > 0) continue;
-              if (other.pos.distanceTo(chainFrom) <= 125.0) {
-                if (lightningArcs.length < 24) {
-                  lightningArcs.add(LightningArcFx(from: chainFrom, to: other.pos));
-                }
+              secondaryColorHex: 0xFFFFD166,
+              style: 'heavyCrater',
+              durationSec: 0.44,
+            );
+            for (final m in List<ActiveMutant>.from(mutants)) {
+              if (m.pos.distanceTo(keg.pos) <= 94.0) {
                 _applyDamageToMutant(
-                  other,
-                  p.damage * (0.45 + (lightningStacks - 1) * 0.25),
-                  sourceKey: p.sourceKey,
-                  sourceLabel: '뇌전 연쇄탄 (기둥 도탄)',
-                  knockDir: (other.pos - chainFrom).normalized,
-                  knockForce: 26.0,
-                  isCritical: false,
-                  fullArmorIgnore: true,
-                  chainDepth: 2,
+                  m,
+                  blastDmg,
+                  sourceKey: 'powder_keg',
+                  sourceLabel: '심야 화약통 유폭',
+                  knockDir: (m.pos - keg.pos).normalized,
+                  knockForce: 150.0,
+                  isCritical: true,
+                  halfArmorPenetration: true,
                 );
-                chainFrom = other.pos;
-                chained++;
-                if (chained >= 3) break;
               }
             }
           }
         }
-      }
-      if (stoppedByPillar) {
-        projectiles.removeAt(i);
-        continue;
-      }
 
-      // 황금 보급 두꺼비 도탄 포획!
-      if (goldenToad != null &&
-          goldenToad!.alive &&
-          _distSegmentToPoint(prevPos, p.pos, goldenToad!.pos) < p.radius + 16.0) {
-        goldenToad!.alive = false;
-        fieldTokens += 45;
-        earnedPermanentTokens += 35;
-        earnedElixirs += 2;
-        _spawnFlyingQiOrb(goldenToad!.pos, 45);
-        pendingSounds.add(SoundCue.serendipityJackpot);
-        callouts.add(
-          FloatingCallout(
-            pos: goldenToad!.pos,
-            text: '🐸 황금 두꺼비 포획 대박! 기력 +45⚡ · 영약 +2!',
-            colorHex: 0xFFFFD166,
-            isBigBanner: true,
-          ),
-        );
-      }
-
-      // 돌연변이 선분-원(Swept Segment-Circle) 정밀 충돌 판정 (4배속 프레임에서도 관통 누락 0건!)
-      bool consumed = false;
-      for (int mIdx = mutants.length - 1; mIdx >= 0; mIdx--) {
-        if (mIdx >= mutants.length) continue;
-        final m = mutants[mIdx];
-        if (m.phaseTransitionTimer > 0) continue;
-        if (p.hitMutantIds.contains(m.uid)) continue;
-        if (p.isPrecisionShot && p.lockedWeakBossUid != null && m.uid != p.lockedWeakBossUid) {
-          continue;
+        // 3) 황금 보물 도깨비 타격 & 처치 보상
+        if (treasureGoblin != null &&
+            treasureGoblin!.alive &&
+            !p.hitMutantIds.contains(-888) &&
+            _distSegmentToPoint(segA, segB, treasureGoblin!.pos) <= 20.0 + p.radius) {
+          p.hitMutantIds.add(-888);
+          final g = treasureGoblin!;
+          g.hitFlashTimer = 1.0;
+          g.hp -= p.damage * 1.25;
+          bursts.add(FxBurst(pos: g.pos, colorHex: 0xFFFFD166, maxRadius: 28));
+          if (g.hp <= 0) {
+            g.alive = false;
+            const gobQi = 34;
+            fieldTokens += gobQi;
+            earnedPermanentTokens += 35;
+            _spawnFlyingQiOrb(g.pos, gobQi);
+            pendingSounds.add(SoundCue.serendipityJackpot);
+            screenShakeTimer = max(screenShakeTimer, 0.30);
+            screenShakeIntensity = max(screenShakeIntensity, 5.2);
+            callouts.add(
+              FloatingCallout(
+                pos: g.pos + const Vec2(0, -18),
+                text: '👹 보물 도깨비 토벌 대박!! +$gobQi⚡ 기력 & 비급 획득!',
+                colorHex: 0xFFFFD166,
+                isBigBanner: true,
+              ),
+            );
+            _queuePerkRoll();
+          }
         }
-        if (_distSegmentToPoint(prevPos, p.pos, m.pos) <= p.radius + m.effectiveRadius) {
+
+        // 4) 황금 보급 두꺼비 포획 (도탄 시 +65⚡ 대박 보너스 · 직격 시 +45⚡!)
+        if (goldenToad != null &&
+            goldenToad!.alive &&
+            _distSegmentToPoint(segA, segB, goldenToad!.pos) < p.radius + 16.0) {
+          goldenToad!.alive = false;
+          final toadQi = p.bouncedOffObstacle ? 65 : 45;
+          fieldTokens += toadQi;
+          earnedPermanentTokens += p.bouncedOffObstacle ? 45 : 35;
+          earnedElixirs += 2;
+          _spawnFlyingQiOrb(goldenToad!.pos, toadQi);
+          pendingSounds.add(SoundCue.serendipityJackpot);
+          callouts.add(
+            FloatingCallout(
+              pos: goldenToad!.pos,
+              text: p.bouncedOffObstacle
+                  ? '🐸 황금 두꺼비 도탄 대박!! 기력 +$toadQi⚡ · 영약 +2!'
+                  : '🐸 황금 두꺼비 포획! 기력 +$toadQi⚡ · 영약 +2!',
+              colorHex: 0xFFFFD166,
+              isBigBanner: true,
+            ),
+          );
+        }
+
+        // 5) 돌연변이 최단 충돌 시각 t ∈ [0, 1] 정렬 다중 관통 판정 (전열→후열 물리 순서 100% 보장!)
+        final hitCandidates = <(double, ActiveMutant)>[];
+        for (final m in mutants) {
+          if (m.phaseTransitionTimer > 0) continue;
+          if (p.hitMutantIds.contains(m.uid)) continue;
+          if (p.isPrecisionShot && p.lockedWeakBossUid != null && m.uid != p.lockedWeakBossUid) {
+            continue;
+          }
+          final tHit = _segmentCircleHitParam(segA, segB, m.pos, p.radius + m.effectiveRadius);
+          if (tHit != null) {
+            hitCandidates.add((tHit, m));
+          }
+        }
+        if (hitCandidates.length > 1) {
+          hitCandidates.sort((a, b) => a.$1.compareTo(b.$1));
+        }
+
+        final savedFinalPos = p.pos;
+        for (final (tHit, m) in hitCandidates) {
+          if (!mutants.contains(m) || m.phaseTransitionTimer > 0 || p.hitMutantIds.contains(m.uid)) {
+            continue;
+          }
           p.hitMutantIds.add(m.uid);
+          p.pos = segA + (segB - segA) * tHit;
           _resolveProjectileHitMutant(p, m, spawnedClones);
 
           if (p.pierceLeft > 0) {
             p.pierceLeft--;
-          } else if (p.bouncesLeft > 0 && (p.material.grade >= 6 || perkStacks(RoguePerk.ricochetMaster) > 0)) {
+            p.pos = savedFinalPos;
+            continue;
+          } else if (p.bouncesLeft > 0 &&
+              (p.material.grade >= 6 || perkStacks(RoguePerk.ricochetMaster) > 0)) {
             p.bouncesLeft--;
             p.vel = Vec2(-p.vel.y * 0.78, p.vel.x * 0.78) * p.material.bounceKeep;
+            p.pos = m.pos + p.vel.normalized * (m.effectiveRadius + p.radius + 1.0);
+            break;
           } else {
             consumed = true;
+            break;
           }
-          break;
         }
       }
-      if (consumed) {
+
+      if (consumed ||
+          stoppedByObstacle ||
+          outOfBounds ||
+          p.traveledDist >= p.maxTravelDist - 1e-4) {
         projectiles.removeAt(i);
       }
     }
@@ -5664,8 +6100,12 @@ class DefenseBattleSim {
         style: 'critStar',
         durationSec: 0.32,
       );
-      if ((chapter.number == 7 || chapter.number == 9) && _fireBurstCooldown <= 0) {
+      if ((chapter.number == 7 || chapter.number == 9) &&
+          (_fireBurstCooldown <= 0 ||
+              _lastFireBurstPos == null ||
+              m.pos.distanceTo(_lastFireBurstPos!) > 85.0)) {
         _fireBurstCooldown = 0.16;
+        _lastFireBurstPos = m.pos;
         final fireR = chapter.number == 9 ? 54.0 : 44.0;
         _spawnShockwaveRing(
           m.pos,
@@ -5711,14 +6151,14 @@ class DefenseBattleSim {
         p.material.density >= 1.35 ||
         isCrit;
     final precisionStrikeHits = crackedWeakPointNow
-        ? 68
+        ? 42
         : (p.isPrecisionShot
-            ? 44
+            ? 24
             : (p.projectileStyle == 'eogiUltimate' ? 16 : 0));
     double resolvedRawDmg = p.damage * mult + precisionBonusTrueDmg;
     if (p.executesLowHpNormal &&
         !m.kind.isBoss &&
-        m.hp <= m.currentMaxHp * 0.45) {
+        m.hp <= m.currentMaxHp * 0.55) {
       resolvedRawDmg = max(resolvedRawDmg, m.hp + 999.0);
     }
     _applyDamageToMutant(
@@ -5734,7 +6174,7 @@ class DefenseBattleSim {
       fullArmorIgnore: p.isPrecisionShot ||
           crackedWeakPointNow ||
           armorBreakStacks > 0 ||
-          (p.executesLowHpNormal && !m.kind.isBoss && m.hp <= m.currentMaxHp * 0.45) ||
+          (p.executesLowHpNormal && !m.kind.isBoss && m.hp <= m.currentMaxHp * 0.55) ||
           (stage.chapterNumber >= 3 && isHeavy),
       bypassCarapace: crackedWeakPointNow,
       extraHitStrikes: precisionStrikeHits,
@@ -5745,6 +6185,7 @@ class DefenseBattleSim {
       p.splitsShadowOnHit = false;
       final spd = p.vel.length * 0.90;
       final baseA = atan2(p.vel.y, p.vel.x);
+      final ch5Extra = chapter.number == 5 ? 2 : 0;
       for (final deltaA in const [-0.42, 0.42]) {
         final a = baseA + deltaA;
         spawnedClones.add(
@@ -5761,6 +6202,7 @@ class DefenseBattleSim {
             colorHex: 0xFFC77DFF,
             radius: max(6.4, p.radius * 0.78),
             pierceLeft: 1,
+            extraBounces: ch5Extra,
             ignoresShield: p.ignoresShield,
             clonedByGate: true,
             splitChild: true,
@@ -5769,12 +6211,17 @@ class DefenseBattleSim {
       }
     }
 
-    // [비급: 쌍탄 분열비급] 첫 적 적중 시 2갈래 분열탄 생성! (중첩당 +40% 설명과 1:1 일치!)
+    // [비급: 쌍탄 분열비급] 첫 적 적중 시 1회만 2갈래 분열탄 생성! (관통탄 중복 다단 분열 차단!)
     final splitStacks = perkStacks(RoguePerk.splitShot);
-    if (splitStacks > 0 && !p.splitChild && projectiles.length + spawnedClones.length < 180) {
+    if (splitStacks > 0 &&
+        !p.splitChild &&
+        !p.alreadySplitPerk &&
+        projectiles.length + spawnedClones.length < 180) {
+      p.alreadySplitPerk = true;
       final spd = p.vel.length * 0.92;
       final baseA = atan2(p.vel.y, p.vel.x);
       final splitDmg = p.damage * (0.52 + (splitStacks - 1) * 0.40);
+      final ch5Extra = chapter.number == 5 ? 2 : 0;
       for (final deltaA in [-0.36, 0.36]) {
         final a = baseA + deltaA;
         spawnedClones.add(
@@ -5791,8 +6238,10 @@ class DefenseBattleSim {
             colorHex: 0xFFFF6B35,
             radius: max(6.2, p.radius * 0.76),
             pierceLeft: 0,
+            extraBounces: ch5Extra,
             freezesOnHit: p.freezesOnHit,
             ignoresShield: p.ignoresShield,
+            alreadySplitPerk: true,
             clonedByGate: true,
             splitChild: true,
           )..hitMutantIds.add(m.uid),
@@ -5859,15 +6308,36 @@ class DefenseBattleSim {
           durationSec: 0.34,
         );
       }
+      final pushAwayFromAltar =
+          p.projectileStyle == 'sectFist' || p.material == StoneMaterial.banseok;
       for (final other in List<ActiveMutant>.from(mutants)) {
         if (other.uid != m.uid && other.pos.distanceTo(m.pos) <= p.aoeSplashRadius) {
+          if (p.oilsOnHit) {
+            other.oilSlipTimer = max(other.oilSlipTimer, 4.0);
+          }
+          if (p.freezesOnHit) {
+            if (other.freezeImmuneTimer <= 0) {
+              final splashFreeze =
+                  (p.freezeDurationOverride ?? (other.kind.isBoss ? 0.65 : 0.95)) * ch3FreezeMult;
+              other.freezeTimer = max(other.freezeTimer, splashFreeze);
+              other.freezeImmuneTimer = other.kind.isBoss ? 3.8 : 2.8;
+            }
+            other.slowTimer = max(other.slowTimer, 2.4 * ch3FreezeMult);
+          } else if (p.slowsOnHit || p.material == StoneMaterial.bingbaek) {
+            other.slowTimer = max(other.slowTimer, 2.0 * ch3FreezeMult);
+          }
+          final rawSplashKnock = pushAwayFromAltar
+              ? (other.pos - shieldCenter)
+              : (other.pos - m.pos);
+          final splashKnockDir =
+              rawSplashKnock.length > 1e-3 ? rawSplashKnock.normalized : hitDir;
           _applyDamageToMutant(
             other,
             p.damage * 0.58,
             sourceKey: p.sourceKey,
             sourceLabel: p.sourceLabel,
-            knockDir: (other.pos - m.pos).normalized,
-            knockForce: p.knockback * 0.75,
+            knockDir: splashKnockDir,
+            knockForce: p.knockback * (pushAwayFromAltar ? 0.95 : 0.75),
             isCritical: false,
             halfArmorPenetration: halfPen,
             fullArmorIgnore: armorBreakStacks > 0,
@@ -6069,10 +6539,16 @@ class DefenseBattleSim {
         );
       }
 
-      if (preset.primaryStone == StoneMaterial.onok && shieldHp > 0 && launchers.isNotEmpty) {
+      if (preset.primaryStone == StoneMaterial.onok &&
+          towerHp > 0 &&
+          launchers.any((e) => !e.isConstructing)) {
         final healRatio = stage.globalIndex >= 900 ? 0.011 : 0.022;
         shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * healRatio);
       }
+
+      // 출두 처치 시 파생되는 연쇄 폭발이 보스 마갑을 개체당 150타씩 즉사 증발시키지 않도록 파생 키 분리!
+      final chainSourceKey =
+          sourceKey == 'support_chuldu' ? 'support_chuldu_chain' : sourceKey;
 
       // [비급: 홍련 폭렬파] 처치 시 화염 유폭! (무한 체력 비례 즉사 방지를 위해 실제 타격 화력 기반으로 상한 제어)
       final corpseStacks = perkStacks(RoguePerk.corpseExplosion);
@@ -6096,7 +6572,7 @@ class DefenseBattleSim {
             _applyDamageToMutant(
               near,
               blastDmg,
-              sourceKey: sourceKey,
+              sourceKey: chainSourceKey,
               sourceLabel: '홍련 폭렬파',
               knockDir: (near.pos - m.pos).normalized,
               knockForce: 68.0,
@@ -6118,7 +6594,7 @@ class DefenseBattleSim {
             _applyDamageToMutant(
               near,
               18.0 * frostStacks * progress.realm.powerMult,
-              sourceKey: sourceKey,
+              sourceKey: chainSourceKey,
               sourceLabel: '만년 빙옥진',
               knockDir: (near.pos - m.pos).normalized,
               knockForce: 42.0,
@@ -6146,7 +6622,7 @@ class DefenseBattleSim {
               _applyDamageToMutant(
                 near,
                 effectiveDmg * 0.52,
-                sourceKey: sourceKey,
+                sourceKey: chainSourceKey,
                 sourceLabel: sourceLabel,
                 knockDir: (near.pos - m.pos).normalized,
                 knockForce: knockForce * 0.7,
@@ -6684,9 +7160,11 @@ class DefenseBattleSim {
     final ecoMin = min(granaryHealth, min(cropsHealth, livestockHealth));
     int stars = 0;
     if (isVictory) {
-      if (shieldHp > 0 && !villageTookDamage && ecoAvg >= 0.99 && ecoMin >= 0.99) {
-        stars = 3;
-      } else if (shieldHp > 0 && ecoAvg >= 0.88 && ecoMin >= 0.85) {
+      if (shieldHp > 0 &&
+          !villageTookDamage &&
+          !towerTookDamage &&
+          ecoAvg >= 0.99 &&
+          ecoMin >= 0.99) {
         stars = 3;
       } else if (ecoAvg >= 0.55) {
         stars = 2;
@@ -6705,8 +7183,19 @@ class DefenseBattleSim {
       serendipityCount++;
     }
 
-    final contribList = _contribMap.values.toList()
-      ..sort((a, b) => b.totalDamage.compareTo(a.totalDamage));
+    final contribList = List<ContributionEntry>.unmodifiable(
+      (_contribMap.values
+              .map(
+                (e) => ContributionEntry(
+                  key: e.key,
+                  label: e.label,
+                  totalDamage: e.totalDamage,
+                  kills: e.kills,
+                ),
+              )
+              .toList()
+            ..sort((a, b) => b.totalDamage.compareTo(a.totalDamage))),
+    );
 
     String tip;
     if (isVictory) {
@@ -6742,9 +7231,11 @@ class DefenseBattleSim {
       coachingTip: tip,
       killCount: killCount,
       wavesClearedCount: isVictory ? stage.waves.length : wavesClearedCount,
-      encounteredMutants: Set<MutantKind>.from(encounteredMutants),
+      encounteredMutants: Set<MutantKind>.unmodifiable(encounteredMutants),
       supportDeductedRealtime: true,
       bossElixirIncluded: true,
+      convoyBuffConsumedRealtime: _convoyBuffConsumedRealtime,
+      towerTookDamage: towerTookDamage,
     );
     if (isFinished) {
       _cachedSummary = summary;

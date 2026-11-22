@@ -370,9 +370,17 @@ Future<void> main(List<String> args) async {
 
   final report = buf.toString();
   stdout.write(report);
-  File('RESULTS_DEFENSE.txt').writeAsStringSync(report);
+  try {
+    File('RESULTS_DEFENSE.txt').writeAsStringSync(report);
+  } on FileSystemException {
+    // 읽기 전용 샌드박스 실행 시 파일 기록 생략
+  }
 
-  if (failedCodes.isNotEmpty || idleAccidentalWins > 0 || delta < 35.0 || minWinDurationSec < 32.0) {
+  if (failedCodes.isNotEmpty ||
+      idleAccidentalWins > 0 ||
+      lazyOneTowerRate > 15.0 ||
+      delta < 35.0 ||
+      minWinDurationSec < 70.0) {
     exitCode = 1;
   }
 }

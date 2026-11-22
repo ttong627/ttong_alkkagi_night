@@ -1362,5 +1362,37 @@ void main() {
     expect(find.byKey(const Key('quick_direct_build_btn')), findsOneWidget);
     expect(find.textContaining('🔨추천축조[곡사]'), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    // 4) v1.0.0+28: 진법 편성실에서 1~14번 거점 지정 병종 칩 터치 변경 & 전장 지원패 사용 후 복귀 시 보호 대화상자 검증
+    await tester.pumpWidget(
+      MaterialApp(home: LoadoutScreen(controller: ctrl)),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    final slot0Chip = find.byKey(const Key('loadout_mount_slot_0'));
+    await tester.ensureVisible(slot0Chip);
+    await tester.pump();
+    final beforeSlot0 = ctrl.progress.activePreset.mountTypes[0];
+    await tester.tap(slot0Chip);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(ctrl.progress.activePreset.mountTypes[0], isNot(equals(beforeSlot0)));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BattleScreen(
+          key: const ValueKey('v28_battle_guard'),
+          controller: ctrl,
+          stage: st2,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.tap(find.byKey(const Key('battle_chuldu_btn')));
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.tap(find.byKey(const Key('battle_pause_btn')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.textContaining('복구되지 않습니다'), findsOneWidget);
+    await tester.tap(find.text('전투 계속'));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(tester.takeException(), isNull);
   });
 }

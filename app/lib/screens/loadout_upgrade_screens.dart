@@ -306,6 +306,69 @@ class LoadoutScreen extends StatelessWidget {
                     child: Divider(height: 1, color: Colors.white12),
                   ),
                   const Text(
+                    '초소 거점별 지정 병종 편성 (1~14번 거점 · 터치하여 병종 순환)',
+                    style: TextStyle(
+                      fontSize: 15.2,
+                      color: NightPalette.accentGold,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '전투 중 [🔨추천축조] 및 거점 선택창에서 우선 제안할 병종을 미리 지정합니다.',
+                    style: TextStyle(
+                      fontSize: 11.8,
+                      color: NightPalette.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: List.generate(preset.mountTypes.length, (slotIdx) {
+                      final curType = preset.mountTypes[slotIdx];
+                      final unlockedTypes = LauncherType.values
+                          .where((t) => t.unlockChapter <= p.highestUnlockedChapter)
+                          .toList();
+                      return ActionChip(
+                        key: Key('loadout_mount_slot_$slotIdx'),
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: NightPalette.bgDeep,
+                        side: BorderSide(
+                          color: Color(curType.colorHex).withValues(alpha: 0.65),
+                        ),
+                        avatar: NightSpriteIcon(
+                          assetPath: NightArtRegistry.launcherAsset(curType),
+                          fallbackIcon: Icons.gps_fixed_rounded,
+                          size: 16,
+                          color: Color(curType.colorHex),
+                        ),
+                        label: Text(
+                          '${slotIdx + 1}거점: ${curType.name.split(" ").first}',
+                          style: TextStyle(
+                            fontSize: 11.2,
+                            fontWeight: FontWeight.bold,
+                            color: Color(curType.colorHex),
+                          ),
+                        ),
+                        onPressed: unlockedTypes.length <= 1
+                            ? null
+                            : () {
+                                final curIdx = unlockedTypes.indexOf(curType);
+                                final nextType = unlockedTypes[
+                                    (curIdx + 1) % unlockedTypes.length];
+                                controller.updatePreset(
+                                  (pr) => pr.mountTypes[slotIdx] = nextType,
+                                );
+                              },
+                      );
+                    }),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Divider(height: 1, color: Colors.white12),
+                  ),
+                  const Text(
                     '10장 고유 지형 발사대 5종 대 돌연변이 상성 일람',
                     style: TextStyle(
                       fontSize: 15.5,

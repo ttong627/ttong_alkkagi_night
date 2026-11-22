@@ -39,6 +39,7 @@ class _BattleScreenState extends State<BattleScreen>
   int _speedMultiplier = 1;
   bool _summaryShown = false;
   int _lastPersistedSupportUsed = 0;
+  int _consumablesUsedThisBattle = 0;
 
   /// 수동 조준 드래그(꾹 누르면 자동 연속 사격!) 및 비차단 실시간 초소 미니 선택창 타이머!
   bool _draggingManualAim = false;
@@ -97,6 +98,7 @@ class _BattleScreenState extends State<BattleScreen>
     )..autoChoosePerks = widget.controller.autoChooseBattlePerks;
     _summaryShown = false;
     _lastPersistedSupportUsed = 0;
+    _consumablesUsedThisBattle = 0;
     _draggingManualAim = false;
     _manualAimPreviewAngleRad = null;
     _panStartSlot = null;
@@ -225,14 +227,16 @@ class _BattleScreenState extends State<BattleScreen>
     return closest;
   }
 
-  /// 전장에서 다단 변이 보스의 빛나는 약점 과녁(🎯)을 직접 터치했는지 판별 (중앙탑/빈공간 오터치 방지 52px 정밀 반경)!
-  ActiveMutant? _hitMultiPhaseBossTarget(Vec2 arenaPos) {
+  /// 전장에서 다단 변이 보스의 빛나는 약점 과녁(🎯)을 직접 터치했는지 판별 (장갑판 또는 타수 마갑 활성 중 52px 정밀 반경)!
+  ActiveMutant? _hitMultiPhaseBossTarget(Vec2 arenaPos, {bool bullseyeOnly = false}) {
     ActiveMutant? best;
-    double bestDist = 52.0;
+    double bestDist = bullseyeOnly ? 38.0 : 52.0;
     for (final m in _sim.mutants) {
-      if (m.totalPhases <= 1 || m.phaseTransitionTimer > 0) continue;
+      if (!m.hasActiveWeakPoint) continue;
       final dWeak = arenaPos.distanceTo(m.weakSpotWorldPos);
-      final dBody = max(0.0, arenaPos.distanceTo(m.pos) - m.effectiveRadius * 0.55);
+      final dBody = bullseyeOnly
+          ? double.infinity
+          : max(0.0, arenaPos.distanceTo(m.pos) - m.effectiveRadius * 0.55);
       final d = min(dWeak, dBody);
       if (d <= bestDist) {
         bestDist = d;
@@ -240,6 +244,51 @@ class _BattleScreenState extends State<BattleScreen>
       }
     }
     return best;
+  }
+
+  Future<void> _confirmExitOrRestart({required bool isRestart}) async {
+    final hasSpentItems = !_sim.isFinished &&
+        (_sim.usedSupportCount > 0 || _consumablesUsedThisBattle > 0);
+    if (hasSpentItems) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: NightPalette.bgCard,
+          title: Text(
+            isRestart ? '전투 처음부터 재개시' : '본영으로 복귀',
+            style: const TextStyle(
+              color: NightPalette.accentGold,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          content: const Text(
+            '이번 전투에서 이미 사용한 지원패(무림수호단 출두) 및 전술 비약은 복구되지 않습니다. 계속하시겠습니까?',
+            style: TextStyle(color: NightPalette.textPrimary, fontSize: 13.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('전투 계속'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: NightPalette.crimsonMoon,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(isRestart ? '재개시' : '복귀'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true || !mounted) return;
+    }
+    if (isRestart) {
+      NightHaptics.instance.lightTap();
+      setState(() => _startNewSim(showIntroToast: false));
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   double _computeAimAngleFromArenaPoint(Vec2 arenaPos, {required bool fromTower}) {
@@ -764,6 +813,11 @@ class _BattleScreenState extends State<BattleScreen>
                               _handedOffBgm = true;
                               final nextStage = CampaignCatalog
                                   .allStages[widget.stage.globalIndex];
+                              if (nextStage.chapterNumber !=
+                                  widget.stage.chapterNumber) {
+                                widget.controller
+                                    .applyRecommendedLoadoutForStage(nextStage);
+                              }
                               Navigator.of(context).pushReplacement(
                                 MaterialPageRoute(
                                   builder: (_) => BattleScreen(
@@ -851,7 +905,9 @@ class _BattleScreenState extends State<BattleScreen>
                     ? _sim.buildCostForType(LauncherType.rapid)
                     : (needExcavateFirst
                         ? _sim.excavationCostForSlot(nextMount)
-                        : _sim.buildCostForType(nextMount.recommendedType));
+                        : _sim.buildCostForType(
+                            _sim.preferredBuildTypeForSlot(nextMount),
+                          ));
                 final qiFill =
                     (_sim.fieldTokens / max(1, nextTargetCost)).clamp(0.0, 1.0);
                 final canBuildAny =
@@ -871,17 +927,16 @@ class _BattleScreenState extends State<BattleScreen>
                             key: const Key('battle_pause_btn'),
                             visualDensity: VisualDensity.compact,
                             tooltip: '본영으로 즉시 복귀',
-                            onPressed: () => Navigator.of(context).pop(),
+                            onPressed: () =>
+                                _confirmExitOrRestart(isRestart: false),
                             icon: const Icon(Icons.arrow_back_rounded),
                           ),
                           IconButton(
                             key: const Key('battle_quick_restart_btn'),
                             visualDensity: VisualDensity.compact,
                             tooltip: '멈춤 없이 즉시 처음부터 재개시',
-                            onPressed: () {
-                              NightHaptics.instance.lightTap();
-                              setState(() => _startNewSim(showIntroToast: false));
-                            },
+                            onPressed: () =>
+                                _confirmExitOrRestart(isRestart: true),
                             icon: const Icon(Icons.refresh_rounded, size: 20),
                           ),
                           Expanded(
@@ -1289,7 +1344,7 @@ class _BattleScreenState extends State<BattleScreen>
                   Center(
                     child: InteractiveViewer(
                       transformationController: _zoomController,
-                      panEnabled: _zoomedView,
+                      panEnabled: _zoomedView && !_sim.centralManualMode,
                       scaleEnabled: _zoomedView,
                       minScale: 1.0,
                       maxScale: 2.2,
@@ -1298,6 +1353,8 @@ class _BattleScreenState extends State<BattleScreen>
                             CampaignCatalog.arenaHeight,
                         child: LayoutBuilder(
                           builder: (ctx, arenaConstraints) {
+                            final allowArenaPan =
+                                !_zoomedView || _sim.centralManualMode;
                             return GestureDetector(
                               key: const Key('battle_arena_gesture'),
                               behavior: HitTestBehavior.opaque,
@@ -1310,6 +1367,23 @@ class _BattleScreenState extends State<BattleScreen>
                                   details.localPosition,
                                   arenaConstraints,
                                 );
+
+                                // 0) 장전 완료 상태에서 보스 약점 과녁(🎯 반경 38px) 정중앙 터치 시 초소·제단보다 최우선 파갑 저격!
+                                if (_sim.isPrecisionStrikeReady) {
+                                  final bullseyeBoss = _hitMultiPhaseBossTarget(
+                                    tapPos,
+                                    bullseyeOnly: true,
+                                  );
+                                  if (bullseyeBoss != null &&
+                                      _sim.firePrecisionStrikeAt(
+                                        tapPos,
+                                        targetBossUid: bullseyeBoss.uid,
+                                      )) {
+                                    NightHaptics.instance.heavyImpact();
+                                    _frameNotifier.value++;
+                                    return;
+                                  }
+                                }
 
                                 // 1) 빈 초소 또는 설치된 발사대 터치 → 게임 멈춤 없이 실시간 배치 띠 / 즉시 승급·합체!
                                 final hitSlot = _hitMountSlot(tapPos);
@@ -1326,7 +1400,7 @@ class _BattleScreenState extends State<BattleScreen>
                                   });
                                 }
 
-                                // 2) 각 장의 실제 수호 제단(중앙 기명 수호탑) 터치 우선 처리 → 보스가 제단에 붙어도 자동/수동 전환 보장!
+                                // 2) 각 장의 실제 수호 제단(중앙 기명 수호탑) 터치 처리 → 자동/수동 전환!
                                 if (tapPos.distanceTo(
                                       _sim.towerPos,
                                     ) <=
@@ -1338,10 +1412,13 @@ class _BattleScreenState extends State<BattleScreen>
                                   return;
                                 }
 
-                                // 3) 다단 변이 보스의 빛나는 약점 과녁(🎯) 터치 → 재사용 대기시간이 찼을 때만 정밀 파갑 신궁탄 격발!
+                                // 3) 다단 변이 보스 본체/약점 터치 → 재사용 대기시간이 찼을 때 정밀 파갑 신궁탄 격발!
                                 final bossTarget = _hitMultiPhaseBossTarget(tapPos);
                                 if (bossTarget != null &&
-                                    _sim.firePrecisionStrikeAt(tapPos)) {
+                                    _sim.firePrecisionStrikeAt(
+                                      tapPos,
+                                      targetBossUid: bossTarget.uid,
+                                    )) {
                                   NightHaptics.instance.heavyImpact();
                                   _frameNotifier.value++;
                                   return;
@@ -1355,7 +1432,7 @@ class _BattleScreenState extends State<BattleScreen>
                                   }
                                 }
                               },
-                              onPanStart: _zoomedView
+                              onPanStart: !allowArenaPan
                                   ? null
                                   : (details) {
                                       if (arenaConstraints.maxWidth <= 0 ||
@@ -1374,12 +1451,14 @@ class _BattleScreenState extends State<BattleScreen>
                                         return;
                                       }
                                       // 중앙탑에서 시작한 드래그가 아닐 때만 다단 변이 보스 약점 즉시 저격!
+                                      final panBoss =
+                                          _hitMultiPhaseBossTarget(startPos);
                                       if (startPos.distanceTo(_sim.towerPos) >
                                               48.0 &&
-                                          _hitMultiPhaseBossTarget(startPos) !=
-                                              null &&
+                                          panBoss != null &&
                                           _sim.firePrecisionStrikeAt(
                                             startPos,
+                                            targetBossUid: panBoss.uid,
                                           )) {
                                         NightHaptics.instance.heavyImpact();
                                         _frameNotifier.value++;
@@ -1409,7 +1488,7 @@ class _BattleScreenState extends State<BattleScreen>
                                       );
                                       _frameNotifier.value++;
                                     },
-                              onPanUpdate: _zoomedView
+                              onPanUpdate: !allowArenaPan
                                   ? null
                                   : (details) {
                                       if (_panStartSlot != null &&
@@ -1441,7 +1520,7 @@ class _BattleScreenState extends State<BattleScreen>
                                           _manualAimPreviewAngleRad!;
                                       _frameNotifier.value++;
                                     },
-                              onPanEnd: _zoomedView
+                              onPanEnd: !allowArenaPan
                                   ? null
                                   : (_) {
                                       if (_panStartSlot != null) {
@@ -1465,7 +1544,7 @@ class _BattleScreenState extends State<BattleScreen>
                                       }
                                       _frameNotifier.value++;
                                     },
-                              onPanCancel: _zoomedView
+                              onPanCancel: !allowArenaPan
                                   ? null
                                   : () {
                                       _panStartSlot = null;
@@ -3243,7 +3322,7 @@ class _BattleScreenState extends State<BattleScreen>
                       ),
                       const SizedBox(height: 4),
 
-                      // 2열: 중앙탑 사격 모드(꾹 눌러 연사) · 비약 3종 · 자동승급 · 무림수호단 출두!
+                      // 2열: 사격모드 · 1.4배확대 · 자동승급 · 자동비급 (360dp 화면에서도 가로 스크롤 없이 한눈에!)
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -3274,7 +3353,7 @@ class _BattleScreenState extends State<BattleScreen>
                                     ? '중앙탑: 수동탄지'
                                     : '중앙탑: 자동발사',
                                 style: TextStyle(
-                                  fontSize: 11.2,
+                                  fontSize: 11.0,
                                   fontWeight: FontWeight.bold,
                                   color: _sim.centralManualMode
                                       ? NightPalette.accentGold
@@ -3309,18 +3388,32 @@ class _BattleScreenState extends State<BattleScreen>
                               label: Text(
                                 _zoomedView ? '🔍광각전체' : '🔍1.4배확대',
                                 style: const TextStyle(
-                                  fontSize: 11.0,
+                                  fontSize: 10.8,
                                   fontWeight: FontWeight.bold,
                                   color: NightPalette.jadeShield,
                                 ),
                               ),
                               onPressed: () {
                                 NightHaptics.instance.lightTap();
+                                final mq = MediaQuery.sizeOf(context);
+                                final txRatio = (_sim.towerPos.x /
+                                        CampaignCatalog.arenaWidth)
+                                    .clamp(0.15, 0.85);
+                                final tyRatio = (_sim.towerPos.y /
+                                        CampaignCatalog.arenaHeight)
+                                    .clamp(0.15, 0.85);
+                                final focusDx = -(mq.width * 0.40 * txRatio);
+                                final focusDy = -(mq.height * 0.34 * tyRatio);
                                 setState(() {
                                   _zoomedView = !_zoomedView;
                                   if (_zoomedView) {
                                     _zoomController.value = Matrix4.identity()
-                                      ..translateByDouble(-76.0, -110.0, 0.0, 1.0)
+                                      ..translateByDouble(
+                                        focusDx,
+                                        focusDy,
+                                        0.0,
+                                        1.0,
+                                      )
                                       ..scaleByDouble(1.4, 1.4, 1.0, 1.0);
                                   } else {
                                     _zoomController.value = Matrix4.identity();
@@ -3329,50 +3422,6 @@ class _BattleScreenState extends State<BattleScreen>
                               },
                             ),
                             const SizedBox(width: 5),
-                            ...TacticalConsumable.values.map((item) {
-                              final cnt = p.consumables[item] ?? 0;
-                              final shortLabel = switch (item) {
-                                TacticalConsumable.qiSurgePill => '기공단',
-                                TacticalConsumable.guardianRepairSeal => '수리패',
-                                TacticalConsumable.auroraCritCharm => '극광부',
-                              };
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 5),
-                                child: ActionChip(
-                                  key: Key('use_consumable_${item.name}'),
-                                  visualDensity: VisualDensity.compact,
-                                  avatar: NightSpriteIcon(
-                                    assetPath:
-                                        NightArtRegistry.consumableAsset(item),
-                                    fallbackIcon: Icons.local_pharmacy_rounded,
-                                    size: 16,
-                                    color: cnt > 0
-                                        ? Color(item.colorHex)
-                                        : Colors.grey.shade600,
-                                    dimmed: cnt <= 0,
-                                    borderRadius: 4,
-                                  ),
-                                  label: Text(
-                                    '$shortLabel($cnt)',
-                                    style: TextStyle(
-                                      fontSize: 11.0,
-                                      color: cnt > 0
-                                          ? NightPalette.textPrimary
-                                          : NightPalette.textMuted,
-                                    ),
-                                  ),
-                                  onPressed: cnt > 0
-                                      ? () {
-                                          if (_sim.activateConsumable(item)) {
-                                            widget.controller
-                                                .notifyConsumableUsedInBattle();
-                                            setState(() {});
-                                          }
-                                        }
-                                      : null,
-                                ),
-                              );
-                            }),
                             FilterChip(
                               visualDensity: VisualDensity.compact,
                               selected: _sim.preset.autoUpgradeInBattle,
@@ -3387,7 +3436,7 @@ class _BattleScreenState extends State<BattleScreen>
                               label: Text(
                                 '자동승급',
                                 style: TextStyle(
-                                  fontSize: 11.0,
+                                  fontSize: 10.8,
                                   color: _sim.preset.autoUpgradeInBattle
                                       ? NightPalette.jadeGreen
                                       : NightPalette.textMuted,
@@ -3416,7 +3465,7 @@ class _BattleScreenState extends State<BattleScreen>
                               label: Text(
                                 '자동비급',
                                 style: TextStyle(
-                                  fontSize: 11.0,
+                                  fontSize: 10.8,
                                   color: _sim.autoChoosePerks
                                       ? NightPalette.accentGold
                                       : NightPalette.textMuted,
@@ -3433,61 +3482,120 @@ class _BattleScreenState extends State<BattleScreen>
                                 setState(() {});
                               },
                             ),
-                            const SizedBox(width: 6),
-                            OutlinedButton.icon(
-                              key: const Key('battle_chuldu_btn'),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 5,
-                                ),
-                                backgroundColor: _sim.supportChargesLeft > 0
-                                    ? const Color(0xFF332410)
-                                    : NightPalette.bgDeep,
-                                foregroundColor: _sim.supportChargesLeft > 0
-                                    ? NightPalette.accentGold
-                                    : NightPalette.textMuted,
-                                side: BorderSide(
-                                  color: _sim.supportChargesLeft > 0
-                                      ? NightPalette.accentGold
-                                      : Colors.white24,
-                                  width: 1.3,
-                                ),
-                              ),
-                              onPressed: _sim.supportChargesLeft > 0
-                                  ? () {
-                                      if (_sim.triggerSupportChuldu()) {
-                                        _lastPersistedSupportUsed =
-                                            _sim.usedSupportCount;
-                                        widget.controller
-                                            .notifySupportUsedInBattle();
-                                      }
-                                      setState(() {});
-                                    }
-                                  : null,
-                              icon: NightSpriteIcon(
-                                assetPath: NightArtRegistry.fxChuldu,
-                                fallbackAssetPath:
-                                    NightArtRegistry.nightSupportSeal,
-                                fallbackIcon: Icons.campaign_rounded,
-                                size: 16,
-                                color: _sim.supportChargesLeft > 0
-                                    ? NightPalette.accentGold
-                                    : Colors.white54,
-                                dimmed: _sim.supportChargesLeft <= 0,
-                                borderRadius: 4,
-                              ),
-                              label: Text(
-                                '무림수호단 출두!(${_sim.supportChargesLeft})',
-                                style: const TextStyle(
-                                  fontSize: 10.8,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
                           ],
                         ),
+                      ),
+                      const SizedBox(height: 3),
+
+                      // 3열: 전술 비약 3종(기공단·수리패·극광부) + 우측 고정 [무림수호단 출두!] (전 기기 무스크롤 즉시 클릭 보장!)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: TacticalConsumable.values.map((item) {
+                                  final cnt = p.consumables[item] ?? 0;
+                                  final shortLabel = switch (item) {
+                                    TacticalConsumable.qiSurgePill => '기공단',
+                                    TacticalConsumable.guardianRepairSeal => '수리패',
+                                    TacticalConsumable.auroraCritCharm => '극광부',
+                                  };
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 5),
+                                    child: ActionChip(
+                                      key: Key('use_consumable_${item.name}'),
+                                      visualDensity: VisualDensity.compact,
+                                      avatar: NightSpriteIcon(
+                                        assetPath:
+                                            NightArtRegistry.consumableAsset(item),
+                                        fallbackIcon: Icons.local_pharmacy_rounded,
+                                        size: 15,
+                                        color: cnt > 0
+                                            ? Color(item.colorHex)
+                                            : Colors.grey.shade600,
+                                        dimmed: cnt <= 0,
+                                        borderRadius: 4,
+                                      ),
+                                      label: Text(
+                                        '$shortLabel($cnt)',
+                                        style: TextStyle(
+                                          fontSize: 10.6,
+                                          color: cnt > 0
+                                              ? NightPalette.textPrimary
+                                              : NightPalette.textMuted,
+                                        ),
+                                      ),
+                                      onPressed: cnt > 0
+                                          ? () {
+                                              if (_sim.activateConsumable(item)) {
+                                                _consumablesUsedThisBattle++;
+                                                widget.controller
+                                                    .notifyConsumableUsedInBattle();
+                                                setState(() {});
+                                              }
+                                            }
+                                          : null,
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          OutlinedButton.icon(
+                            key: const Key('battle_chuldu_btn'),
+                            style: OutlinedButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 5,
+                              ),
+                              backgroundColor: _sim.supportChargesLeft > 0
+                                  ? const Color(0xFF332410)
+                                  : NightPalette.bgDeep,
+                              foregroundColor: _sim.supportChargesLeft > 0
+                                  ? NightPalette.accentGold
+                                  : NightPalette.textMuted,
+                              side: BorderSide(
+                                color: _sim.supportChargesLeft > 0
+                                    ? NightPalette.accentGold
+                                    : Colors.white24,
+                                width: 1.3,
+                              ),
+                            ),
+                            onPressed: _sim.supportChargesLeft > 0
+                                ? () {
+                                    if (_sim.triggerSupportChuldu()) {
+                                      _lastPersistedSupportUsed =
+                                          _sim.usedSupportCount;
+                                      widget.controller
+                                          .notifySupportUsedInBattle();
+                                    }
+                                    setState(() {});
+                                  }
+                                : null,
+                            icon: NightSpriteIcon(
+                              assetPath: NightArtRegistry.fxChuldu,
+                              fallbackAssetPath:
+                                  NightArtRegistry.nightSupportSeal,
+                              fallbackIcon: Icons.campaign_rounded,
+                              size: 16,
+                              color: _sim.supportChargesLeft > 0
+                                  ? NightPalette.accentGold
+                                  : Colors.white54,
+                              dimmed: _sim.supportChargesLeft <= 0,
+                              borderRadius: 4,
+                            ),
+                            label: Text(
+                              '무림수호단 출두!(${_sim.supportChargesLeft})',
+                              style: const TextStyle(
+                                fontSize: 10.2,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

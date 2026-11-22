@@ -517,14 +517,18 @@ class GameController extends ChangeNotifier {
   Future<bool> importBackupCode(String rawCode) async {
     final decoded = PlayerProgress.tryDecodeBackupCode(rawCode);
     if (decoded == null) return false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = await prefs.setString(_prefsKey, decoded.encodeJson());
+      if (!saved) return false;
+    } catch (e) {
+      debugPrint('백업 복원 디스크 저장 실패: $e');
+      return false;
+    }
     _progress = decoded;
     selectedChapter = _progress.highestUnlockedChapter;
     _syncPreferencesFromProgress();
     _syncDeviceSettings();
-    final saved = await saveToDisk();
-    if (!saved) {
-      debugPrint('백업 복원 후 디스크 기록 확인 필요 (메모리 상태는 적용됨)');
-    }
     NightAudioController.instance.playAsset('jingle_levelup.ogg');
     NightHaptics.instance.meridianOpen();
     notifyListeners();
@@ -559,6 +563,7 @@ class GameController extends ChangeNotifier {
       difficultyId: selectedDifficulty.id,
       supportAlreadyDeductedInSim: summary.supportDeductedRealtime,
       bossElixirAlreadyIncluded: summary.bossElixirIncluded,
+      convoyBuffAlreadyConsumed: summary.convoyBuffConsumedRealtime,
     );
     saveToDisk();
     notifyListeners();

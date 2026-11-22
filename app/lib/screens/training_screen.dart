@@ -64,7 +64,11 @@ class _TrainingScreenState extends State<TrainingScreen>
     final inGoldenZone = _breathAnim.value >= 0.68;
     final res = widget.controller.meditate(hitGoldenRing: inGoldenZone);
     final tags = <String>[];
-    if (res.wasEnlightenmentBonus) tags.add('오늘의 깨달음 ×6');
+    if (res.wasEnlightenmentBonus) {
+      tags.add(
+        res.wasCriticalSerendipity ? '오늘의 깨달음+각성 ×6' : '오늘의 깨달음 ×3',
+      );
+    }
     if (res.wasCriticalSerendipity) tags.add('⚡대오각성 크리티컬!');
     if (res.wasOneMoreSerendipity) tags.add('🔁기연 · 한 번 더 운기!');
 

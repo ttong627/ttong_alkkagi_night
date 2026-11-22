@@ -662,9 +662,19 @@ class PlayerProgress {
   double get coreFortitudeBonus => (coreStatLevels[CoreStatType.fortitude] ?? 0) * 0.045;
   double get corePrecisionBonus => (coreStatLevels[CoreStatType.precision] ?? 0) * 0.035;
 
+  static bool _isFarFutureClockDrift(String storedDay, String currentDay) {
+    final a = DateTime.tryParse(storedDay);
+    final b = DateTime.tryParse(currentDay);
+    if (a == null || b == null) return false;
+    return a.difference(b).inDays > 180;
+  }
+
   /// 오늘 남은 일일 깨달음(고배율 운기) 횟수 조회 (새로운 날 진입 시 즉시 10회 반환).
   int remainingDailyEnlightenment({String? todayKey}) {
     final day = todayKey ?? _todayString();
+    if (_isFarFutureClockDrift(lastMeditationDayKey, day)) {
+      return 0;
+    }
     if (lastMeditationDayKey.isEmpty || day.compareTo(lastMeditationDayKey) > 0) {
       return 10;
     }
@@ -678,7 +688,11 @@ class PlayerProgress {
     String? todayKey,
   }) {
     final day = todayKey ?? _todayString();
-    if (lastMeditationDayKey.isEmpty || day.compareTo(lastMeditationDayKey) > 0) {
+    if (_isFarFutureClockDrift(lastMeditationDayKey, day)) {
+      // 잘못된 먼 미래 시계(45일 초과)에서 정상 날짜로 복귀한 경우 당일 중복 보상은 막되 내일부터 정상 회복!
+      lastMeditationDayKey = day;
+      dailyEnlightenmentUsed = 10;
+    } else if (lastMeditationDayKey.isEmpty || day.compareTo(lastMeditationDayKey) > 0) {
       lastMeditationDayKey = day;
       dailyEnlightenmentUsed = 0;
     }
@@ -1091,6 +1105,14 @@ class PlayerProgress {
   /// 10) 일일·주간·월간 수호 임무 기록 및 수령 (기기 시계 역행 남용 차단).
   void syncQuestPeriods({String? todayKey}) {
     final day = todayKey ?? _todayString();
+    if (_isFarFutureClockDrift(attendanceDayKey, day)) {
+      attendanceDayKey = day;
+    }
+    if (_isFarFutureClockDrift(dailyQuestDayKey, day)) {
+      dailyQuestDayKey = day;
+      weeklyQuestKey = NightQuestCatalog.weekKeyOf(day);
+      monthlyQuestKey = NightQuestCatalog.monthKeyOf(day);
+    }
     final saneDaily = NightAttendance.saneDayKey(dailyQuestDayKey, day);
     if (saneDaily != day) {
       dailyQuestDayKey = day;
@@ -1399,12 +1421,11 @@ class PlayerProgress {
       }
       if (unlockedStoneNow == null) {
         for (final st in StoneMaterial.values) {
-          if (!st.isShardStone &&
-              st.grade > activePreset.primaryStone.grade &&
-              canUnlockStone(st) &&
-              unlockStoneWithTokens(st)) {
+          if (!st.isShardStone && canUnlockStone(st) && unlockStoneWithTokens(st)) {
             unlockedStoneNow = st;
-            activePreset.primaryStone = st;
+            if (st.grade > activePreset.primaryStone.grade) {
+              activePreset.primaryStone = st;
+            }
             break;
           }
         }
@@ -1583,6 +1604,7 @@ class PlayerProgress {
     String difficultyId = 'normal',
     bool supportAlreadyDeductedInSim = false,
     bool bossElixirAlreadyIncluded = false,
+    bool convoyBuffAlreadyConsumed = false,
     String? todayKey,
   }) {
     lastRescueBanner = null;
@@ -1624,7 +1646,7 @@ class PlayerProgress {
     recordDeed(NightDeed.cliffPporok, safePporok, todayKey: todayKey);
     recordDeed(NightDeed.serendipityHit, safeSeren, todayKey: todayKey);
 
-    if (convoySupplyBuffBattles > 0) {
+    if (!convoyBuffAlreadyConsumed && convoySupplyBuffBattles > 0) {
       convoySupplyBuffBattles--;
     }
 
@@ -1652,11 +1674,15 @@ class PlayerProgress {
           (stage.chapterNumber + totalMutantKills) % CraftMaterial.values.length];
       materials[dropMat] = (materials[dropMat] ?? 0) + 1;
 
-      if (convoyActive && convoyBattlesRemaining > 0) {
-        convoyBattlesRemaining--;
-      }
-      if (exploreActive && exploreBattlesRemaining > 0) {
-        exploreBattlesRemaining--;
+      final countsTowardDispatch = stage.globalIndex >= 900 ||
+          stage.chapterNumber >= max(1, highestUnlockedChapter - 2);
+      if (countsTowardDispatch) {
+        if (convoyActive && convoyBattlesRemaining > 0) {
+          convoyBattlesRemaining--;
+        }
+        if (exploreActive && exploreBattlesRemaining > 0) {
+          exploreBattlesRemaining--;
+        }
       }
 
       if (stage.globalIndex <= CampaignCatalog.allStages.length) {

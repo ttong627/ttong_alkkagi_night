@@ -22,7 +22,7 @@ enum CraftMaterial {
 enum TacticalConsumable {
   qiSurgePill(
     '기공 급속단',
-    '내공 3.0칸 즉시 완충 + 문파 무공 즉시 준비',
+    '내공 최대치(3~4칸) 즉시 완충 + 문파 무공 즉시 준비',
     0xFF34D399,
     {CraftMaterial.moonHerb: 2, CraftMaterial.frostJade: 1},
   ),
@@ -631,7 +631,7 @@ class OddsDisclosureRow {
       category: '전장 기연',
       name: '황금 보급 두꺼비 출현',
       rateText: '전투 중반 100% (판당 1회)',
-      detail: '전투 개시 32초 경과 시 전장 가로질러 등장 · 도탄 적중 시 현장 기력 +45 및 영약 +2 확정',
+      detail: '전투 개시 32초 경과 시 등장 · 포획 시 현장 기력 +45(도탄 포획 시 +65) 및 영약 +2 확정',
     ),
     OddsDisclosureRow(
       category: '출두 · 수련 기연',
@@ -655,7 +655,7 @@ class OddsDisclosureRow {
       category: '전장 소환 · 돌림판',
       name: '도박 초소 소환 (50기력 + 체증)',
       rateText: '3형 신화 6.0% · 2형 희귀 24.0% · 1형 일반 70.0%',
-      detail: '현재 해금된 발사대 계통 내 균등 무작위 강림 · 같은 종류와 형 2곳 유료 연성(24×형수) 시 상위 형 진화',
+      detail: '현재 해금된 발사대 계통 내 균등 무작위 강림 · 같은 종류와 형 2곳 유료 연성(24×형수) 시 상위 형 진화(4형 합체 시 돌림판 +1)',
     ),
     OddsDisclosureRow(
       category: '전장 소환 · 돌림판',
