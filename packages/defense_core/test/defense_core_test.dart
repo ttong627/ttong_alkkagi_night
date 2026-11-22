@@ -18,11 +18,27 @@ String _forgeValidBackupCode(Map<String, dynamic> payloadMap) {
 
 void main() {
   group('캠페인 1~10장 및 재화 분리 검증', () {
-    test('원작과 동일한 1~10장(10장 보스 10연전 포함 총 111단계)이 빈틈없이 구성되어 있다', () {
+    test('원작과 동일한 1~10현(각 현 10판씩 총 100판) 및 9종 현간 대행군 시네마틱 여정이 빈틈없이 구성되어 있다', () {
       expect(CampaignCatalog.chapters.length, 10);
-      expect(CampaignCatalog.allStages.length, 111);
+      expect(CampaignCatalog.allStages.length, 100);
+      for (int c = 1; c <= 10; c++) {
+        final stages = CampaignCatalog.stagesOfChapter(c);
+        expect(stages.length, 10, reason: '제$c현은 정확히 10판이어야 함');
+        for (int s = 0; s < 10; s++) {
+          expect(stages[s].stageNumber, s + 1);
+          expect(stages[s].globalIndex, (c - 1) * 10 + (s + 1));
+          expect(stages[s].villageNodeName.isNotEmpty, isTrue);
+        }
+      }
+      expect(CampaignCatalog.countyTransitions.length, 9);
+      for (int c = 1; c <= 9; c++) {
+        final tr = CampaignCatalog.countyTransitionAfter(c);
+        expect(tr, isNotNull);
+        expect(tr!.fromChapter, c);
+        expect(tr.toChapter, c + 1);
+        expect(tr.motionAssetKey, 'county_travel_${c}_to_${c + 1}');
+      }
       final ch10 = CampaignCatalog.stagesOfChapter(10);
-      expect(ch10.length, 10);
       expect(ch10.every((s) => s.isBossStage), isTrue);
       expect(ch10.last.outroDialogue, isNotEmpty);
     });
@@ -1214,7 +1230,7 @@ void main() {
       final s1End = CampaignCatalog.stageAt(1, 10);
       final s3 = CampaignCatalog.stageAt(3, 8);
       final s6 = CampaignCatalog.stageAt(6, 10);
-      final s9 = CampaignCatalog.stageAt(9, 12);
+      final s9 = CampaignCatalog.stageAt(9, 10);
       final s10 = CampaignCatalog.stageAt(10, 10);
 
       expect(s1.maxMountCount, 4);
@@ -2523,7 +2539,7 @@ void main() {
       }
 
       // 4) 무한 혈전 100물결 다항 스케일링 유한성 및 양수 검증
-      final pEnd = PlayerProgress(highestClearedGlobalStage: 111, realmIndex: 7);
+      final pEnd = PlayerProgress(highestClearedGlobalStage: 100, realmIndex: 7);
       final endStage = EndlessWaveBuilder.buildEndlessStage(
         chapterTheme: 10,
         waveCount: 100,
@@ -2607,9 +2623,9 @@ void main() {
 
       // 4) 수동 어기어석 필살탄 적중 시 보스 타수 마갑 16타 일거 파쇄
       final simEogi = DefenseBattleSim(
-        stage: CampaignCatalog.stageAt(4, 12),
+        stage: CampaignCatalog.stageAt(4, 10),
         difficulty: DefenseDifficulty.normal,
-        progress: PlayerProgress(highestClearedGlobalStage: 45),
+        progress: PlayerProgress(highestClearedGlobalStage: 40),
         seed: 19,
         allowSerendipity: false,
       );
@@ -2794,6 +2810,19 @@ void main() {
       final sumDamaged = simConv.buildSummary();
       expect(sumDamaged.stars, lessThan(3));
       expect(() => sumDamaged.contributions.clear(), throwsUnsupportedError);
+    });
+
+    test('v1.0.0+29 구버전(111판) 세이브 및 별점(4-12 등) 무손실 100판 이관 검증', () {
+      const legacyJson =
+          '{"cleared":111,"stars":{"1-1":3,"2-11":3,"4-10":1,"4-12":3,"9-12":2}}';
+      final migrated = PlayerProgress.decodeJson(legacyJson);
+      expect(migrated.highestClearedGlobalStage, 100);
+      expect(migrated.highestUnlockedChapter, 10);
+      expect(migrated.stageStars['1-1'], 3);
+      expect(migrated.stageStars['2-10'], 3);
+      expect(migrated.stageStars['4-10'], 3);
+      expect(migrated.stageStars['9-10'], 2);
+      expect(migrated.stageStars.containsKey('4-12'), isFalse);
     });
   });
 }

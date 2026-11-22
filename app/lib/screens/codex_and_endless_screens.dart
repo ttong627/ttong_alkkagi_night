@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
-import 'battle_screen.dart';
+import 'stage_and_county_transitions.dart';
 
 /// 수호 도감(초정밀 돌연변이 해부 · 전신 영웅 갤러리 · 세트 도감력) · 확률 100% 공개 · 심야 무한 혈전.
 class CodexScreen extends StatelessWidget {
@@ -13,11 +13,13 @@ class CodexScreen extends StatelessWidget {
     required this.controller,
     this.embeddedInShell = false,
     this.initialTab = 0,
+    this.onSwitchShellTab,
   });
 
   final GameController controller;
   final bool embeddedInShell;
   final int initialTab;
+  final ValueChanged<int>? onSwitchShellTab;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +75,12 @@ class CodexScreen extends StatelessWidget {
             body: NightSceneBackdrop(
               child: Column(
                 children: [
+                  QuickPlayAndMenuBar(
+                    controller: controller,
+                    currentSection: 'codex',
+                    embeddedInShell: embeddedInShell,
+                    onSwitchShellTab: onSwitchShellTab,
+                  ),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
@@ -903,9 +911,19 @@ class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
             assetPath: selectedChapter.bgAsset,
             fallbackAssetPath: NightArtRegistry.bgNightLobby,
             overlayOpacity: 0.76,
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            child: Column(
               children: [
+                QuickPlayAndMenuBar(
+                  controller: widget.controller,
+                  currentSection: 'endless',
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 18,
+                    ),
+                    children: [
                 // 1) 상단 시네마틱 주인공: 황금 기마대 대 뿔 괴수 해일 결전 배너
                 Center(
                   child: ConstrainedBox(
@@ -1039,11 +1057,9 @@ class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
                                   chapterTheme: _selectedThemeChapter,
                                 );
                                 Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => BattleScreen(
-                                      controller: widget.controller,
-                                      stage: stage,
-                                    ),
+                                  buildSmoothBattleRoute(
+                                    controller: widget.controller,
+                                    stage: stage,
                                   ),
                                 );
                               },
@@ -1064,6 +1080,9 @@ class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
                         ],
                       ),
                     ),
+                  ),
+                ),
+              ],
                   ),
                 ),
               ],

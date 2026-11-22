@@ -267,7 +267,32 @@ class WaveSpawnGroup {
   final String? hierarchyRank;
 }
 
-/// 개별 스테이지 명세.
+/// 현(縣) 정화 완료 후 다음 현으로 대행군할 때 재생되는 시네마틱 여정 명세 (1→2현 ~ 9→10현 총 9종 완전 고유 구성!).
+class CountyTransitionSpec {
+  const CountyTransitionSpec({
+    required this.fromChapter,
+    required this.toChapter,
+    required this.fromCountyName,
+    required this.toCountyName,
+    required this.travelTitle,
+    required this.travelVehicleBadge,
+    required this.motionAssetKey,
+    required this.narrationLines,
+    required this.unlockHighlight,
+  });
+
+  final int fromChapter;
+  final int toChapter;
+  final String fromCountyName;
+  final String toCountyName;
+  final String travelTitle;
+  final String travelVehicleBadge;
+  final String motionAssetKey;
+  final List<String> narrationLines;
+  final String unlockHighlight;
+}
+
+/// 개별 스테이지(현내 1~10번 마을 관문) 명세.
 class StageSpec {
   const StageSpec({
     required this.chapterNumber,
@@ -282,6 +307,8 @@ class StageSpec {
     required this.waves,
     required this.clearElixirBonus,
     required this.isBossStage,
+    this.villageNodeName = '',
+    this.villageMapCoord = const Vec2(0.5, 0.5),
     this.maxMountCount = 6,
     this.rescueCompanion,
     this.rescueBeast,
@@ -302,6 +329,12 @@ class StageSpec {
   final List<List<WaveSpawnGroup>> waves;
   final int clearElixirBonus;
   final bool isBossStage;
+
+  /// 해당 현(縣) 안에서의 고유 마을·요충지 명칭 (1번 초입 마을 ~ 10번 현청 본전).
+  final String villageNodeName;
+
+  /// 현내 10개 마을 행군 지도에서의 정규화 좌표 (0.0~1.0).
+  final Vec2 villageMapCoord;
 
   /// 이 관문에서 배치 가능한 길목 초소 발판 수 (1-1의 4곳에서 시작해 9~10장 결전의 14곳까지 점진 확장!).
   final int maxMountCount;
@@ -609,9 +642,283 @@ class ChapterSpec {
     ];
     return _catmullSplineUniform(raw);
   }
+
+  /// 각 장(1~10장)을 아우르는 대행정 구역 「현(縣)」 정식 명칭.
+  String get countyName => switch (number) {
+        1 => '제1현 · 청산 흙먼지현',
+        2 => '제2현 · 통통 객잔현',
+        3 => '제3현 · 청옥 거북장터현',
+        4 => '제4현 · 쿠비 봉화산현',
+        5 => '제5현 · 황동 기관학당현',
+        6 => '제6현 · 만년설 백옥무림현',
+        7 => '제7현 · 적월 열사사막현',
+        8 => '제8현 · 창파 등대함대현',
+        9 => '제9현 · 흑요 적염화산현',
+        _ => '제10현 · 천상 태극신전현',
+      };
+
+  String get shortCountyName => countyName.split(' · ').last;
+
+  static const Map<int, List<String>> _countyVillageNames = {
+    1: [
+      '산기슭 입구촌',
+      '솔바람 약초막',
+      '폭포 물레방아터',
+      '바위고개 약초마을',
+      '청석 비탈촌',
+      '절벽 숯가마터',
+      '비룡 협곡 나루',
+      '청명 도관 마을',
+      '뒷산 곡창 목책',
+      '흙먼지 신당 본촌',
+    ],
+    2: [
+      '북문 장승거리',
+      '등불 주막촌',
+      '기름 방앗간 마을',
+      '교차로 마구간촌',
+      '금강 우물 장터',
+      '남쪽 쌀자루 거리',
+      '야간 포목 골목',
+      '동문 수레 정류장',
+      '대곡창 외성 마을',
+      '통통 객잔 본채',
+    ],
+    3: [
+      '청옥 수문 나루',
+      '초승달 어시장',
+      '종자 창고 마을',
+      '연등 다리목촌',
+      '취선 양조장 마을',
+      '버드나무 수로촌',
+      '우시장 목책 마을',
+      '비단 포구 거리',
+      '중앙 석교 장터',
+      '거북 현청 대장터',
+    ],
+    4: [
+      '야성 대숲 초입',
+      '출렁다리 산막',
+      '천년고목 사냥촌',
+      '절벽 횃불 초소',
+      '묵객 암각화 마을',
+      '산마루 목재소',
+      '구름 안개 다락촌',
+      '독수리 망루촌',
+      '산채 외곽 성책',
+      '쿠비 대봉화 본채',
+    ],
+    5: [
+      '태엽 외성 관문',
+      '황동 수차 마을',
+      '증기 대장간 거리',
+      '직각 회랑 기숙촌',
+      '설화 빙기 연구소',
+      '청동 종루 마을',
+      '기맥 도관 광장',
+      '톱니 승강기 초소',
+      '내성 방호벽 구역',
+      '로직 기관학당 본전',
+    ],
+    6: [
+      '설원 초입 역참',
+      '빙하 협곡 마을',
+      '한옥 온천 산장',
+      '서리 소나무 촌락',
+      '백호 설산 제단',
+      '백옥 석교 마을',
+      '무림맹 연무장촌',
+      '장로원 외곽 마을',
+      '호법 금강문 거리',
+      '백옥 무림맹 대광장',
+    ],
+    7: [
+      '모래폭풍 초소촌',
+      '붉은 바위 협곡촌',
+      '선인장 우물 마을',
+      '낙타 대상 숙영지',
+      '고대 사구 유적촌',
+      '마교 흑사 오아시스',
+      '열사 절벽 동굴촌',
+      '일월 성화대 마을',
+      '적사 외성 성문촌',
+      '일월 절벽성채 본전',
+    ],
+    8: [
+      '해안 방파제 어촌',
+      '달빛 조선소 마을',
+      '갑판 보급 부두',
+      '검은 파도 암초진',
+      '금룡 해신 사당촌',
+      '구호 곡식 선창가',
+      '전함 연결 잔교촌',
+      '쌍둥이 봉화 방어항',
+      '기함 호위 선단',
+      '구호 대등대 본항',
+    ],
+    9: [
+      '검은 재 산기슭촌',
+      '용암 개울 대장촌',
+      '유황 온천 대피소',
+      '사슬 현수교 관문',
+      '흑요석 광산 마을',
+      '신승 금강 암자촌',
+      '업화 분화구 초소',
+      '적염 결계석 마을',
+      '화산 외성 성채',
+      '적염 봉인신전 본단',
+    ],
+    10: [
+      '운해 승천 초입문',
+      '청산 성좌 부유대',
+      '객잔 성좌 부유대',
+      '장터 성좌 부유대',
+      '봉화 성좌 부유대',
+      '기관 성좌 부유대',
+      '백옥 성좌 부유대',
+      '열사·창파 성좌대',
+      '적염 성좌 회랑',
+      '태초 태극석 본전',
+    ],
+  };
+
+  /// 현내 1~10번 마을 고유 명칭 조회.
+  String villageNodeNameAt(int stageNumber) {
+    final names = _countyVillageNames[number] ?? _countyVillageNames[1]!;
+    return names[(stageNumber - 1).clamp(0, names.length - 1)];
+  }
+
+  /// 각 현의 고유 지형 경로(대각 산길·X교차·3운하·나선절벽·직각미궁·양면광장·역진격사막·해상함대·화산사슬·천상부유섬)를 따라 배치된 10개 마을 정규화 지도 좌표!
+  static const Map<int, List<Vec2>> _countyVillageMapCoords = {
+    1: [
+      Vec2(0.16, 0.16),
+      Vec2(0.30, 0.24),
+      Vec2(0.48, 0.30),
+      Vec2(0.68, 0.36),
+      Vec2(0.54, 0.46),
+      Vec2(0.32, 0.53),
+      Vec2(0.22, 0.64),
+      Vec2(0.38, 0.72),
+      Vec2(0.56, 0.79),
+      Vec2(0.74, 0.85),
+    ],
+    2: [
+      Vec2(0.14, 0.18),
+      Vec2(0.84, 0.18),
+      Vec2(0.28, 0.34),
+      Vec2(0.70, 0.34),
+      Vec2(0.50, 0.48),
+      Vec2(0.24, 0.60),
+      Vec2(0.76, 0.60),
+      Vec2(0.36, 0.73),
+      Vec2(0.64, 0.75),
+      Vec2(0.50, 0.86),
+    ],
+    3: [
+      Vec2(0.22, 0.16),
+      Vec2(0.52, 0.16),
+      Vec2(0.82, 0.20),
+      Vec2(0.74, 0.36),
+      Vec2(0.48, 0.38),
+      Vec2(0.24, 0.42),
+      Vec2(0.38, 0.58),
+      Vec2(0.68, 0.62),
+      Vec2(0.46, 0.76),
+      Vec2(0.22, 0.84),
+    ],
+    4: [
+      Vec2(0.84, 0.16),
+      Vec2(0.84, 0.44),
+      Vec2(0.80, 0.76),
+      Vec2(0.52, 0.84),
+      Vec2(0.20, 0.80),
+      Vec2(0.16, 0.50),
+      Vec2(0.22, 0.22),
+      Vec2(0.52, 0.22),
+      Vec2(0.64, 0.42),
+      Vec2(0.48, 0.54),
+    ],
+    5: [
+      Vec2(0.16, 0.16),
+      Vec2(0.52, 0.16),
+      Vec2(0.52, 0.34),
+      Vec2(0.20, 0.34),
+      Vec2(0.20, 0.56),
+      Vec2(0.62, 0.56),
+      Vec2(0.82, 0.56),
+      Vec2(0.82, 0.74),
+      Vec2(0.46, 0.76),
+      Vec2(0.72, 0.86),
+    ],
+    6: [
+      Vec2(0.50, 0.14),
+      Vec2(0.24, 0.24),
+      Vec2(0.76, 0.24),
+      Vec2(0.18, 0.84),
+      Vec2(0.82, 0.84),
+      Vec2(0.32, 0.70),
+      Vec2(0.68, 0.70),
+      Vec2(0.28, 0.46),
+      Vec2(0.72, 0.46),
+      Vec2(0.50, 0.50),
+    ],
+    7: [
+      Vec2(0.20, 0.86),
+      Vec2(0.80, 0.86),
+      Vec2(0.34, 0.72),
+      Vec2(0.66, 0.72),
+      Vec2(0.50, 0.58),
+      Vec2(0.22, 0.46),
+      Vec2(0.78, 0.46),
+      Vec2(0.36, 0.32),
+      Vec2(0.64, 0.30),
+      Vec2(0.50, 0.16),
+    ],
+    8: [
+      Vec2(0.84, 0.16),
+      Vec2(0.66, 0.24),
+      Vec2(0.78, 0.38),
+      Vec2(0.54, 0.42),
+      Vec2(0.34, 0.48),
+      Vec2(0.64, 0.60),
+      Vec2(0.44, 0.66),
+      Vec2(0.24, 0.68),
+      Vec2(0.42, 0.80),
+      Vec2(0.20, 0.86),
+    ],
+    9: [
+      Vec2(0.50, 0.15),
+      Vec2(0.24, 0.28),
+      Vec2(0.76, 0.28),
+      Vec2(0.50, 0.44),
+      Vec2(0.22, 0.56),
+      Vec2(0.78, 0.56),
+      Vec2(0.54, 0.68),
+      Vec2(0.74, 0.78),
+      Vec2(0.44, 0.82),
+      Vec2(0.22, 0.86),
+    ],
+    10: [
+      Vec2(0.20, 0.18),
+      Vec2(0.44, 0.16),
+      Vec2(0.72, 0.22),
+      Vec2(0.82, 0.38),
+      Vec2(0.60, 0.46),
+      Vec2(0.34, 0.48),
+      Vec2(0.18, 0.60),
+      Vec2(0.42, 0.68),
+      Vec2(0.70, 0.72),
+      Vec2(0.50, 0.85),
+    ],
+  };
+
+  Vec2 villageMapCoordAt(int stageNumber) {
+    final pts = _countyVillageMapCoords[number] ?? _countyVillageMapCoords[1]!;
+    return pts[(stageNumber - 1).clamp(0, pts.length - 1)];
+  }
 }
 
-/// 《수호알까기 · 탄지무림 심야기습》 1~10장(총 111단계) 720×1360 개별 지형 보정 캠페인 생성기.
+/// 《수호알까기 · 탄지무림 심야기습》 1~10현(각 현 10마을 = 총 100판) 720×1360 개별 지형 보정 캠페인 생성기.
 class CampaignCatalog {
   static const double arenaWidth = 720.0;
   static const double arenaHeight = 1360.0;
@@ -784,7 +1091,7 @@ class CampaignCatalog {
           '북쪽 객잔 본관 대신 좌·우 측면 성문 두 곳에서 동시에 쏟아져 나온 탐식 변이군이 한복판 X자 사거리를 교차 돌파하며 하단 청동 화로를 덮친다!',
       unlockNotice: '물자 호송 시스템 정식 개통 · 동료 반달 합류 · 곡사 회전기 개방',
       surfaceFriction: 0.68,
-      stageCount: 11,
+      stageCount: 10,
       towerPos: const Vec2(360, 1084),
       granaryPos: const Vec2(268, 845),
       cropsPos: const Vec2(452, 845),
@@ -905,7 +1212,7 @@ class CampaignCatalog {
           '북쪽 세 개의 수문에서 쏟아져 내려온 자객 변이군이 3개의 일자 청옥 운하 섬과 아치형 반달 다리를 종횡으로 건너 좌하단 거대 현무 반도를 노린다!',
       unlockNotice: '전국 호송망 확장 · 영수 영귀 금강 개방 · 한빙 역장기 개방',
       surfaceFriction: 0.95,
-      stageCount: 11,
+      stageCount: 10,
       towerPos: const Vec2(172, 1042),
       granaryPos: const Vec2(628, 885),
       cropsPos: const Vec2(488, 1185),
@@ -1078,7 +1385,7 @@ class CampaignCatalog {
           '우상단 산채 성문을 뚫은 변이 대군이 전장 네 변의 천길 절벽길과 3아치 석교·출렁다리를 시계방향 대나선으로 일주해 한복판 정중앙 봉화 요새를 포위한다!',
       unlockNotice: '심야 탐색 시스템 정식 개통 · 둘째 문양(동행) · 동료 구르미 합류',
       surfaceFriction: 1.00,
-      stageCount: 12,
+      stageCount: 10,
       towerPos: const Vec2(365, 672),
       granaryPos: const Vec2(282, 575),
       cropsPos: const Vec2(462, 595),
@@ -1227,7 +1534,7 @@ class CampaignCatalog {
           '곡선이 단 하나도 없는 90도 직각 대리석·황동 태엽 미궁 복도를 따라 기관 변이 대군이 직각 행군하며 우하단 청옥 천구의 코어를 노린다!',
       unlockNotice: '내공 증폭기 개방 · 셋째 문양(자동 어기어석) · 동료 정각 합류',
       surfaceFriction: 0.78,
-      stageCount: 11,
+      stageCount: 10,
       towerPos: const Vec2(512, 1052),
       granaryPos: const Vec2(95, 1045),
       cropsPos: const Vec2(95, 1215),
@@ -1395,7 +1702,7 @@ class CampaignCatalog {
           '북쪽 설산 계단과 남쪽 만년 빙하 협곡 위·아래 양면에서 동시에 변이 대군이 몰려와 정중앙 백옥 대광장을 겹겹이 포위한다! 사형 묵현을 구원하라!',
       unlockNotice: '황금 지원패(무림수호단 출두야~~!!) 완성 · 동료 용아 및 위기 난입 묵현 합류',
       surfaceFriction: 0.76,
-      stageCount: 12,
+      stageCount: 10,
       towerPos: const Vec2(360, 596),
       granaryPos: const Vec2(64, 565),
       cropsPos: const Vec2(360, 468),
@@ -1520,7 +1827,7 @@ class CampaignCatalog {
           '화면 맨 아래 남쪽 모래폭풍 성문 두 곳에서 역방향으로 치고 올라오는 변이 대군이 거대 8자(∞) 오아시스 다리를 교차 등반해 최상단 일월 성채를 공격한다!',
       unlockNotice: '4형(극의) 발사대 제련 완성 · 천마 화신 영입 개방',
       surfaceFriction: 1.12,
-      stageCount: 11,
+      stageCount: 10,
       towerPos: const Vec2(360, 212),
       granaryPos: const Vec2(76, 138),
       cropsPos: const Vec2(92, 198),
@@ -1678,7 +1985,7 @@ class CampaignCatalog {
           '거친 밤바다 우상단 해적 돌격선에서 넘어온 심해 변이 대군이 사선으로 연결된 4척의 거대 전함 갑판과 도교를 지그재그로 돌파해 좌하단 석조 등대 구호항을 습격한다!',
       unlockNotice: '영수 천룡 금룡 개방 · 동료 검황 영입 개방',
       surfaceFriction: 0.82,
-      stageCount: 11,
+      stageCount: 10,
       towerPos: const Vec2(172, 1148),
       granaryPos: const Vec2(242, 1138),
       cropsPos: const Vec2(358, 1185),
@@ -1847,7 +2154,7 @@ class CampaignCatalog {
           '시뻘겋게 끓는 용암 바다 위 6개의 육각 흑요석 화산섬을 잇는 쇠사슬 현수교 거미줄을 건너 심연염마왕(1,000타+) 군단이 좌하단 적염 봉인 신전으로 진격한다!',
       unlockNotice: '한철·신물 수호석 제련 극대화 · 동료 무량 신승 개방 · 천상 계단 개통',
       surfaceFriction: 0.90,
-      stageCount: 12,
+      stageCount: 10,
       towerPos: const Vec2(202, 1098),
       granaryPos: const Vec2(535, 875),
       cropsPos: const Vec2(555, 985),
@@ -2215,7 +2522,144 @@ class CampaignCatalog {
     return null;
   }
 
-  /// 관문이 진행될수록 배치 가능한 광역 지형 초소 장소가 4곳(1-1)에서 최대 14곳(9~10장)까지 점진적으로 늘어난다!
+  /// 제1현~제9현 정화 완료 시 다음 현으로 대행군하는 9종 시네마틱 여정 카탈로그.
+  static const List<CountyTransitionSpec> countyTransitions = [
+    CountyTransitionSpec(
+      fromChapter: 1,
+      toChapter: 2,
+      fromCountyName: '제1현 · 청산 흙먼지현',
+      toCountyName: '제2현 · 통통 객잔현',
+      travelTitle: '제1현 정화 완수 · 등불 보급마차 하산 행군',
+      travelVehicleBadge: '🏮 야간 청옥 보급마차단',
+      motionAssetKey: 'county_travel_1_to_2',
+      narrationLines: [
+        '청산 흙먼지현 10개 마을의 산비탈 독기가 걷히고, 백성들이 등불을 밝혀 수호단을 배웅합니다.',
+        '청옥 수호석을 실은 야간 보급마차단이 폭포 산길을 내려가 식량 요충지 「통통 객잔현」 대교차로로 진군합니다!',
+      ],
+      unlockHighlight: '물자 호송 마차 개통 · 곡사 회전기 개방 · 동료 반달 & 영귀 금강 구출 개시',
+    ),
+    CountyTransitionSpec(
+      fromChapter: 2,
+      toChapter: 3,
+      fromCountyName: '제2현 · 통통 객잔현',
+      toCountyName: '제3현 · 청옥 거북장터현',
+      travelTitle: '제2현 정화 완수 · 청옥 운하 나룻배 도하',
+      travelVehicleBadge: '⛵ 연등 수문 나룻배 선단',
+      motionAssetKey: 'county_travel_2_to_3',
+      narrationLines: [
+        '통통 객잔현 대곡창을 지켜낸 수호단이 연꽃 등불이 떠다니는 밤안개 수로에 나룻배를 띄웁니다.',
+        '거대 청옥 현무 석상이 수호하는 세 물길의 상업 거점 「청옥 거북장터현」으로 물길을 가릅니다!',
+      ],
+      unlockHighlight: '한빙 역장기 개방 · 영수 청학 구출 · 숙적 사형 묵현 첫 조우',
+    ),
+    CountyTransitionSpec(
+      fromChapter: 3,
+      toChapter: 4,
+      fromCountyName: '제3현 · 청옥 거북장터현',
+      toCountyName: '제4현 · 쿠비 봉화산현',
+      travelTitle: '제3현 정화 완수 · 천길 절벽 횃불 등반',
+      travelVehicleBadge: '🔥 산악 출렁다리 횃불대',
+      motionAssetKey: 'county_travel_3_to_4',
+      narrationLines: [
+        '거북장터현의 운하와 우시장이 평온을 되찾자, 산꼭대기 봉화대에서 구원 신호탄이 밤하늘을 가릅니다!',
+        '수호단이 횃불을 높이 들고 아찔한 절벽 잔도와 출렁다리를 건너 「쿠비 봉화산현」 요새로 오릅니다!',
+      ],
+      unlockHighlight: '심야 탐색 시스템 개통 · 고지 봉화 전방위 사거리 가호 · 동료 묵객·구르미 합류',
+    ),
+    CountyTransitionSpec(
+      fromChapter: 4,
+      toChapter: 5,
+      fromCountyName: '제4현 · 쿠비 봉화산현',
+      toCountyName: '제5현 · 황동 기관학당현',
+      travelTitle: '제4현 정화 완수 · 황동 시계태엽 대교 진군',
+      travelVehicleBadge: '⚙️ 기맥 증기 태엽교 행군',
+      motionAssetKey: 'county_travel_4_to_5',
+      narrationLines: [
+        '쿠비 봉화산현의 봉화가 일제히 점화되어 동방 산맥 너머 기관 성채의 길목을 환히 비춥니다.',
+        '거대한 황동 톱니바퀴와 청색 기맥 도관이 맞물려 돌아가는 태엽 대교를 건너 「황동 기관학당현」에 입성합니다!',
+      ],
+      unlockHighlight: '내공 증폭기 개방 · 직각 반사 도탄 미궁 · 동료 설화·정각 구출',
+    ),
+    CountyTransitionSpec(
+      fromChapter: 5,
+      toChapter: 6,
+      fromCountyName: '제5현 · 황동 기관학당현',
+      toCountyName: '제6현 · 만년설 백옥무림현',
+      travelTitle: '제5현 정화 완수 · 만년설 빙하 협곡 돌파',
+      travelVehicleBadge: '❄️ 호신강기 설원 선봉대',
+      motionAssetKey: 'county_travel_5_to_6',
+      narrationLines: [
+        '기관학당현의 천구의가 심야 독기의 중심축이 북방 설산 무림맹 본단에 있음을 가리킵니다.',
+        '황금 호신강기로 칼바람 눈보라를 가르며 얼음 협곡을 돌파해 「만년설 백옥무림현」 대광장으로 향합니다!',
+      ],
+      unlockHighlight: '무림수호단 황금 지원패 완성 · 영수 백호 & 동료 용아·사형 묵현 귀순 합류',
+    ),
+    CountyTransitionSpec(
+      fromChapter: 6,
+      toChapter: 7,
+      fromCountyName: '제6현 · 만년설 백옥무림현',
+      toCountyName: '제7현 · 적월 열사사막현',
+      travelTitle: '제6현 정화 완수 · 적월 열사 사막 기마 원정',
+      travelVehicleBadge: '🐪 신수 백호 · 사막 기마단',
+      motionAssetKey: 'county_travel_6_to_7',
+      narrationLines: [
+        '백옥무림현에서 독기를 씻어낸 사형 묵현과 무림수호단이 합류하여 서역 대원정의 깃발을 올립니다!',
+        '붉은 보름달 아래 신수 백호가 앞장서 모래폭풍 사구와 붉은 바위 아치를 넘어 「적월 열사사막현」으로 질주합니다!',
+      ],
+      unlockHighlight: '역방향 8자 사막 협곡 공방 · 4형 극의 발사대 제련 · 천마 화신 합류',
+    ),
+    CountyTransitionSpec(
+      fromChapter: 7,
+      toChapter: 8,
+      fromCountyName: '제7현 · 적월 열사사막현',
+      toCountyName: '제8현 · 창파 등대함대현',
+      travelTitle: '제7현 정화 완수 · 황금 거북선 구호함대 출항',
+      travelVehicleBadge: '🚢 용두 거북선 구호 기함',
+      motionAssetKey: 'county_travel_7_to_8',
+      narrationLines: [
+        '열사사막현 성채를 구원한 수호단이 남해 포구에서 황금 기맥 돛을 올린 거북선 구호 기함에 승선합니다!',
+        '거친 심야 파도를 가르며 등대 불빛이 비추는 바다의 보루 「창파 등대함대현」으로 총진격합니다!',
+      ],
+      unlockHighlight: '해상 4전함 갑판 현측 포격 · 영수 금룡 & 동료 검황 구출 합류',
+    ),
+    CountyTransitionSpec(
+      fromChapter: 8,
+      toChapter: 9,
+      fromCountyName: '제8현 · 창파 등대함대현',
+      toCountyName: '제9현 · 흑요 적염화산현',
+      travelTitle: '제8현 정화 완수 · 용암 지옥 사슬현수교 돌파',
+      travelVehicleBadge: '⛓️ 청학·현무 호위 화산 돌파대',
+      motionAssetKey: 'county_travel_8_to_9',
+      narrationLines: [
+        '구호 함대가 지켜낸 곡식선이 아홉 현 백성들에게 닿고, 수호단은 마침내 지상의 마지막 마굴 화염산에 상륙합니다.',
+        '신수 청학과 금강귀의 비호를 받으며 끓어오르는 용암 강 위 쇠사슬 다리를 건너 「흑요 적염화산현」 심장부로 진군합니다!',
+      ],
+      unlockHighlight: '6화산섬 용암 분출 결전 · 신물 수호석 완성 · 동료 무량 신승 합류',
+    ),
+    CountyTransitionSpec(
+      fromChapter: 9,
+      toChapter: 10,
+      fromCountyName: '제9현 · 흑요 적염화산현',
+      toCountyName: '제10현 · 천상 태극신전현',
+      travelTitle: '제9현 정화 완수 · 황금 비룡 오색 운해 승천',
+      travelVehicleBadge: '🐉 천룡 금룡 · 오색 옥계단 승천',
+      motionAssetKey: 'county_travel_9_to_10',
+      narrationLines: [
+        '지상 아홉 현(90개 마을)의 봉인이 모두 정화되자, 하늘로 통하는 오색 청옥 구름 계단이 찬란하게 열립니다!',
+        '황금 신룡과 열네 수호 영웅이 은하 운해를 박차고 마지막 10연전이 기다리는 「천상 태극신전현」으로 승천합니다!',
+      ],
+      unlockHighlight: '최종 제10현 천상 보스 10연전(91~100판) 개막 · 태초 태극석 완전 정화 결전!',
+    ),
+  ];
+
+  static CountyTransitionSpec? countyTransitionAfter(int clearedChapter) {
+    for (final t in countyTransitions) {
+      if (t.fromChapter == clearedChapter) return t;
+    }
+    return null;
+  }
+
+  /// 관문이 진행될수록 배치 가능한 광역 지형 초소 장소가 4곳(1-1)에서 최대 14곳(9~10현)까지 점진적으로 늘어난다!
   static int _maxMountCountFor(int ch, int st) {
     switch (ch) {
       case 1:
@@ -2227,42 +2671,42 @@ class CampaignCatalog {
       case 3:
         return st <= 5 ? 7 : 8;
       case 4:
-        return st <= 6 ? 8 : 9;
+        return st <= 5 ? 8 : 9;
       case 5:
         return st <= 5 ? 9 : 10;
       case 6:
-        return st <= 6 ? 10 : 11;
+        return st <= 5 ? 10 : 11;
       case 7:
         return st <= 5 ? 11 : 12;
       case 8:
         return st <= 5 ? 12 : 13;
       case 9:
-        return st <= 6 ? 13 : 14;
+        return st <= 5 ? 13 : 14;
       default:
         return st <= 4 ? 13 : 14;
     }
   }
 
-  /// 1~9장 캠페인 전반에 걸쳐 동료 13인과 영수 4종을 지속적으로 구출·영입하는 시간표.
+  /// 1~9현(각 10판) 캠페인 전반에 걸쳐 동료 13인과 영수 4종을 빈틈없이 구출·영입하는 정밀 시간표 (총 16개 구출 관문).
   static CompanionHero? _rescueCompanionFor(int ch, int st) {
     if (ch == 1 && st == 4) return CompanionHero.yeonbi;
     if (ch == 1 && st == 8) return CompanionHero.cheongmyeong;
-    if (ch == 2 && st == 11) return CompanionHero.bandal;
+    if (ch == 2 && st == 10) return CompanionHero.bandal;
     if (ch == 3 && st == 5) return CompanionHero.chwiseon;
     if (ch == 4 && st == 5) return CompanionHero.mukgaek;
-    if (ch == 4 && st == 12) return CompanionHero.gurumi;
+    if (ch == 4 && st == 10) return CompanionHero.gurumi;
     if (ch == 5 && st == 5) return CompanionHero.seolhwa;
-    if (ch == 5 && st == 11) return CompanionHero.jeonggak;
-    if (ch == 6 && st == 12) return CompanionHero.yonga;
+    if (ch == 5 && st == 10) return CompanionHero.jeonggak;
+    if (ch == 6 && st == 10) return CompanionHero.yonga;
     if (ch == 7 && st == 6) return CompanionHero.magyo;
-    if (ch == 8 && st == 11) return CompanionHero.geomhwang;
+    if (ch == 8 && st == 10) return CompanionHero.geomhwang;
     if (ch == 9 && st == 6) return CompanionHero.sinseung;
     return null;
   }
 
   static SpiritBeast? _rescueBeastFor(int ch, int st) {
     if (ch == 2 && st == 5) return SpiritBeast.geumgangTurtle;
-    if (ch == 3 && st == 11) return SpiritBeast.cheonghak;
+    if (ch == 3 && st == 10) return SpiritBeast.cheonghak;
     if (ch == 6 && st == 5) return SpiritBeast.baekho;
     if (ch == 8 && st == 5) return SpiritBeast.geumryong;
     return null;
@@ -2280,17 +2724,21 @@ class CampaignCatalog {
           final isFinalGod = st == 10;
           final refChapter = isFinalGod ? ch : chapters[st - 1];
           final mountCap = _maxMountCountFor(10, st).clamp(1, ch.mounts.length);
+          final vName = ch.villageNodeNameAt(st);
+          final vCoord = ch.villageMapCoordAt(st);
           result.add(
             StageSpec(
               chapterNumber: 10,
               stageNumber: st,
               globalIndex: globalIdx,
+              villageNodeName: vName,
+              villageMapCoord: vCoord,
               title: isFinalGod
-                  ? '최종 관문 · 오염된 태초 탄신 구원'
-                  : '천상 $st관문 · ${refChapter.bossName} 심야 환영',
+                  ? '10-10 최종 결전 · 태초 탄신 구원 ($vName)'
+                  : '10-$st 천상 관문 · ${refChapter.bossName} 환영 ($vName)',
               subtitle: isFinalGod
-                  ? '태극석의 균열을 메워 열 마을의 논밭과 생명을 되살려라! (8물결 · 초소 $mountCap곳)'
-                  : '${refChapter.villageName} 우두머리의 심야 환영 8물결 혈전 · 초소 $mountCap곳 개방',
+                  ? '태극석의 균열을 메워 열 현 백 마을의 논밭과 생명을 되살려라! (8물결 · 초소 $mountCap곳)'
+                  : '$vName · ${refChapter.villageName} 우두머리 심야 환영 8물결 혈전 (초소 $mountCap곳)',
               tacticalHint: isFinalGod
                   ? '14곳 성좌 지형 거점의 마기 암석을 개척하고, 3페이즈 다단 각성하는 태초 탄신의 🎯약점 핵을 정밀 저격해 외각 장갑을 파쇄하세요!'
                   : '일곱 성좌 부유섬 황금 무지개교의 망루·매복암을 개척하고 3페이즈 우두머리의 🎯노출 약점을 집중 타격하세요!',
@@ -2330,14 +2778,14 @@ class CampaignCatalog {
                           StoryLine(
                             speaker: '촌장',
                             portraitPrefix: 'chonjang',
-                            text: '열 마을 백성들의 염원이 모두 네 수호탑에 모여 있다! 마지막 여덟 물결을 버텨 새벽을 밝혀라!',
+                            text: '열 현 백 마을 백성들의 염원이 모두 네 수호탑에 모여 있다! 마지막 여덟 물결을 버텨 새벽을 밝혀라!',
                           ),
                         ]
                       : [
                           StoryLine(
                             speaker: '묵현',
                             portraitPrefix: 'mukhyeon',
-                            text: '천상 제$st관문! 과거 [${refChapter.villageName}]을 위협했던 「${refChapter.bossName}」의 심야 환영이 3페이즈 진신으로 가로막고 있다!',
+                            text: '천상 제$st관문 [$vName]! 과거 [${refChapter.villageName}]을 위협했던 「${refChapter.bossName}」의 심야 환영이 3페이즈 진신으로 가로막고 있다!',
                           ),
                         ],
               outroDialogue: isFinalGod
@@ -2346,7 +2794,7 @@ class CampaignCatalog {
                       StoryLine(
                         speaker: '청명',
                         portraitPrefix: 'cheongmyeong',
-                        text: '「${refChapter.bossName}」의 천상 독기 환영을 정화했습니다! 태극석 신전 정상까지 ${10 - st}관문 남았습니다!',
+                        text: '「${refChapter.bossName}」의 천상 독기 환영을 정화했습니다! 태극석 신전 정상까지 ${10 - st}판 남았습니다!',
                       ),
                     ],
             ),
@@ -2355,16 +2803,19 @@ class CampaignCatalog {
         continue;
       }
 
-      // 1~9장 각 10~12단계 생성 (6~8물결 심야 대장정!)
+      // 1~9현 각 정확히 10판(10개 마을) 생성 -> 10현 × 10판 = 총 100판 대장정!
       for (int st = 1; st <= ch.stageCount; st++) {
         globalIdx++;
         final isChapterBoss = st == ch.stageCount;
         final isHeukpungStage = st == ch.stageCount - 1;
-        final isMukhyeonStage = (ch.number == 3 || ch.number == 5 || ch.number == 6) && st == (ch.stageCount ~/ 2);
+        final isMukhyeonStage =
+            (ch.number == 3 || ch.number == 5 || ch.number == 6) && st == (ch.stageCount ~/ 2);
         final mountCap = _maxMountCountFor(ch.number, st).clamp(1, ch.mounts.length);
         final rescueHero = _rescueCompanionFor(ch.number, st);
         final rescuePet = _rescueBeastFor(ch.number, st);
-        final rescuesMukhyeon = ch.number == 6 && st == 12;
+        final rescuesMukhyeon = ch.number == 6 && st == ch.stageCount;
+        final vName = ch.villageNodeNameAt(st);
+        final vCoord = ch.villageMapCoordAt(st);
 
         final waves = _buildNormalChapterWaves(
           chapter: ch,
@@ -2380,26 +2831,26 @@ class CampaignCatalog {
         String stageTitle;
         String sub;
         if (isChapterBoss) {
-          stageTitle = '${ch.number}-$st 결전 · ${ch.bossName}';
-          sub = '${ch.villageName} 최종 $wCnt물결 심야 결전 (초소 $mountCap곳)';
+          stageTitle = '${ch.number}-$st 현 결전 · ${ch.bossName} ($vName)';
+          sub = '${ch.shortCountyName} [$vName] 최종 $wCnt물결 심야 결전 (초소 $mountCap곳)';
         } else if (isHeukpungStage) {
-          stageTitle = '${ch.number}-$st 약탈 저지 · 부두목 흑풍';
-          sub = '식량 수레를 노리는 약탈 선봉장 흑풍 $wCnt물결 격퇴 (초소 $mountCap곳)';
+          stageTitle = '${ch.number}-$st 약탈 저지 · 부두목 흑풍 ($vName)';
+          sub = '[$vName] 식량 수레를 노리는 약탈 선봉장 흑풍 $wCnt물결 격퇴 (초소 $mountCap곳)';
         } else if (isMukhyeonStage) {
-          stageTitle = '${ch.number}-$st 숙적 조우 · 사형 묵현';
+          stageTitle = '${ch.number}-$st 숙적 조우 · 사형 묵현 ($vName)';
           sub = ch.number == 6
-              ? '독기에 삼켜진 묵현을 $wCnt물결 정화 탄지로 구원하라! (초소 $mountCap곳)'
-              : '폭주하는 사형 묵현의 $wCnt물결 야간 기습! (초소 $mountCap곳)';
+              ? '[$vName] 독기에 삼켜진 묵현을 $wCnt물결 정화 탄지로 구원하라! (초소 $mountCap곳)'
+              : '[$vName] 폭주하는 사형 묵현의 $wCnt물결 야간 기습! (초소 $mountCap곳)';
         } else if (rescueHero != null) {
-          stageTitle = '${ch.number}-$st 구출 작전 · 동료 ${rescueHero.name}';
-          sub = '고립된 ${rescueHero.title} [${rescueHero.name}] $wCnt물결 구출전! (초소 $mountCap곳)';
+          stageTitle = '${ch.number}-$st 구출 작전 · 동료 ${rescueHero.name} ($vName)';
+          sub = '[$vName] 고립된 ${rescueHero.title} [${rescueHero.name}] $wCnt물결 구출전! (초소 $mountCap곳)';
         } else if (rescuePet != null) {
-          stageTitle = '${ch.number}-$st 영수 구출 · ${rescuePet.name}';
-          sub = '독기 포위망에 갇힌 영수 [${rescuePet.name}] $wCnt물결 구원 작전! (초소 $mountCap곳)';
+          stageTitle = '${ch.number}-$st 영수 구출 · ${rescuePet.name} ($vName)';
+          sub = '[$vName] 독기 포위망에 갇힌 영수 [${rescuePet.name}] $wCnt물결 구원 작전! (초소 $mountCap곳)';
         } else {
-          stageTitle = '${ch.number}-$st 야간 길목 수호 ($st차 밤)';
+          stageTitle = '${ch.number}-$st $vName 수호 ($st번째 마을)';
           final midKind = st == 1 ? MutantKind.swiftShadowBoss : _midBossKindFor(ch.number, st);
-          sub = '${ch.villageName} [${ch.routeTopologyTag}] $wCnt물결 방어 (초소 $mountCap곳) · 두목 [${midKind.name}] 침략!';
+          sub = '${ch.shortCountyName} [$vName · ${ch.routeTopologyTag}] $wCnt물결 방어 (초소 $mountCap곳) · 두목 [${midKind.name}] 침략!';
         }
 
         if ((isChapterBoss || isHeukpungStage || isMukhyeonStage) &&
@@ -2418,6 +2869,8 @@ class CampaignCatalog {
             chapterNumber: ch.number,
             stageNumber: st,
             globalIndex: globalIdx,
+            villageNodeName: vName,
+            villageMapCoord: vCoord,
             title: stageTitle,
             subtitle: sub,
             tacticalHint: _hintForStage(ch.number, st, isChapterBoss, isHeukpungStage),
@@ -2434,7 +2887,7 @@ class CampaignCatalog {
                         6,
                   ),
             clearElixirBonus: isChapterBoss
-                ? 5
+                ? 6
                 : ((isHeukpungStage || isMukhyeonStage || rescueHero != null || rescuePet != null) ? 3 : 1),
             isBossStage: isChapterBoss || isHeukpungStage || isMukhyeonStage,
             maxMountCount: mountCap,

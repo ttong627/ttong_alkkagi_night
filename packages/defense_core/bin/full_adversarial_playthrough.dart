@@ -522,7 +522,7 @@ List<String> _runAdversarialEdgeChecks() {
     throw StateError('10단 경맥 개통 후 내공 상한이 4.0칸이 아님: ${pMax.maxQiBars}');
   }
   final fSim = DefenseBattleSim(
-    stage: CampaignCatalog.stageAt(4, 12),
+    stage: CampaignCatalog.stageAt(4, 10),
     difficulty: DefenseDifficulty.normal,
     progress: pMax,
     seed: 33,
@@ -570,11 +570,11 @@ List<String> _runAdversarialEdgeChecks() {
   }
   notes.add('PASS [지형정합] 제5장 100% 직각 미궁 복도 & 제10장 일곱 부유섬 지상교/우측 비룡 공중로 분리 정합 확인');
 
-  // [검증 6] 제7장 남→북 역진격 묵현 난입 · 뼈방패 야차 방향성 방패 · 묵현 상시 능동 스킬 검증
-  final p7 = PlayerProgress(highestClearedGlobalStage: 80, supportTokens: 2);
+  // [검증 6] 제7현 남→북 역진격 묵현 난입 · 뼈방패 야차 방향성 방패 · 묵현 상시 능동 스킬 검증
+  final p7 = PlayerProgress(highestClearedGlobalStage: 70, supportTokens: 2);
   p7.companionLevels[CompanionHero.mukhyeon] = 7;
   final sim7 = DefenseBattleSim(
-    stage: CampaignCatalog.stageAt(7, 11),
+    stage: CampaignCatalog.stageAt(7, 10),
     difficulty: DefenseDifficulty.normal,
     progress: p7,
     seed: 77,
@@ -600,7 +600,7 @@ List<String> _runAdversarialEdgeChecks() {
     throw StateError('제7장 북단 성채 묵현 난입 남방 밀침 실패!');
   }
   // [검증 7] 기둥 뒤 적 오폭 차단(Swept Pillar Occlusion) · 관통탄 전열→후열 t정렬 · ★3 무흠결 판정 · 4→5형 합체 돌림판 지급 검증!
-  final pPhys = PlayerProgress(highestClearedGlobalStage: 111, unlockedStones: StoneMaterial.values.toSet());
+  final pPhys = PlayerProgress(highestClearedGlobalStage: 100, unlockedStones: StoneMaterial.values.toSet());
   final physSim = DefenseBattleSim(
     stage: CampaignCatalog.stageAt(1, 2),
     difficulty: DefenseDifficulty.normal,
@@ -712,7 +712,7 @@ List<String> _runAdversarialEdgeChecks() {
 
   // [검증 8] 14인 동료 전원 · 5종 영수 전원 · 13종 수호석 · 3모양 · 4문파 내공 실전 기여도 100% 검증!
   final rosterP = PlayerProgress(
-    highestClearedGlobalStage: 111,
+    highestClearedGlobalStage: 100,
     realmIndex: 7,
     openedMeridianStep: 10,
     centralGuardianLevel: 20,
@@ -1076,13 +1076,14 @@ void main() {
     }
   }
 
-  final easyAvgSh = diffShieldSum[DefenseDifficulty.easy]! / 111.0;
-  final normAvgSh = diffShieldSum[DefenseDifficulty.normal]! / 111.0;
-  final nightAvgSh = diffShieldSum[DefenseDifficulty.nightmare]! / 111.0;
+  final totalStageCnt = CampaignCatalog.allStages.length;
+  final easyAvgSh = diffShieldSum[DefenseDifficulty.easy]! / totalStageCnt;
+  final normAvgSh = diffShieldSum[DefenseDifficulty.normal]! / totalStageCnt;
+  final nightAvgSh = diffShieldSum[DefenseDifficulty.nightmare]! / totalStageCnt;
   stdout.writeln(
-    '  ✓ [3난이도 변별] 쉬움 ${diffWins[DefenseDifficulty.easy]}/111승(★3 ${diffThreeStars[DefenseDifficulty.easy]}, 최저방어막 ${easyAvgSh.toStringAsFixed(1)}%) | '
-    '보통 ${diffWins[DefenseDifficulty.normal]}/111승(★3 ${diffThreeStars[DefenseDifficulty.normal]}, 최저방어막 ${normAvgSh.toStringAsFixed(1)}%) | '
-    '악몽 ${diffWins[DefenseDifficulty.nightmare]}/111승(★3 ${diffThreeStars[DefenseDifficulty.nightmare]}, 최저방어막 ${nightAvgSh.toStringAsFixed(1)}%)',
+    '  ✓ [3난이도 변별] 쉬움 ${diffWins[DefenseDifficulty.easy]}/$totalStageCnt승(★3 ${diffThreeStars[DefenseDifficulty.easy]}, 최저방어막 ${easyAvgSh.toStringAsFixed(1)}%) | '
+    '보통 ${diffWins[DefenseDifficulty.normal]}/$totalStageCnt승(★3 ${diffThreeStars[DefenseDifficulty.normal]}, 최저방어막 ${normAvgSh.toStringAsFixed(1)}%) | '
+    '악몽 ${diffWins[DefenseDifficulty.nightmare]}/$totalStageCnt승(★3 ${diffThreeStars[DefenseDifficulty.nightmare]}, 최저방어막 ${nightAvgSh.toStringAsFixed(1)}%)',
   );
   if (!(easyAvgSh > normAvgSh && normAvgSh > nightAvgSh) &&
       !(diffThreeStars[DefenseDifficulty.easy]! >= diffThreeStars[DefenseDifficulty.normal]! &&
@@ -1158,7 +1159,7 @@ void main() {
     centralGuardianLevel: 32,
     forgeMasteryLevel: 32,
     elixirResonanceLevel: 28,
-    highestClearedGlobalStage: 111,
+    highestClearedGlobalStage: 100,
     unlockedStones: StoneMaterial.values.toSet(),
     consumables: {
       for (final c in TacticalConsumable.values) c: 3,
@@ -1216,7 +1217,7 @@ void main() {
   final backup = player.exportBackupCode();
   final restored = PlayerProgress.tryDecodeBackupCode(backup);
   if (restored == null ||
-      restored.highestClearedGlobalStage != 111 ||
+      restored.highestClearedGlobalStage != totalStageCnt ||
       restored.openedMeridianStep != player.openedMeridianStep ||
       restored.realmIndex != player.realmIndex ||
       restored.bestEndlessByDifficulty[DefenseDifficulty.normal.id] !=
@@ -1224,8 +1225,8 @@ void main() {
     throw StateError('SUHO1 백업 코드 최종 계정 왕복 무결성 실패!');
   }
 
-  if (player.highestClearedGlobalStage != 111) {
-    throw StateError('111관문 완전 정화 미달성: ${player.highestClearedGlobalStage}');
+  if (player.highestClearedGlobalStage != totalStageCnt) {
+    throw StateError('100판 완전 정화 미달성: ${player.highestClearedGlobalStage}');
   }
   if (player.openedMeridianStep < 10) {
     throw StateError('십대 경맥 10/10 미달성: ${player.openedMeridianStep}');
@@ -1257,11 +1258,11 @@ void main() {
   // 장별 통계 집계 및 보고서 작성
   final buf = StringBuffer()
     ..writeln('================================================================================')
-    ..writeln(' 수호알까기 · 탄지무림 심야기습 v1.0.0+28 — 인간반응(2Hz)·무치팅 전 구간 & 3난이도·무한100물결 적대적 점검표')
+    ..writeln(' 수호알까기 · 탄지무림 심야기습 v1.0.0+29 — 10현×10마을(총 100판) 인간반응(2Hz)·무치팅 전 구간 & 무한100물결 점검표')
     ..writeln('================================================================================')
     ..writeln('• 시작 조건 : 신규 계정 PlayerProgress() · 인간 반응 주기(0.5초/2Hz) · 추가 단전 노가다 0회 · 쿨타임 치팅 0회')
-    ..writeln('• 캠페인 완주 : 총 111 / 111 관문 정화 완료! (1트 클리어 $firstTryWins/111 · 총 시도 $totalAttempts회 · 관문당 평균 기연 ${avgSerendip.toStringAsFixed(1)}회)')
-    ..writeln('• 3난이도 변별 : 쉬움 ${diffWins[DefenseDifficulty.easy]}/111승(★3 ${diffThreeStars[DefenseDifficulty.easy]}, 최저방어막 ${easyAvgSh.toStringAsFixed(1)}%) > 보통 ${diffWins[DefenseDifficulty.normal]}/111승(★3 ${diffThreeStars[DefenseDifficulty.normal]}, 최저방어막 ${normAvgSh.toStringAsFixed(1)}%) > 악몽 ${diffWins[DefenseDifficulty.nightmare]}/111승(★3 ${diffThreeStars[DefenseDifficulty.nightmare]}, 최저방어막 ${nightAvgSh.toStringAsFixed(1)}%)')
+    ..writeln('• 캠페인 완주 : 총 $totalStageCnt / $totalStageCnt 판(10현×10마을) 정화 완료! (1트 클리어 $firstTryWins/$totalStageCnt · 총 시도 $totalAttempts회 · 관문당 평균 기연 ${avgSerendip.toStringAsFixed(1)}회)')
+    ..writeln('• 3난이도 변별 : 쉬움 ${diffWins[DefenseDifficulty.easy]}/$totalStageCnt승(★3 ${diffThreeStars[DefenseDifficulty.easy]}, 최저방어막 ${easyAvgSh.toStringAsFixed(1)}%) > 보통 ${diffWins[DefenseDifficulty.normal]}/$totalStageCnt승(★3 ${diffThreeStars[DefenseDifficulty.normal]}, 최저방어막 ${normAvgSh.toStringAsFixed(1)}%) > 악몽 ${diffWins[DefenseDifficulty.nightmare]}/$totalStageCnt승(★3 ${diffThreeStars[DefenseDifficulty.nightmare]}, 최저방어막 ${nightAvgSh.toStringAsFixed(1)}%)')
     ..writeln('• 무한 100물결 : 막 10-10 클리어 계정 돌파=${freshEndlessRun.summary.wavesClearedCount}물결 · 종결 계정 보통=${masterEndlessNormal.summary.wavesClearedCount}/100물결 완주(PASS!) · 종결 계정 악몽=${masterEndlessNightmare.summary.wavesClearedCount}/100물결')
     ..writeln('• 내공 수련 : 경지 [${player.realm.name} (${player.realmIndex + 1}/8)] · 십대 경맥 ${player.openedMeridianStep}/10(내공 ${player.maxQiBars}칸) · 누적 내공 ${player.naegongPoints}')
     ..writeln('• 영구 강화 : 중앙 수호탑 ${player.centralGuardianLevel}단 · 발사대 영구 ${LauncherType.values.map((t) => "${t.name.split(" ").first}:${player.launcherPermanentLevels[t]}단").join(", ")}')

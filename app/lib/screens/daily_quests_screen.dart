@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
+import 'stage_and_county_transitions.dart';
 
 /// 7일 순환 출석부 · 일일/주간/월간 수호 임무 · 전술 비약 제조 · 영구 업적 통합 화면.
 class DailyAndQuestsScreen extends StatefulWidget {
@@ -96,12 +97,23 @@ class _DailyAndQuestsScreenState extends State<DailyAndQuestsScreen> {
               ),
             ),
             body: NightSceneBackdrop(
-              child: TabBarView(
+              child: Column(
                 children: [
-                  _buildAttendanceTab(context, p),
-                  _buildMissionsTab(context, p),
-                  _buildCraftingTab(context, p),
-                  _buildAchievementsTab(context, p),
+                  if (!embeddedInShell)
+                    QuickPlayAndMenuBar(
+                      controller: controller,
+                      currentSection: 'supply',
+                    ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildAttendanceTab(context, p),
+                        _buildMissionsTab(context, p),
+                        _buildCraftingTab(context, p),
+                        _buildAchievementsTab(context, p),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -22,6 +22,7 @@ class GameController extends ChangeNotifier {
   int selectedChapter = 1;
   int battleSpeedMultiplier = 1;
   bool autoChooseBattlePerks = false;
+  bool continuousVillageMarch = true;
   final Random _rng = Random();
 
   PlayerProgress get progress => _progress;
@@ -33,6 +34,7 @@ class GameController extends ChangeNotifier {
     );
     battleSpeedMultiplier = _progress.preferredBattleSpeed.clamp(1, 4);
     autoChooseBattlePerks = _progress.preferredAutoPerk;
+    continuousVillageMarch = _progress.preferredContinuousMarch;
   }
 
   void _syncDeviceSettings() {
@@ -90,6 +92,14 @@ class GameController extends ChangeNotifier {
   void setAutoChoosePerks(bool enabled) {
     autoChooseBattlePerks = enabled;
     _progress.preferredAutoPerk = enabled;
+    saveToDisk();
+    notifyListeners();
+  }
+
+  void setContinuousVillageMarch(bool enabled) {
+    continuousVillageMarch = enabled;
+    _progress.preferredContinuousMarch = enabled;
+    NightAudioController.instance.playAsset('ui_tap.ogg');
     saveToDisk();
     notifyListeners();
   }

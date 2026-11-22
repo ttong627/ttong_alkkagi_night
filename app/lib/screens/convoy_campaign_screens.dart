@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
-import 'battle_screen.dart';
+import 'stage_and_county_transitions.dart';
 
 typedef ConvoySerendipityScreen = ConvoyAndSerendipityScreen;
 
@@ -187,9 +187,17 @@ class ConvoyAndSerendipityScreen extends StatelessWidget {
             title: const Text('보급 호송 · 심야 탐색 · 기연각'),
           ),
           body: NightSceneBackdrop(
-            child: ListView(
-              padding: const EdgeInsets.all(14),
+            child: Column(
               children: [
+                if (!embeddedInShell)
+                  QuickPlayAndMenuBar(
+                    controller: controller,
+                    currentSection: 'supply',
+                  ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(14),
+                    children: [
                 // 상단 주인공: 마차 호위 무사·구르미 대 변이 들개 격전 원화 + 원터치 일괄 수령/재파견
                 HeroVsMutantShowcaseBanner(
                   sceneAsset: NightArtRegistry.cardSupplyConvoy,
@@ -514,6 +522,9 @@ class ConvoyAndSerendipityScreen extends StatelessWidget {
                   ),
                 ),
               ],
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -522,24 +533,190 @@ class ConvoyAndSerendipityScreen extends StatelessWidget {
   }
 }
 
-/// 1~10장(총 111단계) 코덱스 대륙 월드맵 & 순차 행군 수호 캠페인 화면.
-class CampaignScreen extends StatelessWidget {
+/// 1~10현(각 현 10마을 = 총 100판) 코덱스 대륙도 · 현내 10마을 이동 지도 & 현간 대행군 영상 캠페인 화면.
+class CampaignScreen extends StatefulWidget {
   const CampaignScreen({super.key, required this.controller});
   final GameController controller;
 
-  // 코덱스 대륙 지도(world_map_murim_night.webp) 실제 10대 거점 정규화 좌표 (남단 1장 -> 북단 10장)
+  @override
+  State<CampaignScreen> createState() => _CampaignScreenState();
+}
+
+class _CampaignScreenState extends State<CampaignScreen> {
+  // true: 현내 10개 마을 행군 지도(마을마다 이동), false: 10대 현 대륙도
+  bool _showVillageRouteMap = true;
+
+  GameController get controller => widget.controller;
+
+  // 코덱스 대륙 지도(world_map_murim_night.webp) 실제 10대 현 정규화 좌표 (남단 1현 -> 북단 10현)
   static const List<Offset> _chapterMapCoords = <Offset>[
-    Offset(0.50, 0.87), // 1장 흙먼지 마을
-    Offset(0.43, 0.68), // 2장 통통 객잔
-    Offset(0.66, 0.59), // 3장 거북 장터
-    Offset(0.20, 0.49), // 4장 쿠비 산채 봉화대
-    Offset(0.80, 0.44), // 5장 로직 학당 기관전
-    Offset(0.50, 0.39), // 6장 무림맹 대광장
-    Offset(0.20, 0.31), // 7장 열사의 협곡 오아시스
-    Offset(0.80, 0.27), // 8장 구호 곡식 함대
-    Offset(0.38, 0.25), // 9장 화염산 봉인 제단 (배지와 겹치지 않도록 최적화)
-    Offset(0.62, 0.15), // 10장 천상 태초 탄신전
+    Offset(0.50, 0.87), // 1현 청산 흙먼지현
+    Offset(0.43, 0.68), // 2현 통통 객잔현
+    Offset(0.66, 0.59), // 3현 청옥 거북장터현
+    Offset(0.20, 0.49), // 4현 쿠비 봉화산현
+    Offset(0.80, 0.44), // 5현 황동 기관학당현
+    Offset(0.50, 0.39), // 6현 만년설 백옥무림현
+    Offset(0.20, 0.31), // 7현 적월 열사사막현
+    Offset(0.80, 0.27), // 8현 창파 등대함대현
+    Offset(0.38, 0.25), // 9현 흑요 적염화산현
+    Offset(0.62, 0.15), // 10현 천상 태극신전현
   ];
+
+  Widget _buildInteractiveCountyVillageMap({
+    required BuildContext context,
+    required PlayerProgress progress,
+    required ChapterSpec chSpec,
+    required List<StageSpec> stages,
+    required StageSpec currentOrderStage,
+    required bool allCampaignCleared,
+  }) {
+    final villageCoords = stages
+        .map((s) => Offset(s.villageMapCoord.x, s.villageMapCoord.y))
+        .toList();
+    int clearedInCounty = 0;
+    for (final s in stages) {
+      if (s.globalIndex <= progress.highestClearedGlobalStage) {
+        clearedInCounty++;
+      }
+    }
+
+    return SizedBox(
+      height: 196,
+      child: LayoutBuilder(
+        builder: (ctx, box) {
+          final w = box.maxWidth;
+          final h = box.maxHeight;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                chSpec.bgAsset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Image.asset(
+                  NightArtRegistry.bgNightLobby,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Container(color: const Color(0x6E070E1B)),
+              CustomPaint(
+                painter: _CountyVillageRoutePainter(
+                  coords: villageCoords,
+                  clearedCountInCounty: clearedInCounty,
+                ),
+              ),
+              for (int i = 0; i < stages.length; i++)
+                Builder(
+                  builder: (_) {
+                    final st = stages[i];
+                    final unlocked = progress.isStageUnlocked(st);
+                    final cleared =
+                        st.globalIndex <= progress.highestClearedGlobalStage;
+                    final isCurrent = !allCampaignCleared &&
+                        st.globalIndex == currentOrderStage.globalIndex;
+                    final norm = villageCoords[i];
+                    final px = (norm.dx * w).clamp(32.0, w - 32.0);
+                    final py = (norm.dy * h).clamp(18.0, h - 24.0);
+
+                    final Color bgCol = isCurrent
+                        ? NightPalette.accentGold
+                        : (cleared
+                            ? const Color(0xEE164B41)
+                            : (unlocked
+                                ? const Color(0xEE8E2A2A)
+                                : const Color(0xCC101929)));
+                    final Color fgCol = isCurrent
+                        ? NightPalette.hanjiInk
+                        : (unlocked
+                            ? NightPalette.textPrimary
+                            : NightPalette.textMuted);
+
+                    return Positioned(
+                      left: px - 29,
+                      top: py - 13,
+                      width: 58,
+                      height: 26,
+                      child: GestureDetector(
+                        key: Key('village_node_${st.code}'),
+                        onTap: unlocked
+                            ? () {
+                                Navigator.of(context).push(
+                                  buildSmoothBattleRoute(
+                                    controller: controller,
+                                    stage: st,
+                                  ),
+                                );
+                              }
+                            : null,
+                        child: Container(
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: BoxDecoration(
+                            color: bgCol,
+                            borderRadius: BorderRadius.circular(13),
+                            border: Border.all(
+                              color: isCurrent
+                                  ? Colors.white
+                                  : (st.isBossStage
+                                      ? NightPalette.crimsonMoon
+                                      : (unlocked
+                                          ? NightPalette.accentGold
+                                          : NightPalette.borderGold
+                                              .withValues(alpha: 0.3))),
+                              width: isCurrent ? 2.0 : 1.1,
+                            ),
+                          ),
+                          child: Text(
+                            '${unlocked ? (isCurrent ? "⚔️" : (cleared ? "✓" : "▶")) : "🔒"}${st.stageNumber}판${st.stageNumber == 10 ? "👑" : ""}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10.2,
+                              fontWeight: FontWeight.bold,
+                              color: fgCol,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              Positioned(
+                left: 8,
+                bottom: 6,
+                right: 8,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xE00C1526),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: NightPalette.accentGold.withValues(alpha: 0.65),
+                      ),
+                    ),
+                    child: Text(
+                      '🏘️ ${chSpec.countyName} ($clearedInCounty/10판 · 마을 터치 시 즉시 진입)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: NightPalette.accentGold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   Widget _buildInteractiveWorldMap({
     required BuildContext context,
@@ -693,16 +870,48 @@ class CampaignScreen extends StatelessWidget {
         final stages = CampaignCatalog.stagesOfChapter(chSpec.number);
 
         return Scaffold(
-          appBar: AppBar(title: const Text('탄지무림 10장 심야 수호록')),
+          appBar: AppBar(
+            title: Text(
+              '탄지무림 10현·100판 수호록 (${p.highestClearedGlobalStage}/${CampaignCatalog.allStages.length}판)',
+            ),
+            actions: [
+              TextButton.icon(
+                key: const Key('campaign_open_county_video_btn'),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    buildSmoothScreenRoute(
+                      CountyTransitionScreen(
+                        controller: controller,
+                        fromChapter: chSpec.number.clamp(1, 9),
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(
+                  Icons.movie_filter_rounded,
+                  size: 18,
+                  color: NightPalette.accentGold,
+                ),
+                label: const Text(
+                  '현 이동 영상',
+                  style: TextStyle(
+                    fontSize: 12.2,
+                    color: NightPalette.accentGold,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
           body: NightSceneBackdrop(
             assetPath: chSpec.bgAsset,
             fallbackAssetPath: NightArtRegistry.bgNightLobby,
             overlayOpacity: 0.80,
             child: Column(
               children: [
-                // 1) 코덱스 대륙 월드맵 + 장 선택·난이도·출정 안내 일체형 한지·청람 지령대 (덩어리 압축!)
+                // 1) 10현 대륙도 ↔ 현내 10마을 행군 지도 전환형 지령대
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
                   child: Container(
                     decoration: BoxDecoration(
                       color: NightPalette.bgPanel,
@@ -715,14 +924,91 @@ class CampaignScreen extends StatelessWidget {
                     clipBehavior: Clip.antiAlias,
                     child: Column(
                       children: [
-                        _buildInteractiveWorldMap(
-                          context: context,
-                          progress: p,
-                          selectedChapterNumber: chSpec.number,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          color: const Color(0xF00E1728),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                ChoiceChip(
+                                  key: const Key('campaign_toggle_village_map'),
+                                  visualDensity: VisualDensity.compact,
+                                  selected: _showVillageRouteMap,
+                                  label: Text(
+                                    '🏘️ 제${chSpec.number}현 10마을 지도',
+                                    style: const TextStyle(fontSize: 11.4),
+                                  ),
+                                  onSelected: (_) => setState(
+                                    () => _showVillageRouteMap = true,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                ChoiceChip(
+                                  key: const Key('campaign_toggle_world_map'),
+                                  visualDensity: VisualDensity.compact,
+                                  selected: !_showVillageRouteMap,
+                                  label: const Text(
+                                    '🌏 10대 현 대륙도',
+                                    style: TextStyle(fontSize: 11.4),
+                                  ),
+                                  onSelected: (_) => setState(
+                                    () => _showVillageRouteMap = false,
+                                  ),
+                                ),
+                                if (chSpec.number < 10 &&
+                                    (chSpec.number < p.highestUnlockedChapter ||
+                                        allCampaignCleared)) ...[
+                                  const SizedBox(width: 6),
+                                  ActionChip(
+                                    key: const Key('campaign_quick_next_county_btn'),
+                                    visualDensity: VisualDensity.compact,
+                                    backgroundColor: const Color(0xFF283A18),
+                                    label: Text(
+                                      '🎬 ${chSpec.number}현➔${chSpec.number + 1}현 대행군',
+                                      style: const TextStyle(
+                                        fontSize: 11.2,
+                                        color: NightPalette.accentGold,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        buildSmoothScreenRoute(
+                                          CountyTransitionScreen(
+                                            controller: controller,
+                                            fromChapter: chSpec.number,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
+                        if (_showVillageRouteMap)
+                          _buildInteractiveCountyVillageMap(
+                            context: context,
+                            progress: p,
+                            chSpec: chSpec,
+                            stages: stages,
+                            currentOrderStage: currentOrderStage,
+                            allCampaignCleared: allCampaignCleared,
+                          )
+                        else
+                          _buildInteractiveWorldMap(
+                            context: context,
+                            progress: p,
+                            selectedChapterNumber: chSpec.number,
+                          ),
                         Padding(
                           padding: const EdgeInsets.symmetric(
-                            vertical: 6,
+                            vertical: 5,
                             horizontal: 10,
                           ),
                           child: Column(
@@ -743,7 +1029,7 @@ class CampaignScreen extends StatelessWidget {
                                       child: ChoiceChip(
                                         selected: selected,
                                         label: Text(
-                                          '${unlocked ? (chCleared ? "✓" : "▶") : "🔒"}${c.number}장 ${c.villageName}',
+                                          '${unlocked ? (chCleared ? "✓" : "▶") : "🔒"}${c.number}현 ${c.shortCountyName} (10판)',
                                         ),
                                         onSelected: unlocked
                                             ? (_) => controller
@@ -824,11 +1110,11 @@ class CampaignScreen extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '${chSpec.actLabel} ${chSpec.title} — ${chSpec.villageName}',
+                                      '${chSpec.countyName} — ${chSpec.villageName}',
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontFamily: 'BlackHanSans',
-                                        fontSize: 15.2,
+                                        fontSize: 15.0,
                                         color: NightPalette.hanjiInk,
                                       ),
                                     ),
@@ -846,7 +1132,7 @@ class CampaignScreen extends StatelessWidget {
                                     const SizedBox(height: 2),
                                     Text(
                                       allCampaignCleared
-                                          ? '🏆 전 111관문 완전 정화 달성! 원하는 관문을 자유 재도전하세요.'
+                                          ? '🏆 전 100판(10현×10마을) 완전 정화 달성! 원하는 판을 자유 재도전하세요.'
                                           : '현재 수호 차례: ${currentOrderStage.title} (초소 ${currentOrderStage.maxMountCount}곳 개방)',
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -881,11 +1167,9 @@ class CampaignScreen extends StatelessWidget {
                                 ),
                                 onPressed: () {
                                   Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => BattleScreen(
-                                        controller: controller,
-                                        stage: currentOrderStage,
-                                      ),
+                                    buildSmoothBattleRoute(
+                                      controller: controller,
+                                      stage: currentOrderStage,
                                     ),
                                   );
                                 },
@@ -1198,11 +1482,9 @@ class CampaignScreen extends StatelessWidget {
                                         : null,
                                     onPressed: () {
                                       Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => BattleScreen(
-                                            controller: controller,
-                                            stage: st,
-                                          ),
+                                        buildSmoothBattleRoute(
+                                          controller: controller,
+                                          stage: st,
                                         ),
                                       );
                                     },
@@ -1230,6 +1512,59 @@ class CampaignScreen extends StatelessWidget {
       },
     );
   }
+}
+
+class _CountyVillageRoutePainter extends CustomPainter {
+  const _CountyVillageRoutePainter({
+    required this.coords,
+    required this.clearedCountInCounty,
+  });
+
+  final List<Offset> coords;
+  final int clearedCountInCounty;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (coords.length < 2) return;
+    final clearedGlow = Paint()
+      ..color = const Color(0x554EE3C0)
+      ..strokeWidth = 6.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final clearedLine = Paint()
+      ..color = const Color(0xEEFFD166)
+      ..strokeWidth = 2.8
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final nextLine = Paint()
+      ..color = const Color(0xAAFF7B54)
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final lockedLine = Paint()
+      ..color = const Color(0x558D99AE)
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    for (int i = 0; i < coords.length - 1; i++) {
+      final p1 = Offset(coords[i].dx * size.width, coords[i].dy * size.height);
+      final p2 =
+          Offset(coords[i + 1].dx * size.width, coords[i + 1].dy * size.height);
+      if (i + 1 <= clearedCountInCounty) {
+        canvas.drawLine(p1, p2, clearedGlow);
+        canvas.drawLine(p1, p2, clearedLine);
+      } else if (i == clearedCountInCounty) {
+        canvas.drawLine(p1, p2, nextLine);
+      } else {
+        canvas.drawLine(p1, p2, lockedLine);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CountyVillageRoutePainter oldDelegate) =>
+      oldDelegate.clearedCountInCounty != clearedCountInCounty;
 }
 
 class _WorldMapRoutePainter extends CustomPainter {

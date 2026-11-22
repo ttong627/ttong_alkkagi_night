@@ -22,6 +22,12 @@ class NightArtRegistry {
   static const String homeCommandLoop =
       'assets/images/motions/home_command_loop.webp';
 
+  /// 현(縣) 정화 완료 후 다음 현으로 대행군할 때 재생되는 9종 완전 고유 모션 영상 경로 (`1→2현` ~ `9→10현`).
+  static String countyTravelMotionAsset(int fromChapter) {
+    final safeFrom = fromChapter.clamp(1, 9);
+    return 'assets/images/motions/county_travel_${safeFrom}_to_${safeFrom + 1}.webp';
+  }
+
   static const String bgNightSplash = 'assets/images/scenes/bg_night_splash.webp';
   static const String bgNightLobby = 'assets/images/scenes/bg_night_lobby.webp';
   static const String bgLobbyFallback = 'assets/images/scenes/bg_lobby.webp';

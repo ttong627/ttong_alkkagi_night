@@ -127,7 +127,7 @@ Future<void> main(List<String> args) async {
   final trialsPerStage = args.contains('--full200') ? 200 : 20;
   final buf = StringBuffer();
   buf.writeln('====================================================================');
-  buf.writeln('《수호알까기 · 탄지무림 심야기습》 전 10장(111단계) 10대 고유 지형 루트 · 거점개척 · 6~8물결 진검 검증 성적표');
+  buf.writeln('《수호알까기 · 탄지무림 심야기습》 전 10현 · 100판(10장×10판) 10대 고유 지형 루트 · 거점개척 · 6~8물결 진검 검증 성적표');
   buf.writeln('조건: 720×1360 10장 고유 루트(2,860~7,250px) · 마기암석 개척 & 체증건설비 · 6~8물결 · 두목 2단 & 대수괴 3페이즈 · 지원패 0회 · 기연 0% · 단계당 $trialsPerStage판');
   buf.writeln('====================================================================');
 
@@ -295,8 +295,8 @@ Future<void> main(List<String> args) async {
   final idleAccidentalWins = idleResult.idleWins;
   final idleWinStages = idleResult.idleStages;
 
-  // 2) 역상성/무배치 대조군 검증 (중반 5장 보스전: 무배치 패배 vs 맞춤 초소 배치·비급 선택 승리 비교)
-  final checkStage = CampaignCatalog.stageAt(5, 11);
+  // 2) 역상성/무배치 대조군 검증 (중반 5현 결전 5-10: 무배치 패배 vs 맞춤 초소 배치·비급 선택 승리 비교)
+  final checkStage = CampaignCatalog.stageAt(5, 10);
   final badProg = buildExpectedProgressForChapter(5, tunedLoadout: false);
   final goodProg = buildExpectedProgressForChapter(5, tunedLoadout: true);
   int badWins = 0;
@@ -346,7 +346,7 @@ Future<void> main(List<String> args) async {
 
   buf.writeln('--------------------------------------------------------------------');
   buf.writeln(
-    '무개입 방치 클리어 차단 검증(1-1 쉬움 포함 전 111단계 초소 0개 방치 시): '
+    '무개입 방치 클리어 차단 검증(1-1 쉬움 포함 전 100판 초소 0개 방치 시): '
     '방치 승리 $idleAccidentalWins / ${CampaignCatalog.allStages.length}건 '
     '(${idleAccidentalWins == 0 ? "무개입 시 0.0% 전패 완벽 입증!" : "방치 클리어 발생: ${idleWinStages.join(", ")}"})',
   );
@@ -359,7 +359,7 @@ Future<void> main(List<String> args) async {
     '${minWinDurationSec.toStringAsFixed(1)}초 [$minWinDurationCode]',
   );
   buf.writeln(
-    '직접 배치 & 돌파 비급 민감도 검증 (5-11 폭주 기관 거신): '
+    '직접 배치 & 돌파 비급 민감도 검증 (5-10 폭주 기관 거신): '
     '무배치·미성장 ${badRate.toStringAsFixed(1)}% → 맞춤 초소 배치 시 ${goodRate.toStringAsFixed(1)}% (승률 상승폭 +${delta.toStringAsFixed(1)}%p)',
   );
   buf.writeln(

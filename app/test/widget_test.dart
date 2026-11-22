@@ -6,6 +6,7 @@ import 'package:alkkagi_night/screens/convoy_campaign_screens.dart';
 import 'package:alkkagi_night/screens/daily_quests_screen.dart';
 import 'package:alkkagi_night/screens/loadout_upgrade_screens.dart';
 import 'package:alkkagi_night/screens/settings_and_credits_screen.dart';
+import 'package:alkkagi_night/screens/stage_and_county_transitions.dart';
 import 'package:alkkagi_night/screens/training_screen.dart';
 import 'package:alkkagi_night/state/game_controller.dart';
 import 'package:alkkagi_night/ui/mutant_motion_engine.dart';
@@ -33,6 +34,12 @@ void main() {
     expect(NightArtRegistry.cardRescueBeacon, 'assets/images/scenes/card_rescue_beacon.webp');
     expect(NightArtRegistry.cardSupplyConvoy, 'assets/images/scenes/card_supply_convoy.webp');
     expect(NightArtRegistry.cardEndlessAbyss, 'assets/images/scenes/card_endless_abyss.webp');
+    for (int c = 1; c <= 9; c++) {
+      expect(
+        NightArtRegistry.countyTravelMotionAsset(c),
+        'assets/images/motions/county_travel_${c}_to_${c + 1}.webp',
+      );
+    }
     expect(NightArtRegistry.towerGuardian, 'assets/images/launchers/tower_guardian.webp');
     expect(NightArtRegistry.villageGranary, 'assets/images/launchers/village_granary.webp');
     expect(NightArtRegistry.villageCrops, 'assets/images/launchers/village_crops.webp');
@@ -313,12 +320,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 
-    // 4. 1~10장 지도 화면 및 즉시 야간 수호 출정 + 전술 비약 발동 검증
+    // 4. 10현·100판 지도 화면 및 즉시 야간 수호 출정 + 전술 비약 발동 검증
     await tester.ensureVisible(find.byKey(const Key('home_campaign_map_btn')));
     await tester.tap(find.byKey(const Key('home_campaign_map_btn')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
-    expect(find.text('탄지무림 10장 심야 수호록'), findsOneWidget);
+    expect(find.textContaining('탄지무림 10현·100판 수호록'), findsOneWidget);
     await tester.pageBack();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
@@ -521,7 +528,7 @@ void main() {
     await tester.tap(find.byKey(const Key('open_prod_note_btn')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
-    expect(find.textContaining('111단계'), findsWidgets);
+    expect(find.textContaining('100판'), findsWidgets);
 
     await tester.pageBack();
     await tester.pump();
@@ -1090,6 +1097,8 @@ void main() {
       MaterialApp(home: CampaignScreen(controller: controller)),
     );
     await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(find.byKey(const Key('campaign_toggle_world_map')));
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.textContaining('탄지무림 10대 거점 심야 수호 대륙도'), findsOneWidget);
 
     // 대륙 지도 위의 2장 거점 핀 터치 시 즉시 2장 선택 전환 확인
@@ -1329,12 +1338,12 @@ void main() {
     endgameP.activePreset.mountTypes[0] = LauncherType.curveSpin;
     final ctrl = GameController(initialProgress: endgameP);
 
-    // 1) 111관문 완전 정화 상태에서 캠페인 월드맵이 ✓10장 및 완전 정화 배너를 표시하는지 검증
+    // 1) 100판 완전 정화 상태에서 캠페인 지도 및 완전 정화 배너 표시 검증
     await tester.pumpWidget(
       MaterialApp(home: CampaignScreen(controller: ctrl)),
     );
     await tester.pump(const Duration(milliseconds: 150));
-    expect(find.textContaining('전 111관문 완전 정화 달성'), findsOneWidget);
+    expect(find.textContaining('전 100판(10현×10마을) 완전 정화 달성'), findsOneWidget);
     expect(find.text('최종 관문 재출정'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
@@ -1393,6 +1402,98 @@ void main() {
     expect(find.textContaining('복구되지 않습니다'), findsOneWidget);
     await tester.tap(find.text('전투 계속'));
     await tester.pump(const Duration(milliseconds: 150));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'v1.0.0+29 10현×10마을(100판) 행군 지도 · 9종 현간 대행군 영상 화면 · 전 메뉴 바로출정 · 연속 마을 수호 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2280);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final ctrl = GameController(
+      initialProgress: PlayerProgress(
+        tokens: 1500,
+        elixirs: 80,
+        supportTokens: 3,
+        highestClearedGlobalStage: 20, // 1~2현 완수, 3현 1판 차례
+        tutorialSeen: true,
+        bgmVolume: 0.0,
+        sfxVolume: 0.0,
+      ),
+    );
+    ctrl.setSelectedChapter(1);
+
+    // 1) 현내 10개 마을 행군 지도 <-> 10대 현 대륙도 전환 및 마을 노드 확인
+    await tester.pumpWidget(
+      MaterialApp(home: CampaignScreen(controller: ctrl)),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const Key('village_node_1-1')), findsOneWidget);
+    expect(find.byKey(const Key('village_node_1-10')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('campaign_toggle_world_map')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.textContaining('탄지무림 10대 거점 심야 수호 대륙도'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // 2) 현 마무리 후 다른 현 이동 시네마틱 영상 화면(CountyTransitionScreen) 1→2현, 2→3현 전환 검증
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CountyTransitionScreen(
+          controller: ctrl,
+          fromChapter: 1,
+          openedFromVictory: true,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.textContaining('제1현 정화 완수'), findsOneWidget);
+    expect(find.byKey(const Key('county_trans_pause_auto_btn')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('county_travel_chip_2')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.textContaining('제2현 정화 완수'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // 3) 전 메뉴(진법·대장간·수련·도감) 상단 바로 출정 & 지도 점프 바 및 전장 연속 마을 수호 토글 검증
+    await tester.pumpWidget(
+      MaterialApp(home: LoadoutScreen(controller: ctrl)),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const Key('quick_bar_battle_loadout')), findsOneWidget);
+    expect(find.byKey(const Key('quick_bar_map_loadout')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('quick_bar_battle_loadout')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 550));
+    expect(find.byKey(const Key('battle_continuous_march_chip')), findsOneWidget);
+    expect(find.text('🏃연속수호 ON'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('battle_continuous_march_chip')));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('⏸️연속수호 OFF'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // 4) 마을 수호 승리 시 인근 다음 마을로 자동 연속 이동(3.2초 카운트다운 완주) 검증
+    ctrl.setContinuousVillageMarch(true);
+    int autoAdvanceCount = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        key: const ValueKey('march_card_test_app'),
+        home: Scaffold(
+          body: VictoryContinuousMarchCard(
+            controller: ctrl,
+            clearedStage: CampaignCatalog.stageAt(1, 1),
+            nextStage: CampaignCatalog.stageAt(1, 2),
+            onAdvanceNow: () => autoAdvanceCount++,
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const Key('victory_continuous_march_card')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 3200));
+    expect(autoAdvanceCount, 1);
     expect(tester.takeException(), isNull);
   });
 }

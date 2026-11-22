@@ -1,7 +1,7 @@
 name: alkkagi_night
-description: "수호알까기 · 탄지무림 심야기습 — 자동 탄지 진법으로 열 마을을 지키는 무협 물리 디펜스"
+description: "수호알까기 · 탄지무림 심야기습 — 10현 100판 자동 탄지 진법 무협 물리 디펜스"
 publish_to: 'none'
-version: 1.0.0+28
+version: 1.0.0+29
 
 environment:
   sdk: ^3.13.5

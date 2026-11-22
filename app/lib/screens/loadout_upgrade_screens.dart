@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
+import 'stage_and_county_transitions.dart';
 
 typedef ForgeSanctuaryScreen = UpgradeScreen;
 
@@ -15,10 +16,12 @@ class LoadoutScreen extends StatelessWidget {
     super.key,
     required this.controller,
     this.embeddedInShell = false,
+    this.onSwitchShellTab,
   });
 
   final GameController controller;
   final bool embeddedInShell;
+  final ValueChanged<int>? onSwitchShellTab;
 
   static InputDecoration _darkFieldDecoration(String labelText) {
     return InputDecoration(
@@ -66,10 +69,22 @@ class LoadoutScreen extends StatelessWidget {
               ),
             ),
             body: NightSceneBackdrop(
-              child: TabBarView(
+              child: Column(
                 children: [
-                  _buildCoreArsenalTab(context, p, preset),
-                  _buildCompanionTacticsTab(context, p, preset),
+                  QuickPlayAndMenuBar(
+                    controller: controller,
+                    currentSection: 'loadout',
+                    embeddedInShell: embeddedInShell,
+                    onSwitchShellTab: onSwitchShellTab,
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildCoreArsenalTab(context, p, preset),
+                        _buildCompanionTacticsTab(context, p, preset),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -872,11 +887,13 @@ class UpgradeScreen extends StatelessWidget {
     required this.controller,
     this.initialTab = 0,
     this.embeddedInShell = false,
+    this.onSwitchShellTab,
   });
 
   final GameController controller;
   final int initialTab;
   final bool embeddedInShell;
+  final ValueChanged<int>? onSwitchShellTab;
 
   @override
   Widget build(BuildContext context) {
@@ -905,6 +922,12 @@ class UpgradeScreen extends StatelessWidget {
             body: NightSceneBackdrop(
               child: Column(
                 children: [
+                  QuickPlayAndMenuBar(
+                    controller: controller,
+                    currentSection: 'forge',
+                    embeddedInShell: embeddedInShell,
+                    onSwitchShellTab: onSwitchShellTab,
+                  ),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(

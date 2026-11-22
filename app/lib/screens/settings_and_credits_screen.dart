@@ -397,7 +397,7 @@ class SettingsScreen extends StatelessWidget {
                           size: 34,
                         ),
                         title: const Text('독자용 공개 제작노트 및 검증 성적표'),
-                        subtitle: const Text('전 10장(111단계) 순수 자동 구성 통과 기록 및 제작 내역'),
+                        subtitle: const Text('전 10현 100판(10장×10판) 순수 자동 구성 통과 기록 및 제작 내역'),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(builder: (_) => const ProductionNoteScreen()),
@@ -593,7 +593,7 @@ class CreditsScreen extends StatelessWidget {
   }
 }
 
-/// 독자용 공개 제작노트 및 111단계 자동 검증 성적표 열람 화면 (`production-provenance.md` 준수).
+/// 독자용 공개 제작노트 및 10현 100판 자동 검증 성적표 열람 화면 (`production-provenance.md` 준수).
 class ProductionNoteScreen extends StatelessWidget {
   const ProductionNoteScreen({super.key});
 
@@ -634,7 +634,7 @@ class ProductionNoteScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    '원작 《알까기 · 탄지무림》의 정겨운 세계관과 10장 서사는 그대로 잇되, '
+                    '원작 《알까기 · 탄지무림》과 동일한 1현 10판 ~ 10현 10판(총 100판) 체제와 세계관을 그대로 잇되, '
                     '직접 손가락으로 수백 번 돌을 튕기기 힘든 분들도 전략적인 구성 조정만으로 '
                     '끝까지 완주할 수 있는 「완전 자동 발사 마을 수호전」을 목표로 설계했습니다.',
                     style: TextStyle(fontSize: 13.5, height: 1.5),
@@ -649,7 +649,7 @@ class ProductionNoteScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '✅ 전 10장(111단계) 순수 자동 구성 검증 성적표',
+                    '✅ 전 10현 · 100판(10장×10판) 순수 자동 구성 검증 성적표',
                     style: TextStyle(
                       fontFamily: 'BlackHanSans',
                       fontSize: 18,
@@ -658,8 +658,9 @@ class ProductionNoteScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 6),
                   Text(
-                    '• 검증 조건: 무개입 방치(초소 0곳·수동 0발) 전패 검증 + 1~10장(111단계)·무한 혈전 100물결 전 기능 완주 검증\n'
-                    '• 10대 완전 차별화 고유 전장 & 초소 1px 정밀 좌대 정합: 대각 산비탈(1장)·양익 X자 교차로(2장)·3운하 아치교(3장)·절벽 대나선 중앙봉화(4장)·90° 직각 미궁(5장)·남북 양면포위(6장)·남→북 역진격 8자협곡(7장)·4전함 도교(8장)·6화산섬 사슬교(9장)·7성좌 부유섬(10장) 및 단조 증가 경로(2,860→7,250px)\n'
+                    '• 검증 조건: 무개입 방치(초소 0곳·수동 0발) 전패 검증 + 1~10현(100판)·무한 혈전 100물결 전 기능 완주 검증\n'
+                    '• 10현×10마을 행군 지도 & 9종 고유 현간 이동 모션 영상: 현 안 10개 마을 순차 이동 연출 및 1→2현부터 9→10현까지 전부 다른 대행군 시네마틱 영상 탑재\n'
+                    '• 10대 완전 차별화 고유 전장 & 초소 1px 정밀 좌대 정합: 대각 산비탈(1현)·양익 X자 교차로(2현)·3운하 아치교(3현)·절벽 대나선 중앙봉화(4현)·90° 직각 미궁(5현)·남북 양면포위(6현)·남→북 역진격 8자협곡(7현)·4전함 도교(8현)·6화산섬 사슬교(9현)·7성좌 부유섬(10현) 및 단조 증가 경로(2,860→7,250px)\n'
                     '• 6종 차별화 3D 수호 포탑 & 병종별 고유 투사체·회심 충격파: 청옥 연노 비전창·흑철 용포 운석탄·비취 쌍륜도·만년빙 프리즘·팔괘 뇌전구 및 8방향 십자 회심 충격파\n'
                     '• 공중 비행 변이 2종 & 3단 계급 보스(행동대장 100타+ · 중간보스 300타+ · 장 보스 1,000타+): 혈익 흡혈박쥐·심연 철익귀 방공 교전 및 누적 100~2,000타 이상 타격 파쇄 마갑 시스템\n'
                     '• 비상 위험 알림 & 실시간 2.8배 공격 확대 영상 모니터(PIP): 위험 구역 경보와 동시에 돌연변이 공격 지점을 2.8배 라이브 확대 영상으로 비추고 원터치 정밀 타격 지원\n'

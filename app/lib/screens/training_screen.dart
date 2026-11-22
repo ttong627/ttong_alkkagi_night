@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
+import 'stage_and_county_transitions.dart';
 
 typedef MeditationScreen = TrainingScreen;
 
@@ -143,6 +144,11 @@ class _TrainingScreenState extends State<TrainingScreen>
             body: NightSceneBackdrop(
               child: Column(
                 children: [
+                  if (!widget.embeddedInShell)
+                    QuickPlayAndMenuBar(
+                      controller: widget.controller,
+                      currentSection: 'supply',
+                    ),
                   // 상단 내공 경지 및 자동 운기 표시줄
                   Container(
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),

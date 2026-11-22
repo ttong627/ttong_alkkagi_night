@@ -412,7 +412,7 @@ class PlayerProgress {
     this.centralGuardianLevel = 1,
     this.supportTokens = 2,
     this.moonOmenGauge = 35,
-    this.highestClearedGlobalStage = 0,
+    int highestClearedGlobalStage = 0,
     this.openedMeridianStep = 0,
     this.dailyEnlightenmentUsed = 0,
     this.lastMeditationDayKey = '',
@@ -444,6 +444,7 @@ class PlayerProgress {
     this.preferredDifficultyId = 'normal',
     this.preferredBattleSpeed = 1,
     this.preferredAutoPerk = false,
+    this.preferredContinuousMarch = true,
     Map<String, int>? bestEndlessByDifficulty,
     Map<LauncherType, int>? launcherPermanentLevels,
     Set<StoneMaterial>? unlockedStones,
@@ -461,7 +462,11 @@ class PlayerProgress {
     Set<String>? claimedQuestIds,
     Set<String>? claimedAchievements,
     Set<MutantKind>? seenMutants,
-  })  : bestEndlessByDifficulty = bestEndlessByDifficulty ?? <String, int>{},
+  })  : highestClearedGlobalStage = highestClearedGlobalStage.clamp(
+          0,
+          CampaignCatalog.allStages.length,
+        ),
+        bestEndlessByDifficulty = bestEndlessByDifficulty ?? <String, int>{},
         launcherPermanentLevels = launcherPermanentLevels ??
             {for (final t in LauncherType.values) t: 1},
         unlockedStones = unlockedStones ?? {StoneMaterial.cheongok},
@@ -538,7 +543,7 @@ class PlayerProgress {
   /// 보름달 길조 게이지 (0~100, 100 도달 시 확정 특급 기연 발동!).
   int moonOmenGauge;
 
-  /// 클리어한 최고 전체 스테이지 번호 (0 ~ 111).
+  /// 클리어한 최고 전체 스테이지 번호 (0 ~ 100 · 10현 × 각 10판).
   int highestClearedGlobalStage;
 
   /// 개통 완료한 십대 경맥 단계 (0 ~ 10).
@@ -582,6 +587,7 @@ class PlayerProgress {
   String preferredDifficultyId;
   int preferredBattleSpeed;
   bool preferredAutoPerk;
+  bool preferredContinuousMarch;
   final Map<String, int> bestEndlessByDifficulty;
 
   final Map<LauncherType, int> launcherPermanentLevels;
@@ -1803,6 +1809,7 @@ class PlayerProgress {
         'prefDiff': preferredDifficultyId,
         'prefSpeed': preferredBattleSpeed,
         'prefAutoPerk': preferredAutoPerk,
+        'prefContMarch': preferredContinuousMarch,
         'bestEndlessMap': bestEndlessByDifficulty,
         'launcherLvs': launcherPermanentLevels.map((k, v) => MapEntry(k.id, v)),
         'stones': unlockedStones.map((e) => e.id).toList(),
@@ -1915,6 +1922,7 @@ class PlayerProgress {
       },
       preferredBattleSpeed: _safeInt(j['prefSpeed'], 1).clamp(1, 4),
       preferredAutoPerk: _safeBool(j['prefAutoPerk'], false),
+      preferredContinuousMarch: _safeBool(j['prefContMarch'], true),
     );
 
     if (j['bestEndlessMap'] is Map) {
@@ -1973,8 +1981,23 @@ class PlayerProgress {
       });
     }
     if (j['stars'] is Map) {
+      final legacyStars = <String, int>{};
       (j['stars'] as Map).forEach((k, v) {
-        p.stageStars[k.toString()] = _safeInt(v, 0).clamp(0, 3);
+        legacyStars[k.toString()] = _safeInt(v, 0).clamp(0, 3);
+      });
+      // 구버전(111판 체제: 일부 장 11~12판 존재) 세이브의 결전 별점을 10현×10판(총 100판) 체제의 10판으로 무손실 이관!
+      final stagePattern = RegExp(r'^(\d+)-(\d+)$');
+      legacyStars.forEach((key, stars) {
+        final m = stagePattern.firstMatch(key);
+        if (m == null) return;
+        final ch = int.tryParse(m.group(1)!) ?? 0;
+        final st = int.tryParse(m.group(2)!) ?? 0;
+        if (ch < 1 || ch > 10 || st < 1) return;
+        final mappedCode = '$ch-${st.clamp(1, 10)}';
+        final prev = p.stageStars[mappedCode];
+        if (prev == null || stars > prev) {
+          p.stageStars[mappedCode] = stars;
+        }
       });
     }
     if (j['presets'] is List) {

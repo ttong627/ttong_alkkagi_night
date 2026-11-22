@@ -8,13 +8,13 @@ import '../audio/night_audio.dart';
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
-import 'battle_screen.dart';
 import 'codex_and_endless_screens.dart';
 import 'convoy_campaign_screens.dart';
 import 'daily_quests_screen.dart';
 import 'loadout_upgrade_screens.dart';
 import 'settings_and_credits_screen.dart';
 import 'splash_and_tutorial.dart';
+import 'stage_and_county_transitions.dart';
 import 'training_screen.dart';
 
 /// 수호 본영 통합 5탭 메인 쉘 화면:
@@ -101,16 +101,22 @@ class _HomeScreenState extends State<HomeScreen>
             1 => LoadoutScreen(
                 controller: widget.controller,
                 embeddedInShell: true,
+                onSwitchShellTab: (idx) =>
+                    setState(() => _selectedNavIndex = idx),
               ),
             2 => UpgradeScreen(
                 controller: widget.controller,
                 embeddedInShell: true,
+                onSwitchShellTab: (idx) =>
+                    setState(() => _selectedNavIndex = idx),
               ),
             3 => _buildUnifiedSupplyTrainingHub(p),
             _ => CodexScreen(
                 controller: widget.controller,
                 embeddedInShell: true,
                 initialTab: 4,
+                onSwitchShellTab: (idx) =>
+                    setState(() => _selectedNavIndex = idx),
               ),
           },
           bottomNavigationBar: Container(
@@ -191,6 +197,12 @@ class _HomeScreenState extends State<HomeScreen>
       bottom: false,
       child: Column(
         children: [
+          QuickPlayAndMenuBar(
+            controller: widget.controller,
+            currentSection: 'supply',
+            embeddedInShell: true,
+            onSwitchShellTab: (idx) => setState(() => _selectedNavIndex = idx),
+          ),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -313,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   ),
                                 ),
                                 Text(
-                                  '경지 [${p.realm.name}] · 수호 ${p.highestClearedGlobalStage}/${CampaignCatalog.allStages.length}관문 · 영웅 ${p.unlockedCompanionCount}/14 · 신수 ${p.unlockedBeastCount}/5',
+                                  '경지 [${p.realm.name}] · 수호 ${p.highestClearedGlobalStage}/${CampaignCatalog.allStages.length}판(10현) · 영웅 ${p.unlockedCompanionCount}/14 · 신수 ${p.unlockedBeastCount}/5',
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontSize: 11.8,
@@ -477,15 +489,15 @@ class _HomeScreenState extends State<HomeScreen>
                               preset: preset,
                               nextRescue: nextRescue,
                               height: isWide ? 184 : 138,
-                              onOpenRescueMap: () {
+                                onOpenRescueMap: () {
                                 if (nextRescue != null) {
                                   widget.controller.setSelectedChapter(
                                     nextRescue.chapterNumber,
                                   );
                                 }
                                 Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => CampaignScreen(
+                                  buildSmoothScreenRoute(
+                                    CampaignScreen(
                                       controller: widget.controller,
                                     ),
                                   ),
@@ -510,8 +522,8 @@ class _HomeScreenState extends State<HomeScreen>
                                   badge:
                                       p.canOpenNextMeridian() ? '개통 가능' : null,
                                   onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => TrainingScreen(
+                                    buildSmoothScreenRoute(
+                                      TrainingScreen(
                                         controller: widget.controller,
                                       ),
                                     ),
@@ -529,8 +541,8 @@ class _HomeScreenState extends State<HomeScreen>
                                       '원터치 최적 편성 · 영웅 ${p.unlockedCompanionCount}/14',
                                   accent: NightPalette.accentGold,
                                   onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => LoadoutScreen(
+                                    buildSmoothScreenRoute(
+                                      LoadoutScreen(
                                         controller: widget.controller,
                                       ),
                                     ),
@@ -547,8 +559,8 @@ class _HomeScreenState extends State<HomeScreen>
                                       '수호탑 ${p.centralGuardianLevel}단 · 추천 일괄 강화',
                                   accent: NightPalette.accentGold,
                                   onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => UpgradeScreen(
+                                    buildSmoothScreenRoute(
+                                      UpgradeScreen(
                                         controller: widget.controller,
                                       ),
                                     ),
@@ -571,9 +583,8 @@ class _HomeScreenState extends State<HomeScreen>
                                       ? '보상 도착'
                                       : null,
                                   onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ConvoyAndSerendipityScreen(
+                                    buildSmoothScreenRoute(
+                                      ConvoyAndSerendipityScreen(
                                         controller: widget.controller,
                                       ),
                                     ),
@@ -589,8 +600,8 @@ class _HomeScreenState extends State<HomeScreen>
                                   accent: NightPalette.accentGold,
                                   badge: hasQuestReward ? '수령 가능' : null,
                                   onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => DailyAndQuestsScreen(
+                                    buildSmoothScreenRoute(
+                                      DailyAndQuestsScreen(
                                         controller: widget.controller,
                                       ),
                                     ),
@@ -607,8 +618,8 @@ class _HomeScreenState extends State<HomeScreen>
                                       '최고 ${p.bestEndlessWave}물결 돌파 · 100물결 혈전',
                                   accent: NightPalette.accentGold,
                                   onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => EndlessSurvivalScreen(
+                                    buildSmoothScreenRoute(
+                                      EndlessSurvivalScreen(
                                         controller: widget.controller,
                                       ),
                                     ),
@@ -818,7 +829,7 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${chSpec.title} · ${chSpec.villageName}',
+                            '${chSpec.countyName} · ${nextStage.stageNumber}/10번째 마을 [${nextStage.villageNodeName}]',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 13.0,
@@ -832,7 +843,7 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontFamily: 'BlackHanSans',
-                              fontSize: 22.5,
+                              fontSize: 22.0,
                               color: NightPalette.hanjiInk,
                             ),
                           ),
@@ -861,11 +872,9 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                       ),
                       onPressed: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => BattleScreen(
-                              controller: controller,
-                              stage: nextStage,
-                            ),
+                          buildSmoothBattleRoute(
+                            controller: controller,
+                            stage: nextStage,
                           ),
                         );
                       },
@@ -885,7 +894,7 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                     OutlinedButton.icon(
                       key: const Key('home_campaign_map_btn'),
                       style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(146, 48),
+                        minimumSize: const Size(156, 48),
                         backgroundColor: const Color(0xFFE6D4B0),
                         foregroundColor: NightPalette.hanjiInk,
                         side: const BorderSide(color: Color(0xFF2F3F5C)),
@@ -893,8 +902,8 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                       onPressed: () {
                         controller.setSelectedChapter(nextStage.chapterNumber);
                         Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => CampaignScreen(
+                          buildSmoothScreenRoute(
+                            CampaignScreen(
                               controller: controller,
                             ),
                           ),
@@ -905,7 +914,7 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                         fallbackIcon: Icons.map_rounded,
                         size: 18,
                       ),
-                      label: const Text('1~10장 행군 지도'),
+                      label: const Text('10현·100판 행군 지도'),
                     ),
                     if (hasReadyAction)
                       OutlinedButton.icon(

@@ -10,6 +10,7 @@ import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'battle_painter.dart';
+import 'stage_and_county_transitions.dart';
 
 /// 실시간 수호 전장 화면:
 /// - 초기 길목 무배치(0기) → 개방된 빈 초소(`2~10곳`) 터치 직접 배치·승급·교체·철거
@@ -785,7 +786,48 @@ class _BattleScreenState extends State<BattleScreen>
                       ),
                     );
                   }),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
+                  if (summary.victory &&
+                      widget.stage.globalIndex >= 1 &&
+                      widget.stage.globalIndex <
+                          CampaignCatalog.allStages.length)
+                    VictoryContinuousMarchCard(
+                      controller: widget.controller,
+                      clearedStage: widget.stage,
+                      nextStage:
+                          CampaignCatalog.allStages[widget.stage.globalIndex],
+                      onAdvanceNow: () {
+                        if (!ctx.mounted || !mounted) return;
+                        Navigator.of(ctx).pop();
+                        final nextStage =
+                            CampaignCatalog.allStages[widget.stage.globalIndex];
+                        if (nextStage.chapterNumber !=
+                            widget.stage.chapterNumber) {
+                          widget.controller
+                              .applyRecommendedLoadoutForStage(nextStage);
+                          widget.controller
+                              .setSelectedChapter(nextStage.chapterNumber);
+                          Navigator.of(context).pushReplacement(
+                            buildSmoothScreenRoute(
+                              CountyTransitionScreen(
+                                controller: widget.controller,
+                                fromChapter: widget.stage.chapterNumber,
+                                openedFromVictory: true,
+                              ),
+                            ),
+                          );
+                        } else {
+                          _handedOffBgm = true;
+                          Navigator.of(context).pushReplacement(
+                            buildSmoothBattleRoute(
+                              controller: widget.controller,
+                              stage: nextStage,
+                              previousStage: widget.stage,
+                            ),
+                          );
+                        }
+                      },
+                    ),
                   Row(
                     children: [
                       Expanded(
@@ -810,23 +852,34 @@ class _BattleScreenState extends State<BattleScreen>
                             if (summary.victory &&
                                 widget.stage.globalIndex <
                                     CampaignCatalog.allStages.length) {
-                              _handedOffBgm = true;
                               final nextStage = CampaignCatalog
                                   .allStages[widget.stage.globalIndex];
                               if (nextStage.chapterNumber !=
                                   widget.stage.chapterNumber) {
+                                // 현(縣) 10판 마무리 완료! 다음 현 고유 대행군 이동 영상 화면으로 진입!
                                 widget.controller
                                     .applyRecommendedLoadoutForStage(nextStage);
-                              }
-                              Navigator.of(context).pushReplacement(
-                                MaterialPageRoute(
-                                  builder: (_) => BattleScreen(
-                                    key: ValueKey(nextStage.code),
+                                widget.controller
+                                    .setSelectedChapter(nextStage.chapterNumber);
+                                Navigator.of(context).pushReplacement(
+                                  buildSmoothScreenRoute(
+                                    CountyTransitionScreen(
+                                      controller: widget.controller,
+                                      fromChapter: widget.stage.chapterNumber,
+                                      openedFromVictory: true,
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                _handedOffBgm = true;
+                                Navigator.of(context).pushReplacement(
+                                  buildSmoothBattleRoute(
                                     controller: widget.controller,
                                     stage: nextStage,
+                                    previousStage: widget.stage,
                                   ),
-                                ),
-                              );
+                                );
+                              }
                             } else if (summary.victory &&
                                 widget.stage.chapterNumber == 10 &&
                                 widget.stage.stageNumber == 10) {
@@ -840,18 +893,22 @@ class _BattleScreenState extends State<BattleScreen>
                                 ? (widget.stage.chapterNumber == 10 &&
                                         widget.stage.stageNumber == 10
                                     ? Icons.emoji_events_rounded
-                                    : Icons.skip_next_rounded)
+                                    : (widget.stage.stageNumber == 10
+                                        ? Icons.movie_filter_rounded
+                                        : Icons.skip_next_rounded))
                                 : Icons.refresh_rounded,
                           ),
                           label: Text(
                             summary.victory &&
                                     widget.stage.globalIndex <
                                         CampaignCatalog.allStages.length
-                                ? '다음 수호 차례 진군'
+                                ? (widget.stage.stageNumber == 10
+                                    ? '🎬 제${widget.stage.chapterNumber + 1}현 대행군 출발!'
+                                    : '다음 마을 진군 (${CampaignCatalog.allStages[widget.stage.globalIndex].code})')
                                 : (summary.victory &&
                                         widget.stage.chapterNumber == 10 &&
                                         widget.stage.stageNumber == 10
-                                    ? '🌅 본영으로 금의환향'
+                                    ? '🌅 100판 완승 · 본영 금의환향'
                                     : '다시 도전하기'),
                           ),
                         ),
@@ -958,6 +1015,19 @@ class _BattleScreenState extends State<BattleScreen>
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontSize: 11.0,
+                                      color: NightPalette.jadeGreen,
+                                    ),
+                                  )
+                                else if (widget.stage.globalIndex >= 1 &&
+                                    widget.stage.globalIndex <
+                                        CampaignCatalog.allStages.length)
+                                  Text(
+                                    widget.stage.stageNumber < 10
+                                        ? '🏘️ 현재 [${widget.stage.villageNodeName}] ➔ 다음 인근 마을: [${CampaignCatalog.allStages[widget.stage.globalIndex].villageNodeName}]'
+                                        : '🏯 현 결전 [${widget.stage.villageNodeName}] ➔ 완수 시 제${widget.stage.chapterNumber + 1}현 대행군!',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 10.8,
                                       color: NightPalette.jadeGreen,
                                     ),
                                   ),
@@ -1304,6 +1374,49 @@ class _BattleScreenState extends State<BattleScreen>
                               text:
                                   '극광회심 ${_sim.auroraCritTimer.toStringAsFixed(1)}초',
                               color: Colors.orangeAccent,
+                            ),
+                          if (widget.stage.globalIndex >= 1 &&
+                              widget.stage.globalIndex <=
+                                  CampaignCatalog.allStages.length)
+                            GestureDetector(
+                              key: const Key('battle_continuous_march_chip'),
+                              onTap: () {
+                                widget.controller.setContinuousVillageMarch(
+                                  !widget.controller.continuousVillageMarch,
+                                );
+                                setState(() {});
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: widget.controller.continuousVillageMarch
+                                      ? const Color(0xFF143C34)
+                                      : NightPalette.bgDeep,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color:
+                                        widget.controller.continuousVillageMarch
+                                            ? NightPalette.jadeGreen
+                                            : Colors.white24,
+                                  ),
+                                ),
+                                child: Text(
+                                  widget.controller.continuousVillageMarch
+                                      ? '🏃연속수호 ON'
+                                      : '⏸️연속수호 OFF',
+                                  style: TextStyle(
+                                    fontSize: 10.6,
+                                    fontWeight: FontWeight.bold,
+                                    color:
+                                        widget.controller.continuousVillageMarch
+                                            ? NightPalette.jadeGreen
+                                            : NightPalette.textMuted,
+                                  ),
+                                ),
+                              ),
                             ),
                         ],
                       ),
