@@ -1307,4 +1307,60 @@ void main() {
     expect(ctrl7.autoChooseBattlePerks, isFalse);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('v1.0.0+27 진법 슬롯 편성 ★추천축조 · 10경맥 내공 4칸 표시 · 무한혈전 난이도 선택 · 111관문 완전정화 UI 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2280);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final endgameP = PlayerProgress(
+      tokens: 2000,
+      elixirs: 150,
+      supportTokens: 4,
+      realmIndex: 7,
+      openedMeridianStep: 10,
+      highestClearedGlobalStage: CampaignCatalog.allStages.length,
+      tutorialSeen: true,
+      bgmVolume: 0.0,
+      sfxVolume: 0.0,
+    );
+    endgameP.activePreset.mountTypes[0] = LauncherType.curveSpin;
+    final ctrl = GameController(initialProgress: endgameP);
+
+    // 1) 111관문 완전 정화 상태에서 캠페인 월드맵이 ✓10장 및 완전 정화 배너를 표시하는지 검증
+    await tester.pumpWidget(
+      MaterialApp(home: CampaignScreen(controller: ctrl)),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.textContaining('전 111관문 완전 정화 달성'), findsOneWidget);
+    expect(find.text('최종 관문 재출정'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // 2) 무한 혈전 화면에서 쉬움·보통·악몽 난이도 선택지가 작동하는지 검증
+    await tester.pumpWidget(
+      MaterialApp(home: EndlessSurvivalScreen(controller: ctrl)),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.textContaining('2. 난이도 선택'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // 3) 전장에서 10단 경맥 내공 4칸(/4칸) 및 진법 편성(curveSpin -> 비취) ★추천축조 단추 연동 검증
+    final st2 = CampaignCatalog.stageAt(3, 2);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BattleScreen(
+          key: const ValueKey('v27_battle'),
+          controller: ctrl,
+          stage: st2,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.textContaining('/4칸'), findsOneWidget);
+    expect(find.byKey(const Key('quick_direct_build_btn')), findsOneWidget);
+    expect(find.textContaining('🔨추천축조[곡사]'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -343,7 +343,7 @@ class ConvoyAndSerendipityScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       const Text(
                         '전장 위기 시 태평소 풍악과 함께 아군 기마·수호알 대열이 온 길목의 돌연변이를 한데 싹 몰아 전멸시키고 떠납니다!\n'
-                        '수급 3대 경로: ① 조건 달성(물자 호송 완수 · 마을 3요소 무피해 ★3 수호) · ② 설렘 기연(보름달 길조) · ③ 심야 탐색(산채 봉화대)',
+                        '수급 3대 경로: ① 조건 달성(물자 호송 완수 · 마을 3요소 무피해 ★3 첫 달성) · ② 설렘 기연(전투·깨달음 보름달 길조) · ③ 심야 탐색(산채 봉화대)',
                         style: TextStyle(fontSize: 12.5, color: NightPalette.textMuted, height: 1.4),
                       ),
                       const SizedBox(height: 10),
@@ -581,9 +581,12 @@ class CampaignScreen extends StatelessWidget {
                   Builder(
                     builder: (_) {
                       final chNum = i + 1;
+                      final allDone = progress.highestClearedGlobalStage >=
+                          CampaignCatalog.allStages.length;
                       final unlocked = chNum <= progress.highestUnlockedChapter;
                       final selected = chNum == selectedChapterNumber;
-                      final cleared = chNum < progress.highestUnlockedChapter;
+                      final cleared = chNum < progress.highestUnlockedChapter ||
+                          (chNum == 10 && allDone);
                       final norm = _chapterMapCoords[i];
                       final px = (norm.dx * w).clamp(28.0, w - 28.0);
                       final py = (norm.dy * h).clamp(20.0, h - 22.0);
@@ -678,6 +681,8 @@ class CampaignScreen extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final p = controller.progress;
+        final allCampaignCleared =
+            p.highestClearedGlobalStage >= CampaignCatalog.allStages.length;
         final nextGlobal = (p.highestClearedGlobalStage + 1)
             .clamp(1, CampaignCatalog.allStages.length);
         final currentOrderStage = CampaignCatalog.allStages[nextGlobal - 1];
@@ -729,12 +734,16 @@ class CampaignScreen extends StatelessWidget {
                                     final unlocked =
                                         c.number <= p.highestUnlockedChapter;
                                     final selected = c.number == chSpec.number;
+                                    final chCleared =
+                                        c.number < p.highestUnlockedChapter ||
+                                            (c.number == 10 &&
+                                                allCampaignCleared);
                                     return Padding(
                                       padding: const EdgeInsets.only(right: 6),
                                       child: ChoiceChip(
                                         selected: selected,
                                         label: Text(
-                                          '${unlocked ? (c.number < p.highestUnlockedChapter ? "✓" : "▶") : "🔒"}${c.number}장 ${c.villageName}',
+                                          '${unlocked ? (chCleared ? "✓" : "▶") : "🔒"}${c.number}장 ${c.villageName}',
                                         ),
                                         onSelected: unlocked
                                             ? (_) => controller
@@ -836,7 +845,9 @@ class CampaignScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '현재 수호 차례: ${currentOrderStage.title} (초소 ${currentOrderStage.maxMountCount}곳 개방)',
+                                      allCampaignCleared
+                                          ? '🏆 전 111관문 완전 정화 달성! 원하는 관문을 자유 재도전하세요.'
+                                          : '현재 수호 차례: ${currentOrderStage.title} (초소 ${currentOrderStage.maxMountCount}곳 개방)',
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 11.8,
@@ -878,7 +889,9 @@ class CampaignScreen extends StatelessWidget {
                                     ),
                                   );
                                 },
-                                child: const Text('이번 차례 출정'),
+                                child: Text(
+                                  allCampaignCleared ? '최종 관문 재출정' : '이번 차례 출정',
+                                ),
                               ),
                             ],
                           ),
@@ -898,7 +911,7 @@ class CampaignScreen extends StatelessWidget {
                       final unlocked = p.isStageUnlocked(st);
                       final isCleared =
                           st.globalIndex <= p.highestClearedGlobalStage;
-                      final isCurrentOrder =
+                      final isCurrentOrder = !allCampaignCleared &&
                           st.globalIndex == currentOrderStage.globalIndex;
                       final stars = p.stageStars[st.code] ?? 0;
 

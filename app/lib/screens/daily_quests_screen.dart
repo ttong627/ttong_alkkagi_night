@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:defense_core/defense_core.dart';
 import 'package:flutter/material.dart';
 
@@ -6,7 +8,7 @@ import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 
 /// 7일 순환 출석부 · 일일/주간/월간 수호 임무 · 전술 비약 제조 · 영구 업적 통합 화면.
-class DailyAndQuestsScreen extends StatelessWidget {
+class DailyAndQuestsScreen extends StatefulWidget {
   const DailyAndQuestsScreen({
     super.key,
     required this.controller,
@@ -17,6 +19,41 @@ class DailyAndQuestsScreen extends StatelessWidget {
   final GameController controller;
   final int initialTab;
   final bool embeddedInShell;
+
+  @override
+  State<DailyAndQuestsScreen> createState() => _DailyAndQuestsScreenState();
+}
+
+class _DailyAndQuestsScreenState extends State<DailyAndQuestsScreen> {
+  Timer? _midnightRefreshTimer;
+  int _lastObservedDayKey = 0;
+
+  GameController get controller => widget.controller;
+  int get initialTab => widget.initialTab;
+  bool get embeddedInShell => widget.embeddedInShell;
+
+  static int _localDayKey(DateTime dt) =>
+      dt.year * 10000 + dt.month * 100 + dt.day;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastObservedDayKey = _localDayKey(DateTime.now());
+    _midnightRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      final nowDay = _localDayKey(DateTime.now());
+      if (nowDay != _lastObservedDayKey && mounted) {
+        setState(() {
+          _lastObservedDayKey = nowDay;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _midnightRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   void _toast(BuildContext context, String msg) {
     ScaffoldMessenger.of(context)

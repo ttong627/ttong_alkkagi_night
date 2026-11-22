@@ -464,20 +464,20 @@ class EndlessWaveBuilder {
       final groups = <WaveSpawnGroup>[
         WaveSpawnGroup(
           kind: MutantKind.swarmRat,
-          count: (9 + w * 2).clamp(9, 65),
-          intervalSec: (0.28 - w * 0.004).clamp(0.14, 0.28),
+          count: (9 + w * 2).clamp(9, 56),
+          intervalSec: (0.28 - w * 0.003).clamp(0.16, 0.28),
           laneIndex: w % 3,
         ),
         WaveSpawnGroup(
           kind: MutantKind.sickHound,
-          count: (5 + w * 2).clamp(5, 55),
-          intervalSec: (0.34 - w * 0.004).clamp(0.16, 0.34),
+          count: (5 + (w * 1.6).round()).clamp(5, 44),
+          intervalSec: (0.34 - w * 0.003).clamp(0.18, 0.34),
           laneIndex: (w + 2) % 3,
         ),
         WaveSpawnGroup(
           kind: w % 2 == 0 ? MutantKind.plagueToad : MutantKind.shieldYacha,
-          count: (3 + (w ~/ 2)).clamp(3, 32),
-          intervalSec: 0.50,
+          count: (3 + (w ~/ 3)).clamp(3, 24),
+          intervalSec: 0.52,
           laneIndex: (w + 1) % 3,
         ),
       ];
@@ -485,16 +485,16 @@ class EndlessWaveBuilder {
         groups.add(
           WaveSpawnGroup(
             kind: w % 3 == 0 ? MutantKind.bloodCocoon : MutantKind.ironBoar,
-            count: (2 + (w ~/ 2)).clamp(2, 28),
-            intervalSec: 0.58,
+            count: (2 + (w ~/ 3)).clamp(2, 20),
+            intervalSec: 0.60,
             laneIndex: (w + 2) % 3,
           ),
         );
         groups.add(
           WaveSpawnGroup(
             kind: MutantKind.bloodWingBat,
-            count: (4 + (w ~/ 2)).clamp(4, 24),
-            intervalSec: 0.48,
+            count: (4 + (w ~/ 3)).clamp(4, 20),
+            intervalSec: 0.50,
             laneIndex: w % 3,
           ),
         );
@@ -507,7 +507,7 @@ class EndlessWaveBuilder {
             intervalSec: 1.6,
             laneIndex: w % 3,
             customBossTitle: '무한 제$w물결 공중 행동대장 심연 철익귀',
-            customHitShield: 130 + w * 8,
+            customHitShield: 120 + w * 6,
             hierarchyRank: '공중 행동대장',
           ),
         );
@@ -516,13 +516,13 @@ class EndlessWaveBuilder {
         groups.add(
           WaveSpawnGroup(
             kind: MutantKind.ironBoar,
-            count: (3 + (w - 15) ~/ 3).clamp(3, 22),
-            intervalSec: 0.52,
+            count: (3 + (w - 15) ~/ 4).clamp(3, 16),
+            intervalSec: 0.55,
             laneIndex: w % 3,
           ),
         );
       }
-      // 3파도마다 스피드·맷집·공격력 특화 중간보스가 일반 변이체 무리와 함께 교대 동반 침략! (24물결 이상은 쌍중간보스 동시 기습)
+      // 3파도마다 스피드·맷집·공격력 특화 중간보스가 일반 변이체 무리와 함께 교대 동반 침략!
       if (w % 3 == 0) {
         final midCycle = ((w ~/ 3) - 1) % 3;
         final MutantKind midBoss;
@@ -540,11 +540,11 @@ class EndlessWaveBuilder {
         groups.add(
           WaveSpawnGroup(
             kind: midBoss,
-            count: w >= 24 ? 2 : 1,
-            intervalSec: 1.45,
+            count: w >= 36 ? 2 : 1,
+            intervalSec: 1.55,
             laneIndex: (w ~/ 3) % 3,
             customBossTitle: midTitle,
-            customHitShield: 140 + w * 10,
+            customHitShield: 130 + w * 7,
             hierarchyRank: '중간보스',
           ),
         );
@@ -553,12 +553,12 @@ class EndlessWaveBuilder {
         groups.add(
           WaveSpawnGroup(
             kind: w >= 15 ? MutantKind.chapterOverlord : MutantKind.raiderHeukpung,
-            count: w >= 35 ? 2 : 1,
-            intervalSec: 1.8,
+            count: w >= 60 ? 2 : 1,
+            intervalSec: 1.9,
             laneIndex: 1,
             customBossTitle: '무한 혈전 제$w물결 천련 마수',
             customPortrait: CampaignCatalog.chapterOf(safeTheme).bossPortraitPrefix,
-            customHitShield: w >= 10 ? (1000 + w * 25) : 520,
+            customHitShield: w >= 10 ? (1000 + w * 14) : 520,
             hierarchyRank: w >= 10 ? '장 보스' : '중간보스',
           ),
         );
@@ -566,7 +566,6 @@ class EndlessWaveBuilder {
       waves.add(groups);
     }
 
-    final cappedStartWave = totalWaves > 100 ? 100 : totalWaves;
     return StageSpec(
       globalIndex: 999,
       chapterNumber: safeTheme,
@@ -583,7 +582,7 @@ class EndlessWaveBuilder {
       isBossStage: true,
       maxMountCount: CampaignCatalog.chapterOf(safeTheme).mounts.length,
       waves: waves,
-      startingFieldTokens: 165 + cappedStartWave * 3,
+      startingFieldTokens: 195,
       clearElixirBonus: 3 + (totalWaves ~/ 5),
     );
   }
@@ -607,50 +606,50 @@ class OddsDisclosureRow {
     OddsDisclosureRow(
       category: '지형 · 물리 뽀록',
       name: '절벽 가장자리 기우뚱 추락 (뽀록)',
-      rateText: '35.0%',
+      rateText: '35.0% (8장 해역 50.0%)',
       detail: '밀침 충격을 받아 절벽 경계에 걸친 일반·중형 변이체가 즉시 추락 처치될 확률',
     ),
     OddsDisclosureRow(
       category: '지형 · 물리 뽀록',
       name: '회전 다각형 기둥 어부지리 도탄',
-      rateText: '물리 각도 100% 실측',
-      detail: '기둥 회전 위상과 충돌 법선에 따라 반사 속도 ×1.18 증폭 및 측면 방패 우회',
+      rateText: '회전 정다각형 법선 100% 실측',
+      detail: '회전 다각형 면 법선 반사에 따라 속도 가속 및 측면 방패 우회 · 도탄 보너스 +35%',
     ),
     OddsDisclosureRow(
       category: '전장 기연',
       name: '거대 황금 수호석 (크리티컬 기연)',
-      rateText: '기본 8.0% ~ 최대 14.0%',
-      detail: '중앙 수호탑 발사 시 피해량 2.4배 · 충격량 1.8배 거대 황금탄 발동 (독맥 개통 시 +6%p)',
+      rateText: '수동 14~20% · 자동 7~12%',
+      detail: '발사 동작당 거대 황금 확정 회심탄 발동 (독맥·생사현관 개통 시 추가 상승)',
     ),
     OddsDisclosureRow(
       category: '전장 기연',
-      name: '일거양득 2연사 (한 번 더! 기연)',
-      rateText: '기본 11.0% ~ 최대 17.0%',
-      detail: '길목 발사대 격발 시 대기 시간 없이 추가 수호 알 1발 즉시 연사 (독맥 개통 시 +6%p)',
+      name: '일거양득 속사 장전 (한 번 더! 기연)',
+      rateText: '기본 11.0% ~ 최대 21.0%',
+      detail: '길목 발사대 격발 시 장전 대기시간 대폭 단축 (동일 초소 내부 재사용 1.45초 · 경맥 +10%p)',
     ),
     OddsDisclosureRow(
       category: '전장 기연',
       name: '황금 보급 두꺼비 출현',
       rateText: '전투 중반 100% (판당 1회)',
-      detail: '전투 개시 32초 경과 시 전장 가로질러 등장 · 도탄 적중 시 현장 기력 및 영약 +1 확정',
+      detail: '전투 개시 32초 경과 시 전장 가로질러 등장 · 도탄 적중 시 현장 기력 +45 및 영약 +2 확정',
     ),
     OddsDisclosureRow(
       category: '출두 · 수련 기연',
       name: '무림수호단 출두 대박 / 앙코르 재출두',
-      rateText: '대박 30~36% · 한 번 더 24~30%',
+      rateText: '대박 30~40% · 한 번 더 24~34%',
       detail: '지원패 발동 시 마을 생태계 100% 정화 또는 다음 물결 공짜 재출두 발동',
     ),
     OddsDisclosureRow(
       category: '출두 · 수련 기연',
-      name: '단전 운기 대성공 (크리티컬 · 한 번 더)',
+      name: '단전 운기 대성공 (오늘의 깨달음 3배)',
       rateText: '황금 고리 조준 시 회심 100%',
-      detail: '일반 터치 시 회심 8~11% · 한 번 더 20~26% 추가 내공 및 수련 인장 획득',
+      detail: '매일 첫 10회 오늘의 깨달음 3배 내공·인장 및 길조 충전 · 한 번 더 20~30% 추가 수련',
     ),
     OddsDisclosureRow(
       category: '호송 · 탐색 · 길조',
       name: '물자 호송 / 심야 탐색 대풍년 기연',
-      rateText: '대풍년 26~34% · 한 번 더 22~28%',
-      detail: '보상 2배 또는 지원패 +1 추가 수령 · 보름달 길조 게이지 100% 도달 시 특급 기연 100% 확정',
+      rateText: '대풍년 26~38% · 한 번 더 22~32%',
+      detail: '보상 2배 또는 지원패 +1 추가 수령 · 실전 수호와 깨달음 수련으로 보름달 100% 시 특급 기연 확정',
     ),
     OddsDisclosureRow(
       category: '전장 소환 · 돌림판',

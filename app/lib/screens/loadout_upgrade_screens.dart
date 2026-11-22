@@ -198,6 +198,9 @@ class LoadoutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<StoneMaterial>(
+                    key: ValueKey(
+                      'stone_${p.activePresetIndex}_${preset.primaryStone.name}',
+                    ),
                     isExpanded: true,
                     initialValue: preset.primaryStone,
                     dropdownColor: NightPalette.bgPanel,
@@ -235,6 +238,9 @@ class LoadoutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<StoneShape>(
+                    key: ValueKey(
+                      'shape_${p.activePresetIndex}_${preset.primaryShape.name}',
+                    ),
                     isExpanded: true,
                     initialValue: preset.primaryShape,
                     dropdownColor: NightPalette.bgPanel,
@@ -258,6 +264,9 @@ class LoadoutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<SectTechnique>(
+                    key: ValueKey(
+                      'sect_${p.activePresetIndex}_${preset.sectTechnique.name}',
+                    ),
                     isExpanded: true,
                     initialValue: preset.sectTechnique,
                     dropdownColor: NightPalette.bgPanel,
@@ -297,7 +306,7 @@ class LoadoutScreen extends StatelessWidget {
                     child: Divider(height: 1, color: Colors.white12),
                   ),
                   const Text(
-                    '12굽이 천리협곡 발사대 5종 대 돌연변이 상성 일람',
+                    '10장 고유 지형 발사대 5종 대 돌연변이 상성 일람',
                     style: TextStyle(
                       fontSize: 15.5,
                       color: NightPalette.jadeGreen,
@@ -307,7 +316,7 @@ class LoadoutScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   ...LauncherType.values.map((lt) {
                     final unlocked =
-                        lt.unlockChapter <= p.highestUnlockedChapter + 1;
+                        lt.unlockChapter <= p.highestUnlockedChapter;
                     final permLv = p.launcherPermanentLevels[lt] ?? 1;
                     final targetMutant =
                         NightArtRegistry.counterTargetOfLauncher(lt);
@@ -570,6 +579,9 @@ class LoadoutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<SpiritBeast>(
+                    key: ValueKey(
+                      'beast_${p.activePresetIndex}_${preset.equippedBeast.name}',
+                    ),
                     isExpanded: true,
                     initialValue: preset.equippedBeast,
                     dropdownColor: NightPalette.bgPanel,
@@ -607,6 +619,9 @@ class LoadoutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<AutoTriggerCondition>(
+                    key: ValueKey(
+                      'beastCond_${p.activePresetIndex}_${preset.beastCondition.name}',
+                    ),
                     isExpanded: true,
                     initialValue: preset.beastCondition,
                     dropdownColor: NightPalette.bgPanel,
@@ -705,6 +720,9 @@ class LoadoutScreen extends StatelessWidget {
                           const SizedBox(width: 10),
                           Expanded(
                             child: DropdownButtonFormField<AutoTriggerCondition>(
+                              key: ValueKey(
+                                'heroCond_${p.activePresetIndex}_${hero.name}_${curCond.name}',
+                              ),
                               isExpanded: true,
                               initialValue: curCond,
                               dropdownColor: NightPalette.bgPanel,
@@ -1044,10 +1062,15 @@ class UpgradeScreen extends StatelessWidget {
                                 disabledBackgroundColor: const Color(0x241F2B42),
                                 disabledForegroundColor: const Color(0x9E1F2B42),
                               ),
-                              onPressed: p.tokens >= centralCost
+                              onPressed: p.centralGuardianLevel < 999 &&
+                                      p.tokens >= centralCost
                                   ? controller.upgradeCentralGuardian
                                   : null,
-                              child: Text('증표 $centralCost 강화'),
+                              child: Text(
+                                p.centralGuardianLevel >= 999
+                                    ? '최고 단수'
+                                    : '증표 $centralCost 강화',
+                              ),
                             ),
                           ],
                         ),
@@ -1096,10 +1119,15 @@ class UpgradeScreen extends StatelessWidget {
                                 disabledBackgroundColor: const Color(0x241F2B42),
                                 disabledForegroundColor: const Color(0x9E1F2B42),
                               ),
-                              onPressed: p.tokens >= p.forgeMasteryCost
+                              onPressed: p.forgeMasteryLevel < 9999 &&
+                                      p.tokens >= p.forgeMasteryCost
                                   ? controller.upgradeForgeMastery
                                   : null,
-                              child: Text('증표 ${p.forgeMasteryCost}'),
+                              child: Text(
+                                p.forgeMasteryLevel >= 9999
+                                    ? '최고 단수'
+                                    : '증표 ${p.forgeMasteryCost}',
+                              ),
                             ),
                           ],
                         ),
@@ -1142,6 +1170,8 @@ class UpgradeScreen extends StatelessWidget {
                         final lt = LauncherType.values[idx];
                         final lv = p.launcherPermanentLevels[lt] ?? 1;
                         final cost = lt.permanentUpgradeCost(lv);
+                        final ltUnlocked =
+                            lt.unlockChapter <= p.highestUnlockedChapter;
                         return Row(
                           children: [
                             NightSpriteIcon(
@@ -1149,6 +1179,7 @@ class UpgradeScreen extends StatelessWidget {
                               fallbackIcon: Icons.gps_fixed_rounded,
                               size: 46,
                               color: Color(lt.colorHex),
+                              dimmed: !ltUnlocked,
                               showFrame: true,
                             ),
                             const SizedBox(width: 12),
@@ -1161,12 +1192,16 @@ class UpgradeScreen extends StatelessWidget {
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 15.2,
-                                      color: Color(lt.colorHex),
+                                      color: ltUnlocked
+                                          ? Color(lt.colorHex)
+                                          : NightPalette.textMuted,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    lt.roleSummary,
+                                    ltUnlocked
+                                        ? lt.roleSummary
+                                        : '제${lt.unlockChapter}장 진군 시 제련 및 배치 개방',
                                     style: const TextStyle(
                                       fontSize: 12.3,
                                       color: NightPalette.textMuted,
@@ -1177,10 +1212,16 @@ class UpgradeScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             FilledButton(
-                              onPressed: p.tokens >= cost
+                              onPressed: ltUnlocked &&
+                                      lv < 999 &&
+                                      p.tokens >= cost
                                   ? () => controller.upgradeLauncherPermanent(lt)
                                   : null,
-                              child: Text('증표 $cost'),
+                              child: Text(
+                                !ltUnlocked
+                                    ? '제${lt.unlockChapter}장 개방'
+                                    : (lv >= 999 ? '최고 단수' : '증표 $cost'),
+                              ),
                             ),
                           ],
                         );
@@ -1455,10 +1496,15 @@ class UpgradeScreen extends StatelessWidget {
                                 disabledBackgroundColor: const Color(0x241F2B42),
                                 disabledForegroundColor: const Color(0x9E1F2B42),
                               ),
-                              onPressed: p.elixirs >= p.elixirResonanceCost
+                              onPressed: p.elixirResonanceLevel < 9999 &&
+                                      p.elixirs >= p.elixirResonanceCost
                                   ? controller.upgradeElixirResonance
                                   : null,
-                              child: Text('영약 ${p.elixirResonanceCost}'),
+                              child: Text(
+                                p.elixirResonanceLevel >= 9999
+                                    ? '최고 단수'
+                                    : '영약 ${p.elixirResonanceCost}',
+                              ),
                             ),
                           ],
                         ),

@@ -14,6 +14,7 @@ class NightAudioController {
   double bgmVolume = 0.38;
   double sfxVolume = 0.72;
   String? _currentBgm;
+  String? _loadedBgmSource;
 
   AudioPlayer? _bgmPlayer;
   final List<AudioPlayer> _sfxPool = [];
@@ -37,9 +38,11 @@ class NightAudioController {
     try {
       if (!bgmEnabled) {
         await _bgmPlayer?.pause();
-      } else if (_bgmPlayer != null) {
-        await _bgmPlayer!.setVolume(bgmVolume);
-        if (_currentBgm != null) {
+      } else if (_currentBgm != null) {
+        if (_bgmPlayer == null || _loadedBgmSource != _currentBgm) {
+          await playBgm(_currentBgm!);
+        } else {
+          await _bgmPlayer!.setVolume(bgmVolume);
           await _bgmPlayer!.resume();
         }
       }
@@ -51,9 +54,12 @@ class NightAudioController {
       _currentBgm = assetFileName;
       return;
     }
-    if (_currentBgm == assetFileName && _bgmPlayer != null) {
+    if (_currentBgm == assetFileName &&
+        _loadedBgmSource == assetFileName &&
+        _bgmPlayer != null) {
       try {
         await _bgmPlayer!.setVolume(bgmVolume);
+        await _bgmPlayer!.resume();
       } catch (_) {}
       return;
     }
@@ -63,6 +69,7 @@ class NightAudioController {
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
       await _bgmPlayer!.setVolume(bgmVolume);
       await _bgmPlayer!.play(AssetSource('sounds/$assetFileName'));
+      _loadedBgmSource = assetFileName;
     } catch (e) {
       debugPrint('배경음악 재생 생략: $e');
     }
@@ -70,6 +77,7 @@ class NightAudioController {
 
   Future<void> stopBgm() async {
     _currentBgm = null;
+    _loadedBgmSource = null;
     try {
       await _bgmPlayer?.stop();
     } catch (_) {}
@@ -88,8 +96,8 @@ class NightAudioController {
     try {
       if (_sfxPool.length < 8) {
         final p = AudioPlayer();
-        await p.setReleaseMode(ReleaseMode.stop);
         _sfxPool.add(p);
+        await p.setReleaseMode(ReleaseMode.stop);
       }
       final player = _sfxPool[_poolCursor % _sfxPool.length];
       _poolCursor++;

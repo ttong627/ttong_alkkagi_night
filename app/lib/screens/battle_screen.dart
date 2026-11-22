@@ -38,6 +38,7 @@ class _BattleScreenState extends State<BattleScreen>
   Duration? _lastTick;
   int _speedMultiplier = 1;
   bool _summaryShown = false;
+  int _lastPersistedSupportUsed = 0;
 
   /// 수동 조준 드래그(꾹 누르면 자동 연속 사격!) 및 비차단 실시간 초소 미니 선택창 타이머!
   bool _draggingManualAim = false;
@@ -95,6 +96,7 @@ class _BattleScreenState extends State<BattleScreen>
       seed: DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF,
     )..autoChoosePerks = widget.controller.autoChooseBattlePerks;
     _summaryShown = false;
+    _lastPersistedSupportUsed = 0;
     _draggingManualAim = false;
     _manualAimPreviewAngleRad = null;
     _panStartSlot = null;
@@ -166,6 +168,11 @@ class _BattleScreenState extends State<BattleScreen>
           max(0.0, _sim.dawnPurifyAnimTimer - rawDt);
     } else if (_summaryShown) {
       return;
+    }
+
+    if (_sim.usedSupportCount > _lastPersistedSupportUsed) {
+      _lastPersistedSupportUsed = _sim.usedSupportCount;
+      widget.controller.notifySupportUsedInBattle();
     }
 
     NightAudioController.instance.flushBattleCues(_sim.pendingSounds);
@@ -912,8 +919,9 @@ class _BattleScreenState extends State<BattleScreen>
                             ],
                             selected: {_speedMultiplier},
                             onSelectionChanged: (s) {
-                              widget.controller.battleSpeedMultiplier = s.first.clamp(1, 4);
-                              setState(() => _speedMultiplier = s.first.clamp(1, 4));
+                              final nextSpd = s.first.clamp(1, 4);
+                              widget.controller.setBattleSpeed(nextSpd);
+                              setState(() => _speedMultiplier = nextSpd);
                             },
                             style: ButtonStyle(
                               visualDensity: VisualDensity.compact,
@@ -1215,7 +1223,8 @@ class _BattleScreenState extends State<BattleScreen>
                           _HudStatBadge(
                             assetPath: NightArtRegistry.fxQi,
                             fallbackIcon: Icons.bolt_rounded,
-                            text: '내공 ${_sim.qiBars.toStringAsFixed(1)}/3칸',
+                            text:
+                                '내공 ${_sim.qiBars.toStringAsFixed(1)}/${_sim.maxQiBars.round()}칸',
                             color: NightPalette.jadeGreen,
                           ),
                           _HudStatBadge(
@@ -2155,7 +2164,7 @@ class _BattleScreenState extends State<BattleScreen>
                                           final nextVal = !_sim.autoChoosePerks;
                                           _sim.autoChoosePerks = nextVal;
                                           widget.controller
-                                              .autoChooseBattlePerks = nextVal;
+                                              .setAutoChoosePerks(nextVal);
                                           if (nextVal &&
                                               _sim.pendingPerkChoices
                                                   .isNotEmpty) {
@@ -2461,6 +2470,77 @@ class _BattleScreenState extends State<BattleScreen>
                                       child: Row(
                                         children: [
                                           if (existing == null) ...[
+                                            Builder(
+                                              builder: (_) {
+                                                final recType = _sim
+                                                    .preferredBuildTypeForSlot(
+                                                  slot,
+                                                );
+                                                final recCost = _sim
+                                                    .buildCostForType(recType);
+                                                final canRec = _sim
+                                                        .fieldTokens >=
+                                                    recCost;
+                                                return Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                    right: 6,
+                                                  ),
+                                                  child: ActionChip(
+                                                    key: const Key(
+                                                      'place_recommended_slot_btn',
+                                                    ),
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                    backgroundColor: canRec
+                                                        ? const Color(
+                                                            0xFF14382E,
+                                                          )
+                                                        : Colors.white10,
+                                                    side: BorderSide(
+                                                      color: canRec
+                                                          ? const Color(
+                                                              0xFF80ED99,
+                                                            )
+                                                          : Colors.white24,
+                                                    ),
+                                                    label: Text(
+                                                      '★추천[${recType.name.split(" ").first}] $recCost⚡',
+                                                      style: TextStyle(
+                                                        fontSize: 11.2,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: canRec
+                                                            ? const Color(
+                                                                0xFF80ED99,
+                                                              )
+                                                            : NightPalette
+                                                                .textMuted,
+                                                      ),
+                                                    ),
+                                                    onPressed: canRec
+                                                        ? () {
+                                                            if (_sim
+                                                                .placeLauncherInBattle(
+                                                              selIdx,
+                                                              recType,
+                                                            )) {
+                                                              NightHaptics
+                                                                  .instance
+                                                                  .lightTap();
+                                                              setState(() {
+                                                                _selectedSlotIndex =
+                                                                    null;
+                                                                _livePadMenuTimer =
+                                                                    0.0;
+                                                              });
+                                                            }
+                                                          }
+                                                        : null,
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                             Padding(
                                               padding: const EdgeInsets.only(
                                                 right: 6,
@@ -2618,7 +2698,7 @@ class _BattleScreenState extends State<BattleScreen>
                                                         NightPalette.jadeGreen,
                                                   ),
                                                   label: Text(
-                                                    '▲${existing.tier + 1}형(${existing.type.inBattleUpgradeCost(existing.tier)}⚡)',
+                                                    '▲${existing.tier + 1}형(${_sim.upgradeCostForLauncher(existing)}⚡)',
                                                     style: const TextStyle(
                                                       fontSize: 11.2,
                                                       fontWeight:
@@ -2630,9 +2710,9 @@ class _BattleScreenState extends State<BattleScreen>
                                                   onPressed: !existing
                                                               .isConstructing &&
                                                           _sim.fieldTokens >=
-                                                              existing.type
-                                                                  .inBattleUpgradeCost(
-                                                                existing.tier,
+                                                              _sim
+                                                                  .upgradeCostForLauncher(
+                                                                existing,
                                                               )
                                                       ? () {
                                                           if (_sim
@@ -2809,6 +2889,20 @@ class _BattleScreenState extends State<BattleScreen>
                 final luckyCost = _sim.currentLuckySummonCost;
                 final canQuickLucky =
                     readyEmptySlot != null && _sim.fieldTokens >= luckyCost;
+                final LauncherMountSlot? readySlotObj = readyEmptySlot != null
+                    ? _sim.activeMounts
+                        .where((m) => m.slotIndex == readyEmptySlot)
+                        .firstOrNull
+                    : null;
+                final LauncherType? recDirectType = readySlotObj != null
+                    ? _sim.preferredBuildTypeForSlot(readySlotObj)
+                    : null;
+                final int recDirectCost = recDirectType != null
+                    ? _sim.buildCostForType(recDirectType)
+                    : 0;
+                final bool canQuickDirect = readyEmptySlot != null &&
+                    recDirectType != null &&
+                    _sim.fieldTokens >= recDirectCost;
                 final unexcavatedCost = unexcavatedSlot != null
                     ? _sim.excavationCostForSlot(unexcavatedSlot)
                     : 0;
@@ -2866,6 +2960,40 @@ class _BattleScreenState extends State<BattleScreen>
                                             _livePadMenuTimer =
                                                 _livePadMenuDuration;
                                           });
+                                        }
+                                      }
+                                    : null,
+                              ),
+                              const SizedBox(width: 5),
+                            ],
+                            if (readyEmptySlot != null &&
+                                recDirectType != null) ...[
+                              ActionChip(
+                                key: const Key('quick_direct_build_btn'),
+                                visualDensity: VisualDensity.compact,
+                                backgroundColor: canQuickDirect
+                                    ? const Color(0xFF14382E)
+                                    : NightPalette.bgDeep,
+                                side: BorderSide(
+                                  color: canQuickDirect
+                                      ? const Color(0xFF80ED99)
+                                      : Colors.white24,
+                                ),
+                                label: Text(
+                                  '🔨추천축조[${recDirectType.name.split(" ").first}]($recDirectCost⚡)',
+                                  style: TextStyle(
+                                    fontSize: 11.2,
+                                    fontWeight: FontWeight.bold,
+                                    color: canQuickDirect
+                                        ? const Color(0xFF80ED99)
+                                        : NightPalette.textMuted,
+                                  ),
+                                ),
+                                onPressed: canQuickDirect
+                                    ? () {
+                                        if (_sim.quickDirectBuildNextPad()) {
+                                          NightHaptics.instance.lightTap();
+                                          setState(() {});
                                         }
                                       }
                                     : null,
@@ -3295,8 +3423,8 @@ class _BattleScreenState extends State<BattleScreen>
                                 ),
                               ),
                               onSelected: (v) {
-                                widget.controller.autoChooseBattlePerks = v;
                                 _sim.autoChoosePerks = v;
+                                widget.controller.setAutoChoosePerks(v);
                                 if (v && _sim.pendingPerkChoices.isNotEmpty) {
                                   final rec = _sim.recommendedPerkChoice() ??
                                       _sim.pendingPerkChoices.first;
@@ -3329,7 +3457,12 @@ class _BattleScreenState extends State<BattleScreen>
                               ),
                               onPressed: _sim.supportChargesLeft > 0
                                   ? () {
-                                      _sim.triggerSupportChuldu();
+                                      if (_sim.triggerSupportChuldu()) {
+                                        _lastPersistedSupportUsed =
+                                            _sim.usedSupportCount;
+                                        widget.controller
+                                            .notifySupportUsedInBattle();
+                                      }
                                       setState(() {});
                                     }
                                   : null,

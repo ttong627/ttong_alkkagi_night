@@ -42,7 +42,7 @@ enum RoguePerk {
     id: 'luckyAscension',
     title: '운명의 신화 승급',
     badge: '🎲 초소 무료 각성',
-    description: '설치된 초소 중 1곳이 즉시 +1~2형 무료 각성 승급합니다! (설치 초소가 없으면 군수 기력 +75⚡ 즉시 지급)',
+    description: '설치된 초소 중 1곳이 즉시 +1형 무료 각성 승급합니다! (설치 초소가 없으면 군수 기력 +46⚡ 즉시 지급)',
     rarity: RoguePerkRarity.legendary,
     colorHex: 0xFFFFD166,
   ),

@@ -2543,5 +2543,150 @@ void main() {
         expect(m.maxHp.isFinite && m.maxHp > 0 && m.maxHp < 1e9, isTrue);
       }
     });
+
+    test('v1.0.0+27 적대적 심층 회귀 검증: 비전투 보름달 차단·도박철거 차익 차단·빙결 공격정지·어기어석 16타·10경맥 4칸·출두 즉시차감·요약 멱등성', () {
+      // 1) 일일 깨달음 10회 소진 후 단전 운기 연타 시 보름달 게이지 비전투 무한 수급 원천 차단
+      final pMoon = PlayerProgress();
+      pMoon.meditateBatch(
+        count: 10,
+        hitGoldenRing: true,
+        rng: Random(7),
+        todayKey: '2026-11-22',
+      );
+      final gaugeAfterDaily = pMoon.moonOmenGauge;
+      for (int i = 0; i < 30; i++) {
+        pMoon.meditateOnce(
+          hitGoldenRing: true,
+          rng: Random(100 + i),
+          todayKey: '2026-11-22',
+        );
+      }
+      expect(pMoon.moonOmenGauge, equals(gaugeAfterDaily));
+
+      // 2) 도박 소환 후 즉시 철거 시 기력 증식 차익(Arbitrage) 0건 보장
+      final pLucky = PlayerProgress(highestClearedGlobalStage: 30);
+      final simLucky = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(3, 2),
+        difficulty: DefenseDifficulty.normal,
+        progress: pLucky,
+        seed: 42,
+        allowSerendipity: false,
+      );
+      simLucky.fieldTokens = 200;
+      final beforeTokens = simLucky.fieldTokens;
+      expect(simLucky.summonLuckyLauncherInBattle(0), isNotNull);
+      final refund = simLucky.dismantleLauncherInBattle(0);
+      expect(refund, greaterThan(0));
+      expect(simLucky.fieldTokens, lessThan(beforeTokens));
+
+      // 3) 빙결(freezeTimer > 0) 중인 변이체는 결계·본진 접촉 피해 및 독안개 오라를 가하지 못함
+      final simFreeze = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 2),
+        difficulty: DefenseDifficulty.normal,
+        progress: PlayerProgress(),
+        seed: 11,
+        allowSerendipity: false,
+      );
+      simFreeze.mutants.clear();
+      simFreeze.projectiles.clear();
+      final frozenEnemy = ActiveMutant(
+        uid: 9101,
+        kind: MutantKind.plagueToad,
+        laneIndex: 0,
+        waypoints: simFreeze.chapter.smoothedLane(0),
+        pos: simFreeze.towerPos,
+        maxHp: 9000,
+        speed: 40,
+      )..freezeTimer = 2.0;
+      simFreeze.mutants.add(frozenEnemy);
+      final shieldBefore = simFreeze.shieldHp;
+      final cropsBefore = simFreeze.cropsHealth;
+      simFreeze.step(0.5);
+      expect(simFreeze.shieldHp, equals(shieldBefore));
+      expect(simFreeze.cropsHealth, equals(cropsBefore));
+
+      // 4) 수동 어기어석 필살탄 적중 시 보스 타수 마갑 16타 일거 파쇄
+      final simEogi = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(4, 12),
+        difficulty: DefenseDifficulty.normal,
+        progress: PlayerProgress(highestClearedGlobalStage: 45),
+        seed: 19,
+        allowSerendipity: false,
+      );
+      simEogi.mutants.clear();
+      simEogi.projectiles.clear();
+      final shieldBoss = ActiveMutant(
+        uid: 9201,
+        kind: MutantKind.chapterOverlord,
+        laneIndex: 0,
+        waypoints: simEogi.chapter.smoothedLane(0),
+        pos: simEogi.towerPos + const Vec2(0, -120),
+        maxHp: 90000,
+        speed: 0,
+      )..enableHitShield(100);
+      simEogi.mutants.add(shieldBoss);
+      simEogi.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'eogi_manual',
+          sourceLabel: '어기어석',
+          pos: shieldBoss.pos + const Vec2(0, 12),
+          vel: const Vec2(0, -480),
+          material: StoneMaterial.hyeoncheol,
+          shape: StoneShape.sphere,
+          damage: 1200,
+          knockback: 40,
+          critChance: 1.0,
+          colorHex: 0xFFFFD166,
+          radius: 19.0,
+          projectileStyle: 'eogiUltimate',
+        ),
+      );
+      simEogi.step(1 / 30);
+      expect(shieldBoss.hitShieldLeft, lessThanOrEqualTo(84));
+
+      // 5) 10단 생사현관 개통 시 생사경에서도 내공 상한 4.0칸 확장 & 기연 보너스 증가 & 영약 공명 9999 상한
+      final pMax = PlayerProgress(
+        realmIndex: 7,
+        openedMeridianStep: 10,
+        elixirResonanceLevel: 9999,
+        elixirs: 999999,
+        supportTokens: 3,
+      );
+      expect(pMax.maxQiBars, equals(4.0));
+      expect(pMax.meridianSerendipityBonus, greaterThan(0.08));
+      expect(pMax.upgradeElixirResonance(), isFalse);
+
+      // 6) 출두 발동 즉시 영구 지원패 실시간 차감 & 종료 정산 시 이중 차감 0건 + buildSummary 멱등성
+      final simSup = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(2, 1),
+        difficulty: DefenseDifficulty.normal,
+        progress: pMax,
+        seed: 23,
+      );
+      expect(simSup.triggerSupportChuldu(), isTrue);
+      expect(pMax.supportTokens, equals(2));
+      final sum1 = simSup.buildSummary();
+      final sum2 = simSup.buildSummary();
+      expect(sum1.earnedTokens, equals(sum2.earnedTokens));
+      expect(sum1.earnedElixirs, equals(sum2.earnedElixirs));
+      expect(sum1.supportDeductedRealtime, isTrue);
+      pMax.onBattleFinished(
+        stage: simSup.stage,
+        victory: false,
+        stars: 0,
+        earnedTokens: sum1.earnedTokens,
+        earnedElixirs: sum1.earnedElixirs,
+        usedSupportCount: sum1.usedSupportCount,
+        killCount: 0,
+        pporokCount: 0,
+        bankShotCount: 0,
+        chainShatterCount: 0,
+        serendipityCount: 0,
+        encounteredMutants: const {},
+        supportAlreadyDeductedInSim: sum1.supportDeductedRealtime,
+        bossElixirAlreadyIncluded: sum1.bossElixirIncluded,
+      );
+      expect(pMax.supportTokens, equals(2));
+    });
   });
 }

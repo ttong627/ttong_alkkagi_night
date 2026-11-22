@@ -913,7 +913,7 @@ class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
                     child: HeroVsMutantShowcaseBanner(
                       sceneAsset: NightArtRegistry.cardEndlessAbyss,
                       badgeText:
-                          '최고 돌파 기록: ${p.bestEndlessWave}물결 · 누적 토벌: ${p.totalMutantKills}마리',
+                          '전체 최고: ${p.bestEndlessWave}물결 · ${widget.controller.selectedDifficulty.name.split(" · ").first}: ${p.bestEndlessByDifficulty[widget.controller.selectedDifficulty.id] ?? 0}물결 · 토벌: ${p.totalMutantKills}마리',
                       title: '100물결 심야 무한 혈전 결사항전',
                       subtitle:
                           '3물결마다 재변이 두목이 침공하고 5물결마다 3페이즈 대수괴가 난입합니다. 무림수호단 기마대와 함께 끝없는 괴수 해일을 격파하세요.',
@@ -962,7 +962,37 @@ class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
                           ),
                           const SizedBox(height: 18),
                           const Text(
-                            '2. 전장 지형 선택 (해금된 장 기준)',
+                            '2. 난이도 선택 (난이도별 최고 돌파 기록 별도 집계)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15.5,
+                              color: NightPalette.accentGold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SegmentedButton<DefenseDifficulty>(
+                            segments: DefenseDifficulty.values
+                                .map(
+                                  (d) => ButtonSegment(
+                                    value: d,
+                                    label: Text(
+                                      '${d.name.split(" · ").first} (최고 ${p.bestEndlessByDifficulty[d.id] ?? 0})',
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            selected: {widget.controller.selectedDifficulty},
+                            onSelectionChanged: (s) {
+                              widget.controller.setDifficulty(s.first);
+                              setState(() {});
+                            },
+                            style: const ButtonStyle(
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          const Text(
+                            '3. 전장 지형 선택 (해금된 장 기준)',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15.5,
@@ -971,6 +1001,9 @@ class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
                           ),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<int>(
+                            key: ValueKey(
+                              'endless_ch_${maxCh}_${_selectedThemeChapter.clamp(1, maxCh)}',
+                            ),
                             isExpanded: true,
                             initialValue: _selectedThemeChapter.clamp(1, maxCh),
                             items: List.generate(maxCh, (idx) {

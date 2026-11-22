@@ -116,9 +116,12 @@ class SettingsScreen extends StatelessWidget {
               backgroundColor: NightPalette.accentGold,
               foregroundColor: Colors.black,
             ),
-            onPressed: () {
-              final ok = controller.importBackupCode(inputCtrl.text);
-              Navigator.of(ctx).pop();
+            onPressed: () async {
+              final ok = await controller.importBackupCode(inputCtrl.text);
+              if (ctx.mounted) {
+                Navigator.of(ctx).pop();
+              }
+              if (!context.mounted) return;
               if (ok) {
                 _toast(context, '✅ 백업 진행도가 완벽하게 복원되었습니다!');
               } else {
@@ -686,7 +689,7 @@ class ProductionNoteScreen extends StatelessWidget {
                     '1. 실패 없는 기명 심법 수련: 까다로운 각도 튕기기 시험을 없애고 단전 호흡과 십대 경맥 점등만으로 누구나 100% 내공을 쌓습니다.\n'
                     '2. 증표와 영약 이원화 성장: 변이체가 떨어뜨리는 「증표」는 기계 장치(수호탑·발사대) 강화에, 「영약」은 생명체(영수·동료·내공) 강화에 명확히 분리했습니다.\n'
                     '3. 지원패 3대 수급과 출두 역전극: 물자 호송·심야 탐색·보름달 길조로 지원패를 모아 위기 순간 「무림수호단 출두야~~!!」로 전세를 뒤집습니다.\n'
-                    '4. 직접 초소 배치 · 5대 도파민 전술 시스템 · 제작 도구 투명 공개: 북쪽 굽이길 빈 초소(2→10곳)에 군수기력(⚡)으로 발사대를 건설·합치기 진화하고, 물결마다 3택1 비급과 ×2 복제 핀볼 기물로 탄막을 완성합니다. 변이체·성채·전장 기물·비급 총 101종 원화는 코덱스로 제작하고 연속 곡선 생체역학 모션 코드로 완성했습니다.',
+                    '4. 직접 초소 배치 · 5대 도파민 전술 시스템 · 제작 도구 투명 공개: 장별 고유 지형 빈 초소(4→14곳)에 군수기력(⚡)으로 발사대를 건설·연성 합체 진화하고, 물결마다 3택1 비급과 ×2 복제 핀볼 기물로 탄막을 완성합니다. 변이체·성채·전장 기물·비급 총 101종 원화는 코덱스로 제작하고 연속 곡선 생체역학 모션 코드로 완성했습니다.',
                     style: TextStyle(fontSize: 13, height: 1.5),
                   ),
                 ],

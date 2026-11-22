@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:defense_core/defense_core.dart';
@@ -33,13 +34,27 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ambientAnim;
+  Timer? _midnightRefreshTimer;
+  int _lastObservedDayKey = 0;
   int _selectedNavIndex = 0;
   int _supplySubTab = 0;
+
+  static int _localDayKey(DateTime dt) =>
+      dt.year * 10000 + dt.month * 100 + dt.day;
 
   @override
   void initState() {
     super.initState();
     NightAudioController.instance.playBgm('bgm_lobby.ogg');
+    _lastObservedDayKey = _localDayKey(DateTime.now());
+    _midnightRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      final nowDay = _localDayKey(DateTime.now());
+      if (nowDay != _lastObservedDayKey && mounted) {
+        setState(() {
+          _lastObservedDayKey = nowDay;
+        });
+      }
+    });
     _ambientAnim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 4800),
@@ -48,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    _midnightRefreshTimer?.cancel();
     _ambientAnim.dispose();
     super.dispose();
   }
@@ -405,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen>
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               const Text(
-                                '12굽이 지형 초소 건설과 3페이즈 대수괴 약점 저격 비급을 30초 만에 확인하세요.',
+                                '10장 고유 지형 초소 건설과 3페이즈 대수괴 약점 저격 비급을 30초 만에 확인하세요.',
                                 style: TextStyle(
                                   fontSize: 12.2,
                                   color: NightPalette.textMuted,

@@ -686,8 +686,9 @@ class _TrainingScreenState extends State<TrainingScreen>
       padding: const EdgeInsets.all(16),
       children: CoreStatType.values.map((stat) {
         final lv = p.coreStatLevels[stat] ?? 0;
+        final statMax = lv >= 999;
         final cost = p.coreStatUpgradeCost(stat);
-        final canBuy = p.trainingSeals >= cost;
+        final canBuy = !statMax && p.trainingSeals >= cost;
         final statIcon = switch (stat.index % 4) {
           0 => NightArtRegistry.fxCritical,
           1 => NightArtRegistry.fxBarrier,
@@ -732,7 +733,7 @@ class _TrainingScreenState extends State<TrainingScreen>
                 FilledButton(
                   onPressed:
                       canBuy ? () => widget.controller.upgradeCoreStat(stat) : null,
-                  child: Text('인장 $cost 단련'),
+                  child: Text(statMax ? '최고 단수' : '인장 $cost 단련'),
                 ),
               ],
             ),

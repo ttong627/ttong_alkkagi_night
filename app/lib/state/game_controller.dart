@@ -11,6 +11,7 @@ import '../audio/night_haptics.dart';
 class GameController extends ChangeNotifier {
   GameController({PlayerProgress? initialProgress})
       : _progress = initialProgress ?? PlayerProgress() {
+    _syncPreferencesFromProgress();
     _syncDeviceSettings();
   }
 
@@ -24,6 +25,15 @@ class GameController extends ChangeNotifier {
   final Random _rng = Random();
 
   PlayerProgress get progress => _progress;
+
+  void _syncPreferencesFromProgress() {
+    selectedDifficulty = DefenseDifficulty.values.firstWhere(
+      (d) => d.id == _progress.preferredDifficultyId,
+      orElse: () => DefenseDifficulty.normal,
+    );
+    battleSpeedMultiplier = _progress.preferredBattleSpeed.clamp(1, 4);
+    autoChooseBattlePerks = _progress.preferredAutoPerk;
+  }
 
   void _syncDeviceSettings() {
     NightAudioController.instance.applySettings(
@@ -41,6 +51,7 @@ class GameController extends ChangeNotifier {
       if (raw != null && raw.isNotEmpty) {
         _progress = PlayerProgress.decodeJson(raw);
         selectedChapter = _progress.highestUnlockedChapter;
+        _syncPreferencesFromProgress();
         _syncDeviceSettings();
         notifyListeners();
       }
@@ -49,19 +60,37 @@ class GameController extends ChangeNotifier {
     }
   }
 
-  Future<void> saveToDisk() async {
+  Future<bool> saveToDisk() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_prefsKey, _progress.encodeJson());
+      return await prefs.setString(_prefsKey, _progress.encodeJson());
     } catch (e) {
       debugPrint('자동 저장 예외 무시: $e');
+      return false;
     }
   }
 
   void setDifficulty(DefenseDifficulty diff) {
     selectedDifficulty = diff;
+    _progress.preferredDifficultyId = diff.id;
     NightAudioController.instance.playAsset('ui_tap.ogg');
     NightHaptics.instance.lightTap();
+    saveToDisk();
+    notifyListeners();
+  }
+
+  void setBattleSpeed(int mult) {
+    final clamped = mult.clamp(1, 4);
+    battleSpeedMultiplier = clamped;
+    _progress.preferredBattleSpeed = clamped;
+    saveToDisk();
+    notifyListeners();
+  }
+
+  void setAutoChoosePerks(bool enabled) {
+    autoChooseBattlePerks = enabled;
+    _progress.preferredAutoPerk = enabled;
+    saveToDisk();
     notifyListeners();
   }
 
@@ -277,7 +306,9 @@ class GameController extends ChangeNotifier {
   bool unlockStone(StoneMaterial stone) {
     final ok = _progress.unlockStoneWithTokens(stone);
     if (ok) {
-      _progress.activePreset.primaryStone = stone;
+      if (stone.grade >= _progress.activePreset.primaryStone.grade) {
+        _progress.activePreset.primaryStone = stone;
+      }
       NightAudioController.instance.playAsset('unlock.ogg');
       NightHaptics.instance.heavyImpact();
       saveToDisk();
@@ -483,20 +514,29 @@ class GameController extends ChangeNotifier {
 
   String exportBackupCode() => _progress.exportBackupCode();
 
-  bool importBackupCode(String rawCode) {
+  Future<bool> importBackupCode(String rawCode) async {
     final decoded = PlayerProgress.tryDecodeBackupCode(rawCode);
     if (decoded == null) return false;
     _progress = decoded;
     selectedChapter = _progress.highestUnlockedChapter;
+    _syncPreferencesFromProgress();
     _syncDeviceSettings();
+    final saved = await saveToDisk();
+    if (!saved) {
+      debugPrint('백업 복원 후 디스크 기록 확인 필요 (메모리 상태는 적용됨)');
+    }
     NightAudioController.instance.playAsset('jingle_levelup.ogg');
     NightHaptics.instance.meridianOpen();
-    saveToDisk();
     notifyListeners();
     return true;
   }
 
   void notifyConsumableUsedInBattle() {
+    saveToDisk();
+    notifyListeners();
+  }
+
+  void notifySupportUsedInBattle() {
     saveToDisk();
     notifyListeners();
   }
@@ -516,6 +556,9 @@ class GameController extends ChangeNotifier {
       serendipityCount: summary.serendipityCount,
       encounteredMutants: summary.encounteredMutants,
       endlessWavesCleared: stage.globalIndex >= 900 ? summary.wavesClearedCount : 0,
+      difficultyId: selectedDifficulty.id,
+      supportAlreadyDeductedInSim: summary.supportDeductedRealtime,
+      bossElixirAlreadyIncluded: summary.bossElixirIncluded,
     );
     saveToDisk();
     notifyListeners();

@@ -162,7 +162,7 @@ class MeridianStepSpec {
       acupointNames: ['하단전', '중단전', '상단전 백회혈'],
       acupointCoords: [Vec2(0.50, 0.68), Vec2(0.50, 0.44), Vec2(0.50, 0.16)],
       reqNaegong: 1950,
-      effectSummary: '전투 시작 내공 +1.0칸 & 전 아군 화력 +14% & 황금 광륜 해금!',
+      effectSummary: '단전 최대 내공 4칸 확장 & 시작 내공 +1.0칸 & 전 아군 화력 +14% & 황금 광륜!',
       rewardTokens: 420,
       rewardElixirs: 8,
       rewardSupportTokens: 2,
@@ -441,6 +441,10 @@ class PlayerProgress {
     this.sfxVolume = 0.72,
     this.vibrationEnabled = true,
     this.vibrationStrength = 2,
+    this.preferredDifficultyId = 'normal',
+    this.preferredBattleSpeed = 1,
+    this.preferredAutoPerk = false,
+    Map<String, int>? bestEndlessByDifficulty,
     Map<LauncherType, int>? launcherPermanentLevels,
     Set<StoneMaterial>? unlockedStones,
     Map<StoneMaterial, int>? stoneShards,
@@ -457,7 +461,8 @@ class PlayerProgress {
     Set<String>? claimedQuestIds,
     Set<String>? claimedAchievements,
     Set<MutantKind>? seenMutants,
-  })  : launcherPermanentLevels = launcherPermanentLevels ??
+  })  : bestEndlessByDifficulty = bestEndlessByDifficulty ?? <String, int>{},
+        launcherPermanentLevels = launcherPermanentLevels ??
             {for (final t in LauncherType.values) t: 1},
         unlockedStones = unlockedStones ?? {StoneMaterial.cheongok},
         stoneShards = stoneShards ??
@@ -574,6 +579,10 @@ class PlayerProgress {
   double sfxVolume;
   bool vibrationEnabled;
   int vibrationStrength;
+  String preferredDifficultyId;
+  int preferredBattleSpeed;
+  bool preferredAutoPerk;
+  final Map<String, int> bestEndlessByDifficulty;
 
   final Map<LauncherType, int> launcherPermanentLevels;
   final Set<StoneMaterial> unlockedStones;
@@ -635,6 +644,7 @@ class PlayerProgress {
   double get codexPowerBonus => (codexCollectedCount / codexTotalCount).clamp(0.0, 1.0) * 0.12;
 
   // --- 경맥 & 3대 수련 능력치 누적 보너스 ---
+  double get maxQiBars => openedMeridianStep >= 10 ? 4.0 : 3.0;
   double get meridianLauncherDmgBonus =>
       (openedMeridianStep >= 1 ? 0.06 : 0.0) + (openedMeridianStep >= 10 ? 0.14 : 0.0);
   double get meridianShieldHpBonus => openedMeridianStep >= 2 ? 0.10 : 0.0;
@@ -644,7 +654,8 @@ class PlayerProgress {
   double get meridianCritBonus => openedMeridianStep >= 6 ? 0.06 : 0.0;
   double get meridianStartQiBonus =>
       (openedMeridianStep >= 7 ? 0.6 : 0.0) + (openedMeridianStep >= 10 ? 1.0 : 0.0);
-  double get meridianSerendipityBonus => openedMeridianStep >= 8 ? 0.06 : 0.0;
+  double get meridianSerendipityBonus =>
+      (openedMeridianStep >= 8 ? 0.06 : 0.0) + (openedMeridianStep >= 10 ? 0.04 : 0.0);
   double get meridianKnockbackBonus => openedMeridianStep >= 9 ? 0.12 : 0.0;
 
   double get coreFirepowerBonus => (coreStatLevels[CoreStatType.firepower] ?? 0) * 0.035;
@@ -695,7 +706,10 @@ class PlayerProgress {
 
     naegongPoints += baseNaegong;
     trainingSeals += baseSeals;
-    moonOmenGauge = (moonOmenGauge + (hasDailyBonus ? 4 : 1)).clamp(0, 100);
+    // 오늘의 깨달음(하루 첫 10회) 수련 중에만 보름달 길조 게이지가 차오르며, 이후에는 실전 수호로 충전된다(전투 0회 무한 수령 악용 차단!).
+    if (hasDailyBonus) {
+      moonOmenGauge = (moonOmenGauge + 4).clamp(0, 100);
+    }
     recordDeed(NightDeed.meditate, 1, todayKey: day);
     if (isCrit || isOneMore) {
       recordDeed(NightDeed.serendipityHit, 1, todayKey: day);
@@ -841,6 +855,7 @@ class PlayerProgress {
   double get elixirResonanceBonus => elixirResonanceLevel * 0.055;
 
   bool upgradeElixirResonance() {
+    if (elixirResonanceLevel >= 9999) return false;
     final cost = elixirResonanceCost;
     if (elixirs < cost) return false;
     elixirs -= cost;
@@ -1399,9 +1414,13 @@ class PlayerProgress {
         continue;
       }
 
-      // 4순위: 중앙 수호탑 vs 현재 진법/해금 주력 발사대 중 최소 비용 강화
+      // 4순위: 중앙 수호탑 vs 현재 진법/해금 주력 발사대 중 아직 상한(999단) 미만인 최소 비용 강화
       final unlockedLaunchers = LauncherType.values
-          .where((t) => t.unlockChapter <= highestUnlockedChapter)
+          .where(
+            (t) =>
+                t.unlockChapter <= highestUnlockedChapter &&
+                (launcherPermanentLevels[t] ?? 1) < 999,
+          )
           .toList();
       final presetSet = activePreset.mountTypes.toSet();
       final candidateLaunchers = unlockedLaunchers
@@ -1419,13 +1438,20 @@ class PlayerProgress {
           cheapestLauncher = lt;
         }
       }
-      final centralCost = CentralGuardianSpec.permanentUpgradeCost(centralGuardianLevel);
-      if (centralCost <= cheapestLauncherCost && upgradeCentralGuardian()) {
+      final canUpgCentral = centralGuardianLevel < 999;
+      final centralCost = canUpgCentral
+          ? CentralGuardianSpec.permanentUpgradeCost(centralGuardianLevel)
+          : (1 << 30);
+      if (canUpgCentral && centralCost <= cheapestLauncherCost && upgradeCentralGuardian()) {
         logs.add('중앙 수호탑 $centralGuardianLevel단');
         continue;
       }
       if (cheapestLauncher != null && upgradeLauncherPermanent(cheapestLauncher)) {
         logs.add('${cheapestLauncher.name} ${launcherPermanentLevels[cheapestLauncher]}단');
+        continue;
+      }
+      if (canUpgCentral && upgradeCentralGuardian()) {
+        logs.add('중앙 수호탑 $centralGuardianLevel단');
         continue;
       }
       if (upgradeForgeMastery()) {
@@ -1554,6 +1580,9 @@ class PlayerProgress {
     int serendipityCount = 0,
     Set<MutantKind> encounteredMutants = const {},
     int endlessWavesCleared = 0,
+    String difficultyId = 'normal',
+    bool supportAlreadyDeductedInSim = false,
+    bool bossElixirAlreadyIncluded = false,
     String? todayKey,
   }) {
     lastRescueBanner = null;
@@ -1569,7 +1598,9 @@ class PlayerProgress {
     final safeChain = max(0, chainShatterCount);
     final safeSeren = max(0, serendipityCount);
 
-    supportTokens = (supportTokens - safeUsedSupport).clamp(0, 9999);
+    if (!supportAlreadyDeductedInSim && safeUsedSupport > 0) {
+      supportTokens = (supportTokens - safeUsedSupport).clamp(0, 999999);
+    }
     tokens += safeEarnedTokens;
     elixirs += safeEarnedElixirs;
     moonOmenGauge = (moonOmenGauge + (victory ? 28 : 14)).clamp(0, 100);
@@ -1581,6 +1612,12 @@ class PlayerProgress {
     seenMutants.addAll(encounteredMutants);
     if (endlessWavesCleared > bestEndlessWave) {
       bestEndlessWave = endlessWavesCleared;
+    }
+    if (endlessWavesCleared > 0) {
+      final prevDiffBest = bestEndlessByDifficulty[difficultyId] ?? 0;
+      if (endlessWavesCleared > prevDiffBest) {
+        bestEndlessByDifficulty[difficultyId] = endlessWavesCleared;
+      }
     }
 
     recordDeed(NightDeed.mutantKills, safeKillCount, todayKey: todayKey);
@@ -1601,7 +1638,9 @@ class PlayerProgress {
       naegongPoints += 16 + stage.chapterNumber * 5 + (stage.isBossStage ? 22 : 0);
       trainingSeals += 4 + (stage.chapterNumber ~/ 2) + (stage.isBossStage ? 5 : 0);
       if (stage.isBossStage) {
-        elixirs += 2 + (stage.chapterNumber ~/ 3);
+        if (!bossElixirAlreadyIncluded) {
+          elixirs += 2 + (stage.chapterNumber ~/ 3);
+        }
         _grantRandomShards(
           stage.stageNumber >= 10 ? 3 : 1,
           Random(totalMutantKills + stage.globalIndex + 17),
@@ -1735,6 +1774,10 @@ class PlayerProgress {
         'sfxVol': sfxVolume,
         'vibOn': vibrationEnabled,
         'vibStr': vibrationStrength,
+        'prefDiff': preferredDifficultyId,
+        'prefSpeed': preferredBattleSpeed,
+        'prefAutoPerk': preferredAutoPerk,
+        'bestEndlessMap': bestEndlessByDifficulty,
         'launcherLvs': launcherPermanentLevels.map((k, v) => MapEntry(k.id, v)),
         'stones': unlockedStones.map((e) => e.id).toList(),
         'shards': stoneShards.map((k, v) => MapEntry(k.id, v)),
@@ -1839,7 +1882,22 @@ class PlayerProgress {
       sfxVolume: _safeDouble(j['sfxVol'] ?? j['sfxVolume'], 0.72).clamp(0.0, 1.0),
       vibrationEnabled: _safeBool(j['vibOn'], true),
       vibrationStrength: _safeInt(j['vibStr'] ?? j['vibrationStrength'], 2).clamp(1, 3),
+      preferredDifficultyId: switch (j['prefDiff']) {
+        'easy' => 'easy',
+        'nightmare' => 'nightmare',
+        _ => 'normal',
+      },
+      preferredBattleSpeed: _safeInt(j['prefSpeed'], 1).clamp(1, 4),
+      preferredAutoPerk: _safeBool(j['prefAutoPerk'], false),
     );
+
+    if (j['bestEndlessMap'] is Map) {
+      (j['bestEndlessMap'] as Map).forEach((k, v) {
+        if (k == 'easy' || k == 'normal' || k == 'nightmare') {
+          p.bestEndlessByDifficulty[k as String] = _safeInt(v, 0).clamp(0, 9999);
+        }
+      });
+    }
 
     if (j['launcherLvs'] is Map) {
       (j['launcherLvs'] as Map).forEach((k, v) {
