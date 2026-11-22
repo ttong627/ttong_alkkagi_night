@@ -1,0 +1,213 @@
+<title>수호알까기 · 탄지무림 심야기습 v1.0.0+22 전면 리디자인 결정표</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 배치: 한 줄 세로 목록 — 결정 하나 = 한 덩어리(왜 → 고르기 → 메모) · 위에 진행 막대 고정 */
+:root{
+  --bg:#f5f7f6; --surface:#ffffff; --fg:#17211e; --muted:#5b6964; --line:#d9e1de;
+  --accent:#0f6b58; --accent-ink:#ffffff; --accent-soft:#e3f1ec; --rec:#8a5a00; --rec-soft:#fff3d6;
+  --ok:#1d7a3e; --warn:#a23b1e;
+  --f-display:"IBM Plex Sans KR","Noto Sans KR","Malgun Gothic",sans-serif;
+  --f-body:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101614; --surface:#18201d; --fg:#e7eeeb; --muted:#9aaaa4; --line:#2c3833;
+  --accent:#4cc3a3; --accent-ink:#06231c; --accent-soft:#16312a; --rec:#f0c060; --rec-soft:#33290f;
+  --ok:#6fd58f; --warn:#ff9a7a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101614; --surface:#18201d; --fg:#e7eeeb; --muted:#9aaaa4; --line:#2c3833;
+  --accent:#4cc3a3; --accent-ink:#06231c; --accent-soft:#16312a; --rec:#f0c060; --rec-soft:#33290f;
+  --ok:#6fd58f; --warn:#ff9a7a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:17px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bar strong{font-family:var(--f-display);font-size:16px}
+.meter{flex:1 1 160px;height:12px;background:var(--line);border-radius:6px;overflow:hidden;min-width:120px}
+.meter i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.count{font-variant-numeric:tabular-nums;font-weight:700}
+header h1{font-family:var(--f-display);font-size:30px;line-height:1.3;margin:24px 0 6px;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:62ch}
+.status{font-size:15px;padding:10px 14px;border-radius:10px;background:var(--accent-soft)}
+.status.bad{background:var(--rec-soft)}
+h2{font-family:var(--f-display);font-size:21px;margin:18px 0 0;text-wrap:balance}
+h2 small{display:block;font-family:var(--f-body);font-size:15px;font-weight:400;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.card.done{border-color:var(--accent)}
+.card h3{font-family:var(--f-display);font-size:19px;margin:0;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.tag{font-family:var(--f-body);font-size:13px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--line);color:var(--muted)}
+.card.done .tag{background:var(--accent);color:var(--accent-ink)}
+.why{margin:0;color:var(--muted);font-size:15.5px}
+.why b{color:var(--fg);font-weight:500}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;min-height:56px;padding:12px 14px;border:2px solid var(--line);
+  border-radius:12px;background:var(--surface);color:var(--fg);font:inherit;font-size:16px;cursor:pointer}
+.opt:hover{border-color:var(--accent)}
+.opt:focus-visible,.field:focus-visible,.save:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.dot{flex:0 0 22px;height:22px;border-radius:50%;border:2px solid var(--muted);margin-top:2px;display:grid;place-items:center}
+.opt[aria-pressed="true"] .dot{border-color:var(--accent);background:var(--accent)}
+.opt[aria-pressed="true"] .dot::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent-ink)}
+.opt span{min-width:0}
+.rec{display:inline-block;font-size:12.5px;font-weight:700;color:var(--rec);background:var(--rec-soft);padding:1px 7px;border-radius:6px;margin-left:6px;vertical-align:1px}
+.opt em{display:block;font-style:normal;font-size:14px;color:var(--muted)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+label.lab{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted);min-width:0}
+.field{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:48px;width:100%}
+textarea.field{min-height:64px;resize:vertical}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.save{font:inherit;font-weight:700;font-size:16px;min-height:48px;padding:0 20px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.saved{font-size:14px;color:var(--ok)}
+.saved.err{color:var(--warn)}
+footer{color:var(--muted);font-size:14.5px;border-top:1px solid var(--line);padding-top:14px}
+@media (prefers-reduced-motion: reduce){.meter i{transition:none}}
+</style>
+
+<div class="wrap">
+  <div class="bar" role="status">
+    <strong>고른 결정</strong>
+    <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+    <span class="count" id="count">0</span>
+  </div>
+
+  <header>
+    <h1 id="h1"></h1>
+    <p id="intro"></p>
+  </header>
+
+  <div class="status" id="status">저장소에 연결하는 중…</div>
+
+  <div id="groups" class="wrap" style="gap:14px"></div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+const DATA = {"title": "수호알까기 · 탄지무림 심야기습 v1.0.0+22 전면 리디자인 결정표", "intro": "클로드 프로그램 제작 하네스(program_gate) 기준에 따라 《수호알까기 · 탄지무림 심야기습》 전면 디자인 개편 및 편의성 설계의 핵심 결정을 확정한 정본 문서입니다.", "footer": "검증 명령: <code>python D:\\Gemma4\\_tools\\program_gate\\gate.py 점검 D:\\ttong_alkkagi_night --release<\/code>", "groups": [{"id": "A", "title": "무엇을 · 누구에게", "desc": "게임의 핵심 정체성과 사용자가 3초 안에 체감하는 조작·시각 목표를 고정합니다."}, {"id": "B", "title": "만들기 전에 정할 아키텍처·보안·반영 원칙", "desc": "오프라인 무지연 저장, 개인정보 0건, 껍데기 메뉴 0건을 사전에 잠급니다."}, {"id": "C", "title": "실기기 검증 및 스토어 상용 배포 기준", "desc": "갤럭시 탭 S10 울트라 실기기 완주 검증과 양대 하네스(디자인·프로그램) 정량 통과를 기준으로 삼습니다."}], "decisions": [{"id": "goal", "group": "A", "tag": "목적", "title": "이 프로그램의 한 문장", "why": "빈 건축물 나열이 아니라 영웅과 정밀한 돌연변이 군단의 격돌을 전면에 내세우고, 엄지 한 번으로 출정·편성·보상 수령까지 끝내는 조선 무협 탄지 디펜스를 완성합니다.", "choice": "수호 영웅단과 3페이즈 돌연변이 대수괴의 박진감 넘치는 격돌 일러스트를 전 화면 주인공으로 삼고, 하단 5탭 고정 내비게이션과 원터치 일괄 수령·최적 진법 편성으로 조작 피로를 없앤다", "opts": [["수호 영웅단과 3페이즈 돌연변이 대수괴의 박진감 넘치는 격돌 일러스트를 전 화면 주인공으로 삼고, 하단 5탭 고정 내비게이션과 원터치 일괄 수령·최적 진법 편성으로 조작 피로를 없앤다", "영웅 대 변이 실전 비주얼 + 5탭 직통 전환 + 원터치 편의 기능", true], ["기존 단일 로비 스크롤 구조 유지", "화면 간 뒤로가기 반복 발생"]], "fields": [["sentence", "한 문장", "영웅과 돌연변이의 치열한 심야 혈전을 눈으로 즐기며 하단 5탭과 원터치 자동 편성·일괄 수령으로 막힘없이 111관문을 돌파한다"]]}, {"id": "first_user", "group": "A", "tag": "사용자", "title": "핵심 사용자 및 주 조작 환경", "why": "스마트폰(360px)부터 태블릿 대화면(갤럭시 탭 S10 울트라 1848×2960)까지 한 손·양손 터치 동선이 모두 52px 이상 큼직해야 합니다.", "choice": "모바일·태블릿 무협 디펜스 플레이어 (52px 이상 대형 단추 · 하단 엄지 영역 주 행동 배치)", "opts": [["모바일·태블릿 무협 디펜스 플레이어 (52px 이상 대형 단추 · 하단 엄지 영역 주 행동 배치)", "갤럭시 폰·태블릿 세로/가로 완벽 반응형", true], ["데스크톱 전용 마우스 조작", "모바일 터치 불편"]], "fields": [["who", "대상 기기", "갤럭시 탭 S10 울트라(SM-X926N) 및 안드로이드 스마트폰·웹 브라우저"]]}, {"id": "visual_system", "group": "A", "tag": "디자인 하네스", "title": "시각 화풍 및 클로드 디자인 하네스(design.py) 기준", "why": "보라색 네온 AI티와 잘게 쪼개진 카드 나열을 배제하고, 심야 청람·황금·적염·비취 4색 축과 게슈탈트 3~5덩어리 원칙으로 하네스 100점을 달성합니다.", "choice": "정통 조선 무협 심야 결전 화풍 (영웅 대 변이 전투 키아트 + 게슈탈트 4덩어리 이하 + AI티 0건)", "opts": [["정통 조선 무협 심야 결전 화풍 (영웅 대 변이 전투 키아트 + 게슈탈트 4덩어리 이하 + AI티 0건)", "design.py harness 100점 및 design_quality_gate PASS", true], ["사이버펑크 보라 네온 그라데이션", "AI티 감점 대상"]]}, {"id": "first_slice", "group": "A", "tag": "수직 개통", "title": "껍데기 메뉴 0건 · 수직 개통 범위", "why": "하단 5탭(출정 본영·영웅 진법·대장간 영약·수련 보급·변이 도감)과 원터치 편의 기능 3종(일괄 보상 수령·최적 진법 자동 편성·추천 일괄 강화)이 모두 실제 로컬 저장과 단위·위젯 시험까지 완결되어야 합니다.", "choice": "전 메뉴 실제 저장·조회 100% 개통 (견본·준비중 메뉴 0개)", "opts": [["전 메뉴 실제 저장·조회 100% 개통 (견본·준비중 메뉴 0개)", "defense_core 로직 → GameController 저장 → 5탭 UI → 자동 시험 일괄 완결", true], ["화면 탭만 먼저 만들고 기능은 추후 연결", "껍데기 메뉴 금지 위반"]]}, {"id": "pii", "group": "B", "tag": "개인정보·권한", "title": "개인정보 수집 및 네트워크 권한", "why": "100% 오프라인 완결형 상용 게임으로서 개인정보를 일절 수집하지 않으며 AndroidManifest에 INTERNET 권한조차 두지 않아 데이터 유출 위험을 원천 차단합니다.", "choice": "개인정보를 전혀 안 씀 (오프라인 로컬 SharedPreferences + 무결성 서명 백업 코드만 사용, INTERNET 권한 0건)", "opts": [["개인정보를 전혀 안 씀 (오프라인 로컬 SharedPreferences + 무결성 서명 백업 코드만 사용, INTERNET 권한 0건)", "유출 위험 0% · 비행기 모드 100% 작동", true], ["외부 계정 연동 수집", "불필요한 개인정보 리스크"]]}, {"id": "login", "group": "B", "tag": "로그인", "title": "로그인 및 세이브 이전 방식", "why": "설치 즉시 0초 만에 스플래시와 본영으로 진입하며, 기기 변경 시 HMAC-FNV 무결성 검증이 포함된 오프라인 백업 문자열로 안전하게 복원합니다.", "choice": "로그인 없음 · 즉시 시작 + 서명된 오프라인 백업 코드 내보내기/가져오기", "opts": [["로그인 없음 · 즉시 시작 + 서명된 오프라인 백업 코드 내보내기/가져오기", "초보자 진입 장벽 0 · 변조 방지 검증 내장", true], ["필수 회원가입 후 진입", "이탈률 증가"]]}, {"id": "old_system", "group": "B", "tag": "호환성", "title": "기존 세이브 데이터(v1.0.0+1 ~ +21) 호환 방식", "why": "기존 플레이어의 진행도(111관문, 동료 14인, 영수 5종, 수호석 13단, 재화)가 디자인 전면 교체 후에도 100% 무손실 유지되어야 합니다.", "choice": "기존 suho_alkkagi_night_save_v1 스키마 100% 하위 호환 유지", "opts": [["기존 suho_alkkagi_night_save_v1 스키마 100% 하위 호환 유지", "퇴행 0건 · 기존 저장 데이터 즉시 이어하기", true], ["세이브 초기화", "기존 사용자 데이터 손실 금지 위반"]]}, {"id": "deploy", "group": "B", "tag": "배포 패키징", "title": "상용 빌드 산출물 및 반영 승인 방식", "why": "Play 스토어용 AAB/APK, 직접 설치용 APK, 로컬/웹 프리뷰 빌드를 한 번에 검증 후 묶어 패키징하고 운영반영기록.md에 지문을 남깁니다.", "choice": "단위·위젯·111관문 시뮬레이션·양대 하네스 전원 통과 후 4종 릴리스 빌드 일괄 패키징", "opts": [["단위·위젯·111관문 시뮬레이션·양대 하네스 전원 통과 후 4종 릴리스 빌드 일괄 패키징", "버전 1.0.0+22 · SHA-256 지문 기록", true], ["미검증 개별 수동 빌드", "버전 불일치 위험"]]}, {"id": "alerts", "group": "B", "tag": "인게임 알림", "title": "보상 도착 및 전장 위기 알림 방식", "why": "외부 푸시 스팸 없이 하단 내비게이션 배지와 본영 상단 『도착 보상 원터치 일괄 수령』 배너, 전장 무정지 영웅/보스 컷인으로 즉각적인 피드백을 제공합니다.", "choice": "인앱 금빛 상태 배지 + 원터치 일괄 수령 띠 + 전장 무정지(0.00초) 액션 컷인", "opts": [["인앱 금빛 상태 배지 + 원터치 일괄 수령 띠 + 전장 무정지(0.00초) 액션 컷인", "흐름 끊김 0% · 색+아이콘+한국어 문구 동시 표기", true], ["전투 멈춤 팝업 남발", "무정지 실시간 전장 원칙 위배"]]}, {"id": "pilot", "group": "C", "tag": "실기기 검증", "title": "실제 태블릿 연결 전 구간 검증", "why": "에뮬레이터가 아닌 실제 연결된 갤럭시 탭 S10 울트라(R54X9040G2H)에 설치해 5탭 전환, 원터치 편성/수령, 3페이즈 보스전과 컷인까지 실측 캡처하고 하네스로 채점합니다.", "choice": "갤럭시 탭 S10 울트라(SM-X926N) 실기기 설치 · 전 화면 캡처 · 디자인/프로그램 하네스 실측 통과", "opts": [["갤럭시 탭 S10 울트라(SM-X926N) 실기기 설치 · 전 화면 캡처 · 디자인/프로그램 하네스 실측 통과", "1848×2960 해상도 실측 및 오버플로 0건 확인", true], ["코드 정적 분석만 수행", "실기기 체감 확인 불가"]], "fields": [["where", "검증 기기", "Samsung Galaxy Tab S10 Ultra (SM-X926N / R54X9040G2H)"], ["start", "검증 일자", "2026-11-22", "date"]]}, {"id": "switch", "group": "C", "tag": "통과 기준", "title": "상용 완성판(v1.0.0+22) 출하 통과 기준", "why": "날짜가 아니라 5대 정량 관문(단위시험, 위젯시험, 111관문 전수 클리어 밸런스, program_gate exit 0, design.py harness 100점) 모두 통과해야 완성으로 판정합니다.", "choice": "5대 정량 관문(단위·위젯·111관문 밸런스·프로그램 관문·디자인 관문) 100% 통과 시 출하", "opts": [["5대 정량 관문(단위·위젯·111관문 밸런스·프로그램 관문·디자인 관문) 100% 통과 시 출하", "결함 0건 · 자화자찬 없는 수치 검증", true], ["기능만 동작하면 출하", "하네스 기준 미달"]]}, {"id": "hardware", "group": "C", "tag": "대응 해상도", "title": "지원 기기 해상도 및 사운드·진동 장치", "why": "소형 폰(360×780)부터 초대형 태블릿(1848×2960 세로·가로)까지 레이아웃 깨짐이 없어야 하며, 오디오/진동 미지원 환경에서도 예외 없이 동작해야 합니다.", "choice": "360×780 소형 폰 ~ 1848×2960 울트라 태블릿 세로·가로 전 대응 (오디오·진동 안전 예외 처리 포함)", "opts": [["360×780 소형 폰 ~ 1848×2960 울트라 태블릿 세로·가로 전 대응 (오디오·진동 안전 예외 처리 포함)", "위젯 테스트로 좁은 화면·태블릿 가로/세로 동시 잠금", true], ["단일 해상도 고정", "태블릿 여백 붕괴 또는 소형 폰 잘림 발생"]], "fields": [["device", "실측 장비", "SM-X926N (1848×2960) + 로컬 웹 서버(127.0.0.1:8792)"]]}]};
+const DECISIONS = DATA.decisions;
+
+const state = {};
+let db = null, me = "";
+
+function el(tag, attrs, ...kids){
+  const n = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs||{})) {
+    if (k === "class") n.className = v; else if (k === "html") n.innerHTML = v; else n.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+}
+
+function frame(){
+  document.getElementById("h1").textContent = DATA.title || "결정표";
+  document.getElementById("intro").innerHTML = DATA.intro || "";
+  document.getElementById("foot").innerHTML = DATA.footer || "다 고르면 대화창에 「결정표 다 했어」라고만 말해 주세요.";
+  const box = document.getElementById("groups");
+  (DATA.groups || [{id:"A", title:"결정"}]).forEach((g) => {
+    const sec = el("section", {class:"wrap", style:"gap:14px"});
+    const h = el("h2", {}, g.title);
+    if (g.desc) h.append(el("small", {}, g.desc));
+    sec.append(h, el("div", {id:"group"+g.id, class:"wrap", style:"gap:14px"}));
+    box.append(sec);
+  });
+}
+
+function render(){
+  (DATA.groups || [{id:"A"}]).forEach((g) => document.getElementById("group"+g.id).replaceChildren());
+  DECISIONS.forEach((d) => {
+    const cur = state[d.id] || {};
+    const card = el("article", {class:"card"+(cur.choice?" done":""), id:"card-"+d.id});
+    card.append(el("h3", {}, el("span",{class:"tag"}, cur.choice ? "고름 ✓" : d.tag), d.title));
+    card.append(el("p", {class:"why", html:d.why}));
+    const opts = el("div", {class:"opts", role:"group", "aria-label":d.title});
+    d.opts.forEach(([label, hint, rec]) => {
+      const b = el("button", {class:"opt", type:"button", "aria-pressed": String(cur.choice === label)});
+      const s = el("span", {}, label);
+      if (rec) s.append(el("span",{class:"rec"},"권장"));
+      if (hint) s.append(el("em",{}, hint));
+      b.append(el("span",{class:"dot","aria-hidden":"true"}), s);
+      b.addEventListener("click", () => save(d.id, { choice: label }));
+      opts.append(b);
+    });
+    card.append(opts);
+
+    const fieldsWrap = el("div", {class:"fields"});
+    (d.fields||[]).forEach(([key, lab, ph, type]) => {
+      const inp = el("input", {class:"field", id:`f-${d.id}-${key}`, type:type||"text", placeholder:ph||""});
+      inp.value = (cur.fields && cur.fields[key]) || "";
+      fieldsWrap.append(el("label", {class:"lab", for:inp.id}, lab, inp));
+    });
+    const memo = el("textarea", {class:"field", id:`f-${d.id}-memo`, placeholder:"하고 싶은 말이 있으면 (없어도 돼요)"});
+    memo.value = cur.memo || "";
+    fieldsWrap.append(el("label", {class:"lab", for:memo.id, style:"grid-column:1/-1"}, "메모", memo));
+    card.append(fieldsWrap);
+
+    const row = el("div", {class:"row"});
+    const btn = el("button", {class:"save", type:"button"}, "적은 내용 저장");
+    const note = el("span", {class:"saved", id:"saved-"+d.id, "aria-live":"polite"}, cur.at ? "저장됨 · " + fmt(cur.at) : "");
+    btn.addEventListener("click", () => {
+      const fields = {};
+      (d.fields||[]).forEach(([key]) => { fields[key] = document.getElementById(`f-${d.id}-${key}`).value.trim(); });
+      save(d.id, { fields, memo: memo.value.trim() });
+    });
+    row.append(btn, note);
+    card.append(row);
+    (document.getElementById("group"+(d.group||"A")) || document.getElementById("groups")).append(card);
+  });
+  const n = DECISIONS.filter(d => state[d.id] && state[d.id].choice).length;
+  document.getElementById("count").textContent = `${n} / ${DECISIONS.length}`;
+  document.getElementById("meter").style.width = (n / DECISIONS.length * 100) + "%";
+}
+
+function fmt(iso){
+  try { const d = new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
+  catch { return ""; }
+}
+
+async function save(id, patch){
+  const prev = state[id] || {};
+  const next = { ...prev, ...patch, at: new Date().toISOString(), by: me };
+  state[id] = next;
+  render();
+  const note = document.getElementById("saved-"+id);
+  if (!db) { if (note) { note.textContent = "이 화면에서는 저장이 안 돼요 — 대화창에 알려 주세요"; note.className = "saved err"; } return; }
+  try {
+    await db.doc("decisions/" + id).set(next);
+    if (note) { note.textContent = "저장됨 · " + fmt(next.at); note.className = "saved"; }
+  } catch (e) {
+    if (note) { note.textContent = "저장 실패 — 잠시 뒤 다시 눌러 주세요"; note.className = "saved err"; }
+  }
+}
+
+function setStatus(text, bad){
+  const s = document.getElementById("status");
+  s.textContent = text; s.className = "status" + (bad ? " bad" : "");
+}
+
+frame();
+render();
+
+(async () => {
+  const timer = setTimeout(() => setStatus("저장소 응답이 늦어요. 눌러 둔 것은 이 화면에만 보일 수 있어요.", true), 10000);
+  try {
+    const c = window.claude;
+    db = c && c.use ? await c.use("db") : null;
+    const user = c && c.use ? await c.use("user") : null;
+    if (user && user.id) { try { me = (await user.id()) || ""; } catch { me = ""; } }
+    if (!db) { clearTimeout(timer); setStatus("이 화면에서는 저장이 안 돼요(로그인하지 않은 화면). 고른 것을 대화창에 말해 주세요.", true); return; }
+    db.collection("decisions").onSnapshot((snap) => {
+      clearTimeout(timer);
+      snap.docs.forEach((doc) => { if (doc.exists) state[doc.id] = { ...doc.data() }; });
+      setStatus("누르는 즉시 저장돼요. 안토니가 이 결과를 읽어요.");
+      render();
+    }, () => { clearTimeout(timer); setStatus("저장소를 읽지 못했어요. 새로 고침 해 주세요.", true); });
+  } catch {
+    clearTimeout(timer);
+    setStatus("저장소에 연결하지 못했어요. 고른 것을 대화창에 말해 주세요.", true);
+  }
+})();
+</script>

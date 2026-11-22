@@ -12,8 +12,14 @@ typedef MeditationScreen = TrainingScreen;
 
 /// 초간단 「기명 심법 수련실」 — 알까기 조작 없음 · 실패 판정 0% 보장!
 class TrainingScreen extends StatefulWidget {
-  const TrainingScreen({super.key, required this.controller});
+  const TrainingScreen({
+    super.key,
+    required this.controller,
+    this.embeddedInShell = false,
+  });
+
   final GameController controller;
+  final bool embeddedInShell;
 
   @override
   State<TrainingScreen> createState() => _TrainingScreenState();
@@ -115,9 +121,14 @@ class _TrainingScreenState extends State<TrainingScreen>
         return DefaultTabController(
           length: 3,
           child: Scaffold(
+            backgroundColor: Colors.transparent,
             appBar: AppBar(
+              automaticallyImplyLeading: !widget.embeddedInShell,
               title: const Text('기명 심법 수련실 (실패 0%)'),
               bottom: const TabBar(
+                indicatorColor: NightPalette.accentGold,
+                labelColor: NightPalette.accentGold,
+                unselectedLabelColor: NightPalette.textMuted,
                 tabs: [
                   Tab(text: '① 단전 운기'),
                   Tab(text: '② 십대 경맥(10단)'),
@@ -211,167 +222,252 @@ class _TrainingScreenState extends State<TrainingScreen>
   }
 
   Widget _buildMeditationTab(PlayerProgress p) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: NightPalette.hanjiLight,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: NightPalette.accentGold, width: 2.0),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x48000000),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const NightSpriteIcon(
-                  assetPath: NightArtRegistry.nightMeridian,
-                  fallbackIcon: Icons.self_improvement_rounded,
-                  size: 32,
-                  color: NightPalette.jadeGreen,
+            // 1) 상단 3D 수련 전각 & 사부 기명 라이브 모션 무대 (주인공 비중 강화!)
+            SizedBox(
+              height: 236,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        NightArtRegistry.cardTrainingHall,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const ColoredBox(color: NightPalette.bgPanel),
+                      ),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0x20141F33), Color(0xD8141F33)],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 12,
+                        child: Row(
+                          children: [
+                            NightSpriteIcon(
+                              assetPath: NightArtRegistry.charMotion('sabu'),
+                              fallbackAssetPath:
+                                  NightArtRegistry.charAttack('sabu'),
+                              fallbackIcon: Icons.self_improvement_rounded,
+                              size: 68,
+                              borderRadius: 14,
+                              fit: BoxFit.cover,
+                              showFrame: true,
+                              frameColor: NightPalette.accentGold,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '기명 · 무량 신승의 황금 경맥 대주천',
+                                    style: TextStyle(
+                                      fontFamily: 'BlackHanSans',
+                                      fontSize: 18.5,
+                                      color: NightPalette.accentGold,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    '언제 눌러도 100% 성공 · 황금 고리 수축 시 2배 대오각성 기연 폭발',
+                                    style: TextStyle(
+                                      fontSize: 12.2,
+                                      color: NightPalette.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 8),
-                const Flexible(
-                  child: Text(
-                    '알을 튕길 필요 없이 구슬만 톡 누르세요!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: NightPalette.accentGold,
-                    ),
+
+                // 2) 하단 한지 일체형 단전 운기 단상 (정렬·명도·덩어리 게슈탈트 통합!)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+                  child: Column(
+                    children: [
+                      const Text(
+                        '알을 튕길 필요 없이 중앙 단전 구슬만 가볍게 누르세요',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'BlackHanSans',
+                          fontSize: 19.5,
+                          color: NightPalette.hanjiInk,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        key: const Key('meditation_orb_button'),
+                        onTap: _performMeditationTap,
+                        child: AnimatedBuilder(
+                          animation: _breathAnim,
+                          builder: (context, _) {
+                            final ringRadius = 114.0 - 46.0 * _breathAnim.value;
+                            final inGolden = _breathAnim.value >= 0.68;
+                            return SizedBox(
+                              width: 236,
+                              height: 236,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 224,
+                                    height: 224,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Color(0xFF16233A),
+                                    ),
+                                  ),
+                                  Transform.rotate(
+                                    angle: _breathAnim.value * pi * 0.6,
+                                    child: Opacity(
+                                      opacity: 0.42 + 0.32 * _breathAnim.value,
+                                      child: Image.asset(
+                                        NightArtRegistry.fxQi,
+                                        width: 204,
+                                        height: 204,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (_, _, _) =>
+                                            const SizedBox.shrink(),
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 144,
+                                    height: 144,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: NightPalette.accentGold
+                                            .withValues(alpha: 0.40),
+                                        width: 9,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    width: ringRadius * 2,
+                                    height: ringRadius * 2,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: inGolden
+                                            ? NightPalette.accentGold
+                                            : NightPalette.jadeShield,
+                                        width: inGolden ? 4.5 : 2.5,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 118,
+                                    height: 118,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: RadialGradient(
+                                        colors: inGolden
+                                            ? const [
+                                                Color(0xFFFFF3B0),
+                                                Color(0xFFFFB703),
+                                                Color(0xFF9A031E),
+                                              ]
+                                            : const [
+                                                Color(0xFF90E0EF),
+                                                Color(0xFF0077B6),
+                                                Color(0xFF03045E),
+                                              ],
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: (inGolden
+                                                  ? NightPalette.accentGold
+                                                  : NightPalette.jadeShield)
+                                              .withValues(alpha: 0.55),
+                                          blurRadius: 22,
+                                        ),
+                                      ],
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: const Text(
+                                      '단전 운기\n(터치)',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontFamily: 'BlackHanSans',
+                                        fontSize: 18,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: FilledButton.icon(
+                          key: const Key('meditate_batch_10_btn'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: NightPalette.hanjiInk,
+                            foregroundColor: NightPalette.accentGold,
+                          ),
+                          onPressed: _performBatchMeditation,
+                          icon: const Icon(Icons.bolt_rounded),
+                          label: Text(
+                            p.remainingDailyEnlightenment() > 0
+                                ? '⚡ 오늘의 깨달음 10회 연속 운기 (6배 대박)'
+                                : '⚡ 10회 연속 대주천 운기 (즉시 수련)',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        '운기마다 휴대폰에 즉시 자동 저장되며 전투 승리 시에도 내공이 누적됩니다.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12.2,
+                          color: NightPalette.hanjiSubInk,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            const Text(
-              '언제 눌러도 100% 성공하며, 황금 숨결 고리가 안쪽으로 모일 때 누르면\n⚡대오각성 크리티컬(2배)과 🔁한 번 더 기연이 터집니다!',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13.5, color: NightPalette.textMuted),
-            ),
-            const SizedBox(height: 24),
-            GestureDetector(
-              key: const Key('meditation_orb_button'),
-              onTap: _performMeditationTap,
-              child: AnimatedBuilder(
-                animation: _breathAnim,
-                builder: (context, _) {
-                  final ringRadius = 124.0 - 52.0 * _breathAnim.value;
-                  final inGolden = _breathAnim.value >= 0.68;
-                  return SizedBox(
-                    width: 256,
-                    height: 256,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // 단전 내공 기운(fx_qi.webp) 회전 광륜
-                        Transform.rotate(
-                          angle: _breathAnim.value * pi * 0.6,
-                          child: Opacity(
-                            opacity: 0.36 + 0.32 * _breathAnim.value,
-                            child: Image.asset(
-                              NightArtRegistry.fxQi,
-                              width: 220,
-                              height: 220,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                            ),
-                          ),
-                        ),
-                        // 외곽 대오각성 황금 구간 표시
-                        Container(
-                          width: 152,
-                          height: 152,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: NightPalette.accentGold.withValues(alpha: 0.35),
-                              width: 10,
-                            ),
-                          ),
-                        ),
-                        // 수축하는 숨결 고리
-                        Container(
-                          width: ringRadius * 2,
-                          height: ringRadius * 2,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: inGolden
-                                  ? NightPalette.accentGold
-                                  : NightPalette.jadeShield,
-                              width: inGolden ? 4.5 : 2.5,
-                            ),
-                          ),
-                        ),
-                        // 중앙 기명 단전 구슬
-                        Container(
-                          width: 122,
-                          height: 122,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: inGolden
-                                  ? const [
-                                      Color(0xFFFFF3B0),
-                                      Color(0xFFFFB703),
-                                      Color(0xFF9A031E),
-                                    ]
-                                  : const [
-                                      Color(0xFF90E0EF),
-                                      Color(0xFF0077B6),
-                                      Color(0xFF03045E),
-                                    ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (inGolden
-                                        ? NightPalette.accentGold
-                                        : NightPalette.jadeShield)
-                                    .withValues(alpha: 0.55),
-                                blurRadius: 24,
-                              ),
-                            ],
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            '단전 운기\n(터치)',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'BlackHanSans',
-                              fontSize: 18,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              key: const Key('meditate_batch_10_btn'),
-              style: FilledButton.styleFrom(
-                backgroundColor: NightPalette.accentGold,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              onPressed: _performBatchMeditation,
-              icon: const Icon(Icons.bolt_rounded),
-              label: Text(
-                p.remainingDailyEnlightenment() > 0
-                    ? '⚡ 오늘의 깨달음 10회 연속 운기 (6배 대박)'
-                    : '⚡ 10회 연속 대주천 운기 (즉시 수련)',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '1회·10회 운기마다 휴대폰에 즉시 자동 저장되며 전투 승리 시에도 내공이 오릅니다',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, color: NightPalette.jadeGreen),
-            ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 

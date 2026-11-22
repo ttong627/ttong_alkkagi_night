@@ -430,3 +430,77 @@ class DamagePopupFx {
 
   double get progress => (1.0 - (ttlSec / durationSec)).clamp(0.0, 1.0);
 }
+
+/// 실시간 위험 비상 경보 & 돌연변이 공격 지점 2.8배 확대 중계 모니터 데이터.
+class CrisisAlertInfo {
+  const CrisisAlertInfo({
+    required this.zoneName,
+    required this.headline,
+    required this.attackerUid,
+    required this.attackerKind,
+    required this.attackerName,
+    required this.focusPos,
+    required this.rawTargetPos,
+    required this.severity,
+    required this.isDirectAttack,
+    this.totalHitsTaken = 0,
+    this.hitShieldLeft = 0,
+    this.maxHitShield = 0,
+  });
+
+  /// 공격 발생 구역 한국어 명칭 (예: '중앙 수호제단 결계', '북서 협곡 상공', '좌측 식량창고 구역').
+  final String zoneName;
+
+  /// 상단 비상 사이렌 배너 문구.
+  final String headline;
+
+  /// 추적 중인 최우선 위협 돌연변이 고유 번호.
+  final int attackerUid;
+
+  /// 추적 중인 돌연변이 종류(3D 모션 영상 인셋 연동용).
+  final MutantKind attackerKind;
+
+  /// 추적 중인 돌연변이 표시 이름.
+  final String attackerName;
+
+  /// 60fps 카메라 흔들림 방지 보간이 적용된 확대 영상 초점 좌표.
+  final Vec2 focusPos;
+
+  /// 즉시 정밀 타격 유도용 실제 괴물 좌표.
+  final Vec2 rawTargetPos;
+
+  /// 위험도 (0.0 ~ 1.0 · 0.78 이상 적색 최고 비상 경보).
+  final double severity;
+
+  /// 결계·수호탑·마을 직접 타격 중인지 여부.
+  final bool isDirectAttack;
+
+  /// 보스·행동대장 누적 피격 타수 및 잔여 타수 실드.
+  final int totalHitsTaken;
+  final int hitShieldLeft;
+  final int maxHitShield;
+}
+
+/// 치명타(회심)·중포 운석·한빙 설화·팔괘 뇌전·문파 절기 발동 순간 화면을 가르는 고임팩트 충격파 링 & 십자 섬광!
+class ShockwaveRingFx {
+  ShockwaveRingFx({
+    required this.pos,
+    required this.maxRadius,
+    required this.colorHex,
+    this.secondaryColorHex = 0xFFFFFFFF,
+    this.style = 'critStar',
+    this.durationSec = 0.36,
+  }) : ttlSec = durationSec;
+
+  final Vec2 pos;
+  final double maxRadius;
+  final int colorHex;
+  final int secondaryColorHex;
+
+  /// `'critStar'` | `'heavyCrater'` | `'frostNova'` | `'baguaPulse'` | `'skillUltimate'`
+  final String style;
+  final double durationSec;
+  double ttlSec;
+
+  double get progress => (1.0 - (ttlSec / durationSec)).clamp(0.0, 1.0);
+}

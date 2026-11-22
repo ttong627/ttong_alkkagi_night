@@ -215,6 +215,32 @@ class MutantMotionEngine {
         slashColor = const Color(0xFFFF0054);
         break;
 
+      case 'wingFlap': // 혈익 흡혈박쥐: 지면 위 높은 고도에서 빠른 날개짓 + 상공 선회 급강하!
+        final p = safePhase * 2.45 + uid * 0.53;
+        final flap = sin(p);
+        liftY = -20.5 - flap * 4.8;
+        swayX = cos(p * 0.55 + uid) * 4.2;
+        scaleX = 1.04 + flap * 0.14;
+        scaleY = 0.96 - flap * 0.09;
+        tiltRad = moveBank * 1.65 + sin(p * 0.55) * 0.14;
+        footImpact = 0.0;
+        afterimages = 1;
+        slashColor = const Color(0xFFFF4D6D);
+        break;
+
+      case 'skyDiveBoss': // 심연 철익귀(공중 행동대장): 육중한 강철 날개 체공 + 폭격 급강하!
+        final p = safePhase * 1.45 + uid * 0.27;
+        final beat = sin(p);
+        liftY = -24.0 - beat * 5.6;
+        swayX = sin(safeTime * 2.1 + uid) * 3.6;
+        scaleX = 1.03 + beat * 0.11;
+        scaleY = 0.98 - beat * 0.07;
+        tiltRad = moveBank * 1.25 + cos(p * 0.5) * 0.09;
+        footImpact = 0.0;
+        afterimages = 2;
+        slashColor = const Color(0xFFC77DFF);
+        break;
+
       case 'shadowDash': // 혈영 질풍귀(속도형 중간보스): 잔상 경공 질주 + 쌍갈퀴 베기
         final p = safePhase * 1.95 + uid * 0.19;
         final hop = _smoothHop(p);

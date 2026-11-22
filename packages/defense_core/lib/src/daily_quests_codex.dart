@@ -490,6 +490,27 @@ class EndlessWaveBuilder {
             laneIndex: (w + 2) % 3,
           ),
         );
+        groups.add(
+          WaveSpawnGroup(
+            kind: MutantKind.bloodWingBat,
+            count: (4 + (w ~/ 2)).clamp(4, 24),
+            intervalSec: 0.48,
+            laneIndex: w % 3,
+          ),
+        );
+      }
+      if (w >= 4 && w % 4 == 0 && w % 3 != 0) {
+        groups.add(
+          WaveSpawnGroup(
+            kind: MutantKind.abyssalGargoyle,
+            count: 1,
+            intervalSec: 1.6,
+            laneIndex: w % 3,
+            customBossTitle: '무한 제$w물결 공중 행동대장 심연 철익귀',
+            customHitShield: 130 + w * 8,
+            hierarchyRank: '공중 행동대장',
+          ),
+        );
       }
       if (w >= 18) {
         groups.add(
@@ -523,6 +544,8 @@ class EndlessWaveBuilder {
             intervalSec: 1.45,
             laneIndex: (w ~/ 3) % 3,
             customBossTitle: midTitle,
+            customHitShield: 140 + w * 10,
+            hierarchyRank: '중간보스',
           ),
         );
       }
@@ -533,8 +556,10 @@ class EndlessWaveBuilder {
             count: w >= 35 ? 2 : 1,
             intervalSec: 1.8,
             laneIndex: 1,
-            customBossTitle: '무한 혈전 제$w물결 심야 마수',
+            customBossTitle: '무한 혈전 제$w물결 천련 마수',
             customPortrait: CampaignCatalog.chapterOf(safeTheme).bossPortraitPrefix,
+            customHitShield: w >= 10 ? (1000 + w * 25) : 520,
+            hierarchyRank: w >= 10 ? '장 보스' : '중간보스',
           ),
         );
       }

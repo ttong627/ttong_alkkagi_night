@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:defense_core/defense_core.dart';
 
@@ -122,146 +123,177 @@ PlayerProgress buildExpectedProgressForChapter(int chapterNumber, {required bool
   );
 }
 
-void main(List<String> args) {
+Future<void> main(List<String> args) async {
   final trialsPerStage = args.contains('--full200') ? 200 : 20;
   final buf = StringBuffer();
   buf.writeln('====================================================================');
-  buf.writeln('《수호알까기 · 탄지무림 심야기습》 전 10장(111단계) 12굽이 천리협곡 · 거점개척 · 6~8물결 진검 검증 성적표');
-  buf.writeln('조건: 720×1360 12굽이(3,900px+) · 마기암석 개척 & 체증건설비 · 6~8물결 · 두목 2단 & 대수괴 3페이즈 · 지원패 0회 · 기연 0% · 단계당 $trialsPerStage판');
+  buf.writeln('《수호알까기 · 탄지무림 심야기습》 전 10장(111단계) 10대 고유 지형 루트 · 거점개척 · 6~8물결 진검 검증 성적표');
+  buf.writeln('조건: 720×1360 10장 고유 루트(2,860~7,250px) · 마기암석 개척 & 체증건설비 · 6~8물결 · 두목 2단 & 대수괴 3페이즈 · 지원패 0회 · 기연 0% · 단계당 $trialsPerStage판');
   buf.writeln('====================================================================');
+
+  final chapterFutures = CampaignCatalog.chapters.map((chSpec) {
+    final chNum = chSpec.number;
+    return Isolate.run(() {
+      final ch = CampaignCatalog.chapterOf(chNum);
+      final tunedProgress = buildExpectedProgressForChapter(ch.number, tunedLoadout: true);
+      final stages = CampaignCatalog.stagesOfChapter(ch.number);
+      double chEasySum = 0;
+      double chNormalSum = 0;
+      double chNightmareSum = 0;
+      double chDurationSum = 0;
+      int chPassed = 0;
+      final chFailed = <String>[];
+      double chMinWinDur = 999999.0;
+      String chMinWinCode = '';
+
+      for (final st in stages) {
+        if (ch.number == 1 && st.stageNumber >= 5) {
+          tunedProgress.companionLevels[CompanionHero.yeonbi] = 2;
+          if (!tunedProgress.activePreset.companions.contains(CompanionHero.yeonbi)) {
+            tunedProgress.activePreset.companions.add(CompanionHero.yeonbi);
+          }
+        }
+        if (ch.number == 1 && st.stageNumber >= 9) {
+          tunedProgress.companionLevels[CompanionHero.cheongmyeong] = 2;
+          if (!tunedProgress.activePreset.companions.contains(CompanionHero.cheongmyeong)) {
+            tunedProgress.activePreset.companions.add(CompanionHero.cheongmyeong);
+          }
+          for (final lt in LauncherType.values) {
+            tunedProgress.launcherPermanentLevels[lt] = 2;
+          }
+        }
+
+        int easyWins = 0;
+        int normalWins = 0;
+        int nightmareWins = 0;
+        double stMinElapsed = 999999.0;
+        double stAvgElapsed = 0.0;
+
+        for (int t = 0; t < trialsPerStage; t++) {
+          final seedBase = st.globalIndex * 1000 + t * 17 + 7;
+          final easyRun = runSingleHeadlessSim(
+            stage: st,
+            difficulty: DefenseDifficulty.easy,
+            progress: tunedProgress,
+            seed: seedBase,
+          );
+          if (easyRun.summary.victory) {
+            easyWins++;
+            if (easyRun.elapsedSec < stMinElapsed) stMinElapsed = easyRun.elapsedSec;
+            if (easyRun.elapsedSec < chMinWinDur) {
+              chMinWinDur = easyRun.elapsedSec;
+              chMinWinCode = '${st.code}(쉬움)';
+            }
+          }
+          final normalRun = runSingleHeadlessSim(
+            stage: st,
+            difficulty: DefenseDifficulty.normal,
+            progress: tunedProgress,
+            seed: seedBase + 3,
+          );
+          stAvgElapsed += normalRun.elapsedSec;
+          if (normalRun.summary.victory) {
+            normalWins++;
+            if (normalRun.elapsedSec < stMinElapsed) stMinElapsed = normalRun.elapsedSec;
+            if (normalRun.elapsedSec < chMinWinDur) {
+              chMinWinDur = normalRun.elapsedSec;
+              chMinWinCode = '${st.code}(보통)';
+            }
+          }
+          final nightmareRun = runSingleHeadlessSim(
+            stage: st,
+            difficulty: DefenseDifficulty.nightmare,
+            progress: tunedProgress,
+            seed: seedBase + 9,
+          );
+          if (nightmareRun.summary.victory) {
+            nightmareWins++;
+          }
+        }
+
+        final easyRate = easyWins / trialsPerStage * 100.0;
+        final normalRate = normalWins / trialsPerStage * 100.0;
+        final nightmareRate = nightmareWins / trialsPerStage * 100.0;
+        chEasySum += easyRate;
+        chNormalSum += normalRate;
+        chNightmareSum += nightmareRate;
+        chDurationSum += stAvgElapsed / trialsPerStage;
+
+        final durationOk = stMinElapsed >= 70.0;
+        final ok = easyRate >= 80.0 && normalRate >= 60.0 && durationOk;
+        if (ok) {
+          chPassed++;
+        } else {
+          chFailed.add(
+            '${st.code}(쉬움:${easyRate.toStringAsFixed(0)}%, 보통:${normalRate.toStringAsFixed(0)}%, 최단:${stMinElapsed.toStringAsFixed(1)}초)',
+          );
+        }
+      }
+
+      final n = stages.length;
+      final padSpan = '${stages.first.maxMountCount}~${stages.last.maxMountCount}초소';
+      final line =
+          '제${ch.number.toString().padLeft(2)}장 [${ch.villageName}] ($n단계 · $padSpan · 평균 ${(chDurationSum / n).toStringAsFixed(1)}초) '
+          '→ 승률 | 쉬움 ${(chEasySum / n).toStringAsFixed(1)}% · '
+          '보통 ${(chNormalSum / n).toStringAsFixed(1)}% · '
+          '악몽 ${(chNightmareSum / n).toStringAsFixed(1)}%';
+      return (
+        line: line,
+        passed: chPassed,
+        failed: chFailed,
+        minDur: chMinWinDur,
+        minCode: chMinWinCode,
+      );
+    });
+  }).toList();
+
+  final idleFuture = Isolate.run(() {
+    int idleWins = 0;
+    final idleStages = <String>[];
+    for (final st in CampaignCatalog.allStages) {
+      final prog = buildExpectedProgressForChapter(st.chapterNumber, tunedLoadout: true);
+      final easyIdle = runSingleHeadlessSim(
+        stage: st,
+        difficulty: DefenseDifficulty.easy,
+        progress: prog,
+        seed: 7000 + st.globalIndex,
+        autoBuildPads: false,
+      );
+      final normalIdle = runSingleHeadlessSim(
+        stage: st,
+        difficulty: DefenseDifficulty.normal,
+        progress: prog,
+        seed: 8000 + st.globalIndex,
+        autoBuildPads: false,
+      );
+      if (easyIdle.summary.victory || normalIdle.summary.victory) {
+        idleWins++;
+        idleStages.add(st.code);
+      }
+    }
+    return (idleWins: idleWins, idleStages: idleStages);
+  });
+
+  final chapterResults = await Future.wait(chapterFutures);
+  final idleResult = await idleFuture;
 
   int passedStages = 0;
   final failedCodes = <String>[];
   double minWinDurationSec = 999999.0;
   String minWinDurationCode = '';
 
-  for (final ch in CampaignCatalog.chapters) {
-    final tunedProgress = buildExpectedProgressForChapter(ch.number, tunedLoadout: true);
-    final stages = CampaignCatalog.stagesOfChapter(ch.number);
-    double chEasySum = 0;
-    double chNormalSum = 0;
-    double chNightmareSum = 0;
-    double chDurationSum = 0;
-
-    for (final st in stages) {
-      if (ch.number == 1 && st.stageNumber >= 5) {
-        tunedProgress.companionLevels[CompanionHero.yeonbi] = 2;
-        if (!tunedProgress.activePreset.companions.contains(CompanionHero.yeonbi)) {
-          tunedProgress.activePreset.companions.add(CompanionHero.yeonbi);
-        }
-      }
-      if (ch.number == 1 && st.stageNumber >= 9) {
-        tunedProgress.companionLevels[CompanionHero.cheongmyeong] = 2;
-        if (!tunedProgress.activePreset.companions.contains(CompanionHero.cheongmyeong)) {
-          tunedProgress.activePreset.companions.add(CompanionHero.cheongmyeong);
-        }
-        for (final lt in LauncherType.values) {
-          tunedProgress.launcherPermanentLevels[lt] = 2;
-        }
-      }
-
-      int easyWins = 0;
-      int normalWins = 0;
-      int nightmareWins = 0;
-      double stMinElapsed = 999999.0;
-      double stAvgElapsed = 0.0;
-
-      for (int t = 0; t < trialsPerStage; t++) {
-        final seedBase = st.globalIndex * 1000 + t * 17 + 7;
-        final easyRun = runSingleHeadlessSim(
-          stage: st,
-          difficulty: DefenseDifficulty.easy,
-          progress: tunedProgress,
-          seed: seedBase,
-        );
-        if (easyRun.summary.victory) {
-          easyWins++;
-          if (easyRun.elapsedSec < stMinElapsed) stMinElapsed = easyRun.elapsedSec;
-          if (easyRun.elapsedSec < minWinDurationSec) {
-            minWinDurationSec = easyRun.elapsedSec;
-            minWinDurationCode = '${st.code}(쉬움)';
-          }
-        }
-        final normalRun = runSingleHeadlessSim(
-          stage: st,
-          difficulty: DefenseDifficulty.normal,
-          progress: tunedProgress,
-          seed: seedBase + 3,
-        );
-        stAvgElapsed += normalRun.elapsedSec;
-        if (normalRun.summary.victory) {
-          normalWins++;
-          if (normalRun.elapsedSec < stMinElapsed) stMinElapsed = normalRun.elapsedSec;
-          if (normalRun.elapsedSec < minWinDurationSec) {
-            minWinDurationSec = normalRun.elapsedSec;
-            minWinDurationCode = '${st.code}(보통)';
-          }
-        }
-        final nightmareRun = runSingleHeadlessSim(
-          stage: st,
-          difficulty: DefenseDifficulty.nightmare,
-          progress: tunedProgress,
-          seed: seedBase + 9,
-        );
-        if (nightmareRun.summary.victory) {
-          nightmareWins++;
-        }
-      }
-
-      final easyRate = easyWins / trialsPerStage * 100.0;
-      final normalRate = normalWins / trialsPerStage * 100.0;
-      final nightmareRate = nightmareWins / trialsPerStage * 100.0;
-      chEasySum += easyRate;
-      chNormalSum += normalRate;
-      chNightmareSum += nightmareRate;
-      chDurationSum += stAvgElapsed / trialsPerStage;
-
-      final durationOk = stMinElapsed >= 70.0;
-      final ok = easyRate >= 80.0 && normalRate >= 60.0 && durationOk;
-      if (ok) {
-        passedStages++;
-      } else {
-        failedCodes.add(
-          '${st.code}(쉬움:${easyRate.toStringAsFixed(0)}%, 보통:${normalRate.toStringAsFixed(0)}%, 최단:${stMinElapsed.toStringAsFixed(1)}초)',
-        );
-      }
-    }
-
-    final n = stages.length;
-    final padSpan = '${stages.first.maxMountCount}~${stages.last.maxMountCount}초소';
-    buf.writeln(
-      '제${ch.number.toString().padLeft(2)}장 [${ch.villageName}] ($n단계 · $padSpan · 평균 ${(chDurationSum / n).toStringAsFixed(1)}초) '
-      '→ 승률 | 쉬움 ${(chEasySum / n).toStringAsFixed(1)}% · '
-      '보통 ${(chNormalSum / n).toStringAsFixed(1)}% · '
-      '악몽 ${(chNightmareSum / n).toStringAsFixed(1)}%',
-    );
-  }
-
-  // 1) 무개입 방치(초소 0개 배치 · 수동 조작 0회) 전 구간 100% 패배(마을 함락) 하드게이트 검증!
-  // 가장 쉬운 1-1(쉬움)을 포함해 전 111단계에서 아무것도 안 하고 가만히 두면 단 1판도 깨져서는 안 된다!
-  int idleAccidentalWins = 0;
-  final idleWinStages = <String>[];
-  for (final st in CampaignCatalog.allStages) {
-    final prog = buildExpectedProgressForChapter(st.chapterNumber, tunedLoadout: true);
-    final easyIdle = runSingleHeadlessSim(
-      stage: st,
-      difficulty: DefenseDifficulty.easy,
-      progress: prog,
-      seed: 7000 + st.globalIndex,
-      autoBuildPads: false,
-    );
-    final normalIdle = runSingleHeadlessSim(
-      stage: st,
-      difficulty: DefenseDifficulty.normal,
-      progress: prog,
-      seed: 8000 + st.globalIndex,
-      autoBuildPads: false,
-    );
-    if (easyIdle.summary.victory || normalIdle.summary.victory) {
-      idleAccidentalWins++;
-      idleWinStages.add(st.code);
+  for (final r in chapterResults) {
+    buf.writeln(r.line);
+    passedStages += r.passed;
+    failedCodes.addAll(r.failed);
+    if (r.minDur < minWinDurationSec) {
+      minWinDurationSec = r.minDur;
+      minWinDurationCode = r.minCode;
     }
   }
+
+  final idleAccidentalWins = idleResult.idleWins;
+  final idleWinStages = idleResult.idleStages;
 
   // 2) 역상성/무배치 대조군 검증 (중반 5장 보스전: 무배치 패배 vs 맞춤 초소 배치·비급 선택 승리 비교)
   final checkStage = CampaignCatalog.stageAt(5, 11);

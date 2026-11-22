@@ -80,6 +80,15 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 현재 도전 관문 기준 최적 진법(최고 등급 수호석·모양·추천 초소·영수·상위 동료 3인) 원터치 자동 편성!
+  StageSpec applyRecommendedForNextStage() {
+    final nextIdx = (_progress.highestClearedGlobalStage + 1)
+        .clamp(1, CampaignCatalog.allStages.length);
+    final stage = CampaignCatalog.allStages[nextIdx - 1];
+    applyRecommendedLoadoutForStage(stage);
+    return stage;
+  }
+
   /// 해당 스테이지의 추천 진법(알·발사대·동료·영수)을 원터치로 자동 맞춤 편성!
   void applyRecommendedLoadoutForStage(StageSpec stage) {
     final preset = _progress.activePreset;
@@ -107,10 +116,16 @@ class GameController extends ChangeNotifier {
     }
 
     final unlockedHeroes = CompanionHero.values
-        .where((h) => h != CompanionHero.mukhyeon && (_progress.companionLevels[h] ?? 0) > 0)
-        .toList();
-    if (unlockedHeroes.length >= 3) {
-      preset.companions = unlockedHeroes.reversed.take(3).toList();
+        .where((h) => (_progress.companionLevels[h] ?? 0) > 0)
+        .toList()
+      ..sort((a, b) {
+        final lvCmp = (_progress.companionLevels[b] ?? 0)
+            .compareTo(_progress.companionLevels[a] ?? 0);
+        if (lvCmp != 0) return lvCmp;
+        return b.index.compareTo(a.index);
+      });
+    if (unlockedHeroes.isNotEmpty) {
+      preset.companions = unlockedHeroes.take(3).toList();
     }
     preset.autoUpgradeInBattle = true;
 
@@ -118,6 +133,37 @@ class GameController extends ChangeNotifier {
     NightHaptics.instance.lightTap();
     saveToDisk();
     notifyListeners();
+  }
+
+  /// 도착한 모든 보상(보름달·호송·탐색·출석·임무·업적) 원터치 일괄 수령 + 호송·탐색 자동 재출발!
+  BatchClaimSummary claimAllReadyRewards({bool autoRedispatch = true}) {
+    final summary = _progress.claimAllReadyRewards(
+      _rng,
+      autoRedispatch: autoRedispatch,
+    );
+    if (summary.hasAnyAction) {
+      NightAudioController.instance.playAsset(
+        summary.gainedSupportTokens > 0
+            ? 'serendipity_jackpot.wav'
+            : 'jingle_reward.ogg',
+      );
+      NightHaptics.instance.meridianOpen();
+      saveToDisk();
+      notifyListeners();
+    }
+    return summary;
+  }
+
+  /// 대장간·영약각·경맥 원터치 스마트 추천 일괄 강화!
+  List<String> upgradeRecommendedBatch({int maxSteps = 5}) {
+    final logs = _progress.upgradeRecommendedBatch(maxSteps: maxSteps);
+    if (logs.isNotEmpty) {
+      NightAudioController.instance.playAsset('jingle_levelup.ogg');
+      NightHaptics.instance.heavyImpact();
+      saveToDisk();
+      notifyListeners();
+    }
+    return logs;
   }
 
   void updatePreset(void Function(LoadoutPreset preset) updater) {

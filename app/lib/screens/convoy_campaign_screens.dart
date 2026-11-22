@@ -10,8 +10,14 @@ typedef ConvoySerendipityScreen = ConvoyAndSerendipityScreen;
 
 /// 물자 호송 · 심야 탐색 · 보름달 길조 기연 & 암행어사 출두 지원패 수급소.
 class ConvoyAndSerendipityScreen extends StatelessWidget {
-  const ConvoyAndSerendipityScreen({super.key, required this.controller});
+  const ConvoyAndSerendipityScreen({
+    super.key,
+    required this.controller,
+    this.embeddedInShell = false,
+  });
+
   final GameController controller;
+  final bool embeddedInShell;
 
   Widget _buildRewardLine({
     required String assetPath,
@@ -175,12 +181,132 @@ class ConvoyAndSerendipityScreen extends StatelessWidget {
         final exploreUnlocked = p.highestUnlockedChapter >= 4;
 
         return Scaffold(
-          appBar: AppBar(title: const Text('보급 호송 · 심야 탐색 · 기연각')),
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            automaticallyImplyLeading: !embeddedInShell,
+            title: const Text('보급 호송 · 심야 탐색 · 기연각'),
+          ),
           body: NightSceneBackdrop(
             child: ListView(
               padding: const EdgeInsets.all(14),
               children: [
-                // 지원패 보유 현황 및 3대 획득 경로 안내
+                // 상단 주인공: 마차 호위 무사·구르미 대 변이 들개 격전 원화 + 원터치 일괄 수령/재파견
+                HeroVsMutantShowcaseBanner(
+                  sceneAsset: NightArtRegistry.cardSupplyConvoy,
+                  badgeText: '보유 지원패(무림수호단 출두): ${p.supportTokens}개',
+                  title: '협곡 군량 호송대 & 심야 봉화 탐색',
+                  subtitle:
+                      '마차 호송·심야 탐색·보름달 기연 보상을 한 번에 수령하고 자동 재출발합니다.',
+                  leftHeroAsset: NightArtRegistry.charAttack('banDal'),
+                  leftHeroLabel: '반달 호위',
+                  rightMutantAsset:
+                      NightArtRegistry.mutantAttackAsset(MutantKind.sickHound),
+                  rightMutantLabel: '습격 변이군',
+                  artHeight: 112,
+                  actionRow: SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: FilledButton.icon(
+                      key: const Key('convoy_batch_claim_btn'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: NightPalette.hanjiInk,
+                        foregroundColor: NightPalette.accentGold,
+                      ),
+                      onPressed: () {
+                        final s = controller.claimAllReadyRewards();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: NightPalette.bgCard,
+                            content: Text(
+                              s.hasAnyAction
+                                  ? '보급 일괄 정리 완료! 증표 +${s.gainedTokens} · 영약 +${s.gainedElixirs} · 지원패 +${s.gainedSupportTokens}'
+                                  : '모든 마차·탐색대가 운행 중이거나 수령할 보상이 없습니다.',
+                              style: const TextStyle(
+                                color: NightPalette.accentGold,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.redeem_rounded, size: 18),
+                      label: const Text(
+                        '도착 보상 일괄 수령 & 재파견',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // 1) 보름달 길조 게이지 (기연 경로 — 첫 화면에서 스크롤 없이 즉시 개봉!)
+                MurimCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const NightSpriteIcon(
+                            assetPath: NightArtRegistry.nightSerendipity,
+                            fallbackIcon: Icons.auto_awesome_rounded,
+                            size: 44,
+                            showFrame: true,
+                            frameColor: NightPalette.accentGold,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '🌕 보름달 길조 게이지 (${p.moonOmenGauge} / 100)',
+                                  style: const TextStyle(
+                                    fontSize: 16.0,
+                                    fontWeight: FontWeight.bold,
+                                    color: NightPalette.accentGold,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                LinearProgressIndicator(
+                                  value: (p.moonOmenGauge / 100.0).clamp(0.0, 1.0),
+                                  minHeight: 10,
+                                  borderRadius: BorderRadius.circular(6),
+                                  color: NightPalette.accentGold,
+                                  backgroundColor: NightPalette.bgDeep,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        '보름달(100)이 차오르면 영약·신물 조각·지원패 특급 기연이 100% 확정 발동합니다.',
+                        style: TextStyle(fontSize: 12.2, color: NightPalette.textMuted),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.icon(
+                          onPressed: p.moonOmenGauge >= 100
+                              ? () {
+                                  final res = controller.claimFullMoon();
+                                  if (res != null) _showClaimDialog(context, res);
+                                }
+                              : null,
+                          icon: const NightSpriteIcon(
+                            assetPath: NightArtRegistry.nightSerendipity,
+                            fallbackIcon: Icons.auto_awesome_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('보름달 특급 기연 열기'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // 지원패 보유 현황 및 마을 생태 3요소 안내
                 MurimCard(
                   borderColor: NightPalette.accentGold,
                   child: Column(
@@ -244,74 +370,6 @@ class ConvoyAndSerendipityScreen extends StatelessWidget {
                             roleText: '수레 우마 보급',
                           ),
                         ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 1) 보름달 길조 게이지 (기연 경로)
-                MurimCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const NightSpriteIcon(
-                            assetPath: NightArtRegistry.nightSerendipity,
-                            fallbackIcon: Icons.auto_awesome_rounded,
-                            size: 46,
-                            showFrame: true,
-                            frameColor: NightPalette.accentGold,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '🌕 보름달 길조 게이지 (${p.moonOmenGauge} / 100)',
-                                  style: const TextStyle(
-                                    fontSize: 16.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: NightPalette.accentGold,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                LinearProgressIndicator(
-                                  value: (p.moonOmenGauge / 100.0).clamp(0.0, 1.0),
-                                  minHeight: 10,
-                                  borderRadius: BorderRadius.circular(6),
-                                  color: NightPalette.accentGold,
-                                  backgroundColor: NightPalette.bgDeep,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        '야간 수호와 단전 운기를 할 때마다 달이 차오르며, 보름달(100)이 되면 영약·신물 조각·지원패가 담긴 특급 기연이 100% 확정 발동합니다!',
-                        style: TextStyle(fontSize: 12.5, color: NightPalette.textMuted),
-                      ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: FilledButton.icon(
-                          onPressed: p.moonOmenGauge >= 100
-                              ? () {
-                                  final res = controller.claimFullMoon();
-                                  if (res != null) _showClaimDialog(context, res);
-                                }
-                              : null,
-                          icon: const NightSpriteIcon(
-                            assetPath: NightArtRegistry.nightSerendipity,
-                            fallbackIcon: Icons.auto_awesome_rounded,
-                            size: 18,
-                          ),
-                          label: const Text('보름달 특급 기연 열기'),
-                        ),
                       ),
                     ],
                   ),
@@ -464,10 +522,155 @@ class ConvoyAndSerendipityScreen extends StatelessWidget {
   }
 }
 
-/// 1~10장(총 111단계) 순차 행군 수호 캠페인 지도 화면.
+/// 1~10장(총 111단계) 코덱스 대륙 월드맵 & 순차 행군 수호 캠페인 화면.
 class CampaignScreen extends StatelessWidget {
   const CampaignScreen({super.key, required this.controller});
   final GameController controller;
+
+  // 코덱스 대륙 지도(world_map_murim_night.webp) 실제 10대 거점 정규화 좌표 (남단 1장 -> 북단 10장)
+  static const List<Offset> _chapterMapCoords = <Offset>[
+    Offset(0.50, 0.87), // 1장 흙먼지 마을
+    Offset(0.43, 0.68), // 2장 통통 객잔
+    Offset(0.66, 0.59), // 3장 거북 장터
+    Offset(0.20, 0.49), // 4장 쿠비 산채 봉화대
+    Offset(0.80, 0.44), // 5장 로직 학당 기관전
+    Offset(0.50, 0.39), // 6장 무림맹 대광장
+    Offset(0.20, 0.31), // 7장 열사의 협곡 오아시스
+    Offset(0.80, 0.27), // 8장 구호 곡식 함대
+    Offset(0.38, 0.25), // 9장 화염산 봉인 제단 (배지와 겹치지 않도록 최적화)
+    Offset(0.62, 0.15), // 10장 천상 태초 탄신전
+  ];
+
+  Widget _buildInteractiveWorldMap({
+    required BuildContext context,
+    required PlayerProgress progress,
+    required int selectedChapterNumber,
+  }) {
+    return SizedBox(
+      height: 204,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(14.5)),
+        child: LayoutBuilder(
+          builder: (ctx, box) {
+            final w = box.maxWidth;
+            final h = box.maxHeight;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  NightArtRegistry.worldMapLiveMotion,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, _, _) => Image.asset(
+                    NightArtRegistry.worldMapMurimNight,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Image.asset(
+                      NightArtRegistry.bgNightLobby,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                CustomPaint(
+                  painter: _WorldMapRoutePainter(
+                    coords: _chapterMapCoords,
+                    unlockedChapter: progress.highestUnlockedChapter,
+                    selectedChapter: selectedChapterNumber,
+                  ),
+                ),
+                for (int i = 0; i < CampaignCatalog.chapters.length; i++)
+                  Builder(
+                    builder: (_) {
+                      final chNum = i + 1;
+                      final unlocked = chNum <= progress.highestUnlockedChapter;
+                      final selected = chNum == selectedChapterNumber;
+                      final cleared = chNum < progress.highestUnlockedChapter;
+                      final norm = _chapterMapCoords[i];
+                      final px = (norm.dx * w).clamp(28.0, w - 28.0);
+                      final py = (norm.dy * h).clamp(20.0, h - 22.0);
+
+                      final Color pinBg = selected
+                          ? NightPalette.accentGold
+                          : (cleared
+                              ? const Color(0xEE184E44)
+                              : (unlocked
+                                  ? const Color(0xEE8C2D2D)
+                                  : const Color(0xCC121B2C)));
+                      final Color pinFg = selected
+                          ? NightPalette.hanjiInk
+                          : (unlocked
+                              ? NightPalette.textPrimary
+                              : NightPalette.textMuted);
+
+                      return Positioned(
+                        left: px - 26,
+                        top: py - 14,
+                        width: 52,
+                        height: 28,
+                        child: GestureDetector(
+                          onTap: unlocked
+                              ? () => controller.setSelectedChapter(chNum)
+                              : null,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: pinBg,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: selected
+                                    ? Colors.white
+                                    : (unlocked
+                                        ? NightPalette.accentGold
+                                        : NightPalette.borderGold
+                                            .withValues(alpha: 0.35)),
+                                width: selected ? 2.0 : 1.2,
+                              ),
+                            ),
+                            child: Text(
+                              '${unlocked ? (cleared ? "✓" : "🔥") : "🔒"}$chNum장',
+                              style: TextStyle(
+                                fontSize: 10.6,
+                                fontWeight: FontWeight.bold,
+                                color: pinFg,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                Positioned(
+                  right: 10,
+                  bottom: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xE00E1728),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: NightPalette.accentGold.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    child: const Text(
+                      '🗺️ 탄지무림 10대 거점 심야 수호 대륙도 (거점 터치 이동)',
+                      style: TextStyle(
+                        fontSize: 10.8,
+                        fontWeight: FontWeight.bold,
+                        color: NightPalette.accentGold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -489,143 +692,196 @@ class CampaignScreen extends StatelessWidget {
           body: NightSceneBackdrop(
             assetPath: chSpec.bgAsset,
             fallbackAssetPath: NightArtRegistry.bgNightLobby,
-            overlayOpacity: 0.84,
+            overlayOpacity: 0.80,
             child: Column(
               children: [
-                // 상단 순차 행군 장 선택 & 난이도 선택 & 이번 차례 바로 출정 바
-                Container(
-                  color: NightPalette.bgPanel.withValues(alpha: 0.94),
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                  child: Column(
-                    children: [
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: CampaignCatalog.chapters.map((c) {
-                            final unlocked = c.number <= p.highestUnlockedChapter;
-                            final selected = c.number == chSpec.number;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                selected: selected,
-                                label: Text(
-                                  '${unlocked ? (c.number < p.highestUnlockedChapter ? "✓" : "▶") : "🔒"}${c.number}장 ${c.villageName}',
-                                ),
-                                onSelected: unlocked
-                                    ? (_) => controller.setSelectedChapter(c.number)
-                                    : null,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          SegmentedButton<DefenseDifficulty>(
-                            segments: DefenseDifficulty.values
-                                .map((d) => ButtonSegment(
-                                      value: d,
-                                      label: Text(d.name.split(' · ').first),
-                                    ))
-                                .toList(),
-                            selected: {controller.selectedDifficulty},
-                            onSelectionChanged: (s) => controller.setDifficulty(s.first),
-                            style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                          ),
-                          if (nextRescue != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xDD11353B),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: NightPalette.jadeGreen),
-                              ),
-                              child: Text(
-                                '🆘 다음 구출: ${nextRescue.code} ${nextRescue.rescueBadgeText}',
-                                style: const TextStyle(
-                                  fontSize: 11.2,
-                                  color: NightPalette.jadeGreen,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 선택된 장 줄거리 및 이번 수호 차례 안내 배너
+                // 1) 코덱스 대륙 월드맵 + 장 선택·난이도·출정 안내 일체형 한지·청람 지령대 (덩어리 압축!)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: MurimCard(
-                    borderColor: NightPalette.accentGold,
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: NightPalette.bgPanel,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: NightPalette.accentGold,
+                        width: 1.8,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
                       children: [
-                        NightSpriteIcon(
-                          assetPath: NightArtRegistry.charFace(chSpec.bossPortraitPrefix),
-                          fallbackAssetPath: NightArtRegistry.mutantAsset(MutantKind.chapterOverlord),
-                          fallbackIcon: Icons.shield_moon_rounded,
-                          size: 48,
-                          borderRadius: 12,
-                          fit: BoxFit.cover,
-                          showFrame: true,
-                          frameColor: NightPalette.accentGold,
+                        _buildInteractiveWorldMap(
+                          context: context,
+                          progress: p,
+                          selectedChapterNumber: chSpec.number,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 10,
+                          ),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                '${chSpec.actLabel} ${chSpec.title} — ${chSpec.villageName}',
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontFamily: 'BlackHanSans',
-                                  fontSize: 15.5,
-                                  color: NightPalette.accentGold,
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: CampaignCatalog.chapters.map((c) {
+                                    final unlocked =
+                                        c.number <= p.highestUnlockedChapter;
+                                    final selected = c.number == chSpec.number;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: ChoiceChip(
+                                        selected: selected,
+                                        label: Text(
+                                          '${unlocked ? (c.number < p.highestUnlockedChapter ? "✓" : "▶") : "🔒"}${c.number}장 ${c.villageName}',
+                                        ),
+                                        onSelected: unlocked
+                                            ? (_) => controller
+                                                .setSelectedChapter(c.number)
+                                            : null,
+                                      ),
+                                    );
+                                  }).toList(),
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '▶ 현재 수호 차례: ${currentOrderStage.title} (초소 ${currentOrderStage.maxMountCount}곳 개방)',
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: NightPalette.jadeGreen,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              const SizedBox(height: 5),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  SegmentedButton<DefenseDifficulty>(
+                                    segments: DefenseDifficulty.values
+                                        .map((d) => ButtonSegment(
+                                              value: d,
+                                              label: Text(
+                                                  d.name.split(' · ').first),
+                                            ))
+                                        .toList(),
+                                    selected: {controller.selectedDifficulty},
+                                    onSelectionChanged: (s) =>
+                                        controller.setDifficulty(s.first),
+                                    style: const ButtonStyle(
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+                                  if (nextRescue != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 9,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xDD11353B),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                            color: NightPalette.jadeGreen),
+                                      ),
+                                      child: Text(
+                                        '🆘 다음 구출: ${nextRescue.code} ${nextRescue.rescueBadgeText}',
+                                        style: const TextStyle(
+                                          fontSize: 11.2,
+                                          color: NightPalette.jadeGreen,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            backgroundColor: NightPalette.accentGold,
-                            foregroundColor: Colors.black,
-                          ),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => BattleScreen(
-                                  controller: controller,
-                                  stage: currentOrderStage,
+                        Container(
+                          color: NightPalette.hanjiLight,
+                          padding: const EdgeInsets.all(10),
+                          child: Row(
+                            children: [
+                              NightSpriteIcon(
+                                assetPath: chSpec.floorAsset,
+                                fallbackAssetPath: NightArtRegistry.charMotion(
+                                    chSpec.bossPortraitPrefix),
+                                fallbackIcon: Icons.map_rounded,
+                                size: 52,
+                                borderRadius: 10,
+                                fit: BoxFit.cover,
+                                showFrame: true,
+                                frameColor: NightPalette.hanjiInk,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${chSpec.actLabel} ${chSpec.title} — ${chSpec.villageName}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontFamily: 'BlackHanSans',
+                                        fontSize: 15.2,
+                                        color: NightPalette.hanjiInk,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '🗺️ ${chSpec.routeTopologyTag} · ✨ ${chSpec.chapterTraitTitle} (${chSpec.chapterTraitDesc})',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11.2,
+                                        color: Color(0xFF164E63),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '현재 수호 차례: ${currentOrderStage.title} (초소 ${currentOrderStage.maxMountCount}곳 개방)',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11.8,
+                                        color: NightPalette.hanjiSubInk,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            );
-                          },
-                          child: const Text('이번 차례 출정'),
+                              const SizedBox(width: 6),
+                              NightSpriteIcon(
+                                assetPath: NightArtRegistry.mutantMotionAsset(
+                                  MutantKind.chapterOverlord,
+                                ),
+                                fallbackAssetPath:
+                                    NightArtRegistry.showcaseBossChapter,
+                                fallbackIcon: Icons.whatshot_rounded,
+                                size: 46,
+                                borderRadius: 10,
+                                fit: BoxFit.cover,
+                                showFrame: true,
+                                frameColor: NightPalette.crimsonMoon,
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(94, 42),
+                                  backgroundColor: NightPalette.hanjiInk,
+                                  foregroundColor: NightPalette.accentGold,
+                                ),
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => BattleScreen(
+                                        controller: controller,
+                                        stage: currentOrderStage,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: const Text('이번 차례 출정'),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -961,4 +1217,56 @@ class CampaignScreen extends StatelessWidget {
       },
     );
   }
+}
+
+class _WorldMapRoutePainter extends CustomPainter {
+  const _WorldMapRoutePainter({
+    required this.coords,
+    required this.unlockedChapter,
+    required this.selectedChapter,
+  });
+
+  final List<Offset> coords;
+  final int unlockedChapter;
+  final int selectedChapter;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (coords.length < 2) return;
+    final activePaint = Paint()
+      ..color = const Color(0xDDF4CC6A)
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final lockedPaint = Paint()
+      ..color = const Color(0x558D99AE)
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    for (int i = 0; i < coords.length - 1; i++) {
+      final p1 = Offset(coords[i].dx * size.width, coords[i].dy * size.height);
+      final p2 =
+          Offset(coords[i + 1].dx * size.width, coords[i + 1].dy * size.height);
+      final isOpen = (i + 2) <= unlockedChapter;
+      canvas.drawLine(p1, p2, isOpen ? activePaint : lockedPaint);
+    }
+
+    if (selectedChapter >= 1 && selectedChapter <= coords.length) {
+      final sel = coords[selectedChapter - 1];
+      final sc = Offset(sel.dx * size.width, sel.dy * size.height);
+      canvas.drawCircle(
+        sc,
+        22,
+        Paint()
+          ..color = const Color(0x44FFD166)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WorldMapRoutePainter oldDelegate) =>
+      oldDelegate.unlockedChapter != unlockedChapter ||
+      oldDelegate.selectedChapter != selectedChapter;
 }

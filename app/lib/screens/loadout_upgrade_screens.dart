@@ -7,22 +7,30 @@ import '../ui/night_art_registry.dart';
 
 typedef ForgeSanctuaryScreen = UpgradeScreen;
 
-/// 진법 편성실 (슬롯 3칸 · 알/모양/무공 · 거점 발사대 · 영수/동료 조건부 자동 발동 설정).
+/// 영웅 · 자동 수호 진법 편성실
+/// - 영웅단 전신 공격 일러스트 대 3페이즈 돌연변이 쇼케이스 무대
+/// - 원터치 최적 진법 자동 편성 + 3슬롯 프리셋 + 발사대별 상성 변이체 직관 안내.
 class LoadoutScreen extends StatelessWidget {
-  const LoadoutScreen({super.key, required this.controller});
+  const LoadoutScreen({
+    super.key,
+    required this.controller,
+    this.embeddedInShell = false,
+  });
+
   final GameController controller;
+  final bool embeddedInShell;
 
   static InputDecoration _darkFieldDecoration(String labelText) {
     return InputDecoration(
       labelText: labelText,
       labelStyle: const TextStyle(fontSize: 12.8, color: NightPalette.textMuted),
       filled: true,
-      fillColor: NightPalette.bgDeep.withValues(alpha: 0.78),
+      fillColor: NightPalette.bgDeep.withValues(alpha: 0.84),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
-          color: NightPalette.borderGold.withValues(alpha: 0.28),
+          color: NightPalette.borderGold.withValues(alpha: 0.30),
         ),
       ),
       focusedBorder: OutlineInputBorder(
@@ -43,9 +51,14 @@ class LoadoutScreen extends StatelessWidget {
         return DefaultTabController(
           length: 2,
           child: Scaffold(
+            backgroundColor: Colors.transparent,
             appBar: AppBar(
+              automaticallyImplyLeading: !embeddedInShell,
               title: const Text('자동 수호 진법 편성실'),
               bottom: const TabBar(
+                indicatorColor: NightPalette.accentGold,
+                labelColor: NightPalette.accentGold,
+                unselectedLabelColor: NightPalette.textMuted,
                 tabs: [
                   Tab(text: '☯️ 수호 알 · 내공 · 거점 발사대'),
                   Tab(text: '🐾 영수 · 동료 · 출두 조건'),
@@ -55,8 +68,8 @@ class LoadoutScreen extends StatelessWidget {
             body: NightSceneBackdrop(
               child: TabBarView(
                 children: [
-                  _buildCoreArsenalTab(p, preset),
-                  _buildCompanionTacticsTab(p, preset),
+                  _buildCoreArsenalTab(context, p, preset),
+                  _buildCompanionTacticsTab(context, p, preset),
                 ],
               ),
             ),
@@ -66,79 +79,42 @@ class LoadoutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCoreArsenalTab(PlayerProgress p, LoadoutPreset preset) {
+  Widget _buildCoreArsenalTab(
+    BuildContext context,
+    PlayerProgress p,
+    LoadoutPreset preset,
+  ) {
+    final leadHero = preset.companions.isNotEmpty
+        ? preset.companions.first
+        : CompanionHero.seokdu;
+    final nextIdx = (p.highestClearedGlobalStage + 1)
+        .clamp(1, CampaignCatalog.allStages.length);
+    final nextStage = CampaignCatalog.allStages[nextIdx - 1];
+
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       children: [
-        // 1) 상단 한지 명패 + 진법 저장 슬롯 3칸 통합반 (게슈탈트 제1덩어리 · 확실한 시각 주인공 강조)
+        // 1) 상단 제1주인공: 영웅단 실전 집결 원화 + 원터치 최적 진법 편성 + 3슬롯 프리셋
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8EED5),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: NightPalette.accentGold, width: 2.4),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x55000000),
-                    blurRadius: 16,
-                    offset: Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: HeroVsMutantShowcaseBanner(
+              sceneAsset: NightArtRegistry.homeCommandLoop,
+              badgeText:
+                  '현재 편성: ${preset.name} · 출전 동료 ${preset.companions.length}/3인',
+              title:
+                  '${preset.primaryStone.grade}단 ${preset.primaryStone.name} · ${preset.sectTechnique.skillName}',
+              subtitle:
+                  '${preset.primaryShape.name} · 동행 영수 [${preset.equippedBeast.name}] · 목표 관문 ${nextStage.code}',
+              leftHeroAsset: NightArtRegistry.heroMotionAsset(leadHero),
+              leftHeroLabel: '${leadHero.name} 3D모션',
+              rightMutantAsset:
+                  NightArtRegistry.mutantMotionAsset(MutantKind.chapterOverlord),
+              rightMutantLabel: '3페이즈 진화',
+              artHeight: 176,
+              actionRow: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      NightSpriteIcon(
-                        assetPath: NightArtRegistry.stoneAsset(
-                          preset.primaryStone,
-                        ),
-                        fallbackIcon: Icons.circle,
-                        size: 78,
-                        color: Color(preset.primaryStone.colorHex),
-                        showFrame: true,
-                        frameColor: const Color(0xFF1B2538),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '상황별 즉시 전환 · 3대 수호 진법 저장소',
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF394B6D),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${preset.name} (${preset.primaryStone.grade}단 ${preset.primaryStone.name})',
-                              style: const TextStyle(
-                                fontFamily: 'BlackHanSans',
-                                fontSize: 25,
-                                color: Color(0xFF162033),
-                              ),
-                            ),
-                            Text(
-                              '${preset.primaryShape.name} · ${preset.sectTechnique.sectName} [${preset.sectTechnique.skillName}]',
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF2E3D59),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
@@ -146,25 +122,55 @@ class LoadoutScreen extends StatelessWidget {
                       final sel = p.activePresetIndex == i;
                       return ChoiceChip(
                         selected: sel,
-                        backgroundColor: const Color(0xFFE3D4B3),
-                        selectedColor: const Color(0xFF233048),
+                        backgroundColor: const Color(0xFFE4D5B4),
+                        selectedColor: NightPalette.hanjiInk,
                         checkmarkColor: NightPalette.accentGold,
                         side: BorderSide(
                           color: sel
-                              ? const Color(0xFF1B2538)
+                              ? NightPalette.hanjiInk
                               : const Color(0xFFB5A178),
                         ),
                         labelStyle: TextStyle(
                           color: sel
                               ? NightPalette.accentGold
-                              : const Color(0xFF233048),
+                              : NightPalette.hanjiInk,
                           fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                          fontSize: 12.8,
                         ),
                         label: Text(p.presets[i].name),
                         onSelected: (_) => controller.selectPreset(i),
                       );
                     }),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 48,
+                    child: FilledButton.icon(
+                      key: const Key('loadout_auto_recommend_btn'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: NightPalette.hanjiInk,
+                        foregroundColor: NightPalette.accentGold,
+                      ),
+                      onPressed: () {
+                        final st = controller.applyRecommendedForNextStage();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: NightPalette.bgCard,
+                            content: Text(
+                              '${st.code} 관문 맞춤 최강 수호석·영웅·영수·초소 진법을 자동 편성했습니다.',
+                              style: const TextStyle(
+                                color: NightPalette.accentGold,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.auto_fix_high_rounded, size: 19),
+                      label: Text(
+                        '현재 차례(${nextStage.code}) 최적 진법 원터치 자동 편성',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -173,7 +179,7 @@ class LoadoutScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // 2) 주력 수호 알 · 문파 내공 · 12굽이 천리협곡 거점 발사대 5종 통합 석판 (게슈탈트 제2덩어리)
+        // 2) 주력 수호 알 · 문파 내공 · 5종 지형 초소 발사대 상성 통합 석판 (게슈탈트 제2덩어리)
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -288,39 +294,31 @@ class LoadoutScreen extends StatelessWidget {
                   ),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Divider(height: 1),
+                    child: Divider(height: 1, color: Colors.white12),
                   ),
                   const Text(
-                    '12굽이 천리협곡(720×1360) 5종 지형 초소 발사대 도감',
+                    '12굽이 천리협곡 발사대 5종 대 돌연변이 상성 일람',
                     style: TextStyle(
                       fontSize: 15.5,
                       color: NightPalette.jadeGreen,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    '• 전방 초소(3번 이후)는 🪨마기 암석을 개척한 뒤 건설하며, 포탑 수가 늘수록 체증 군수비(+14⚡)와 2.2초 축조 시간이 적용됩니다.\n'
-                    '• 두목은 2차 재변이하며 포탑에 🕸️마기 침식을 걸고(터치 시 즉시 정화!), 3페이즈 대수괴는 회전 약점(🎯)을 정밀 다격해야 파쇄됩니다.',
-                    style: TextStyle(
-                      fontSize: 12.2,
-                      color: NightPalette.textMuted,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   ...LauncherType.values.map((lt) {
                     final unlocked =
                         lt.unlockChapter <= p.highestUnlockedChapter + 1;
                     final permLv = p.launcherPermanentLevels[lt] ?? 1;
+                    final targetMutant =
+                        NightArtRegistry.counterTargetOfLauncher(lt);
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: 9),
                       child: Row(
                         children: [
                           NightSpriteIcon(
                             assetPath: NightArtRegistry.launcherAsset(lt),
                             fallbackIcon: Icons.gps_fixed_rounded,
-                            size: 38,
+                            size: 42,
                             color: Color(lt.colorHex),
                             dimmed: !unlocked,
                             showFrame: true,
@@ -331,9 +329,9 @@ class LoadoutScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '${lt.name} (영구 $permLv단 · 기본 ${lt.buildCostTokens}⚡ + 체증)',
+                                  '${lt.name} (영구 $permLv단 · 기본 ${lt.buildCostTokens}⚡)',
                                   style: TextStyle(
-                                    fontSize: 13.5,
+                                    fontSize: 13.8,
                                     fontWeight: FontWeight.bold,
                                     color: unlocked
                                         ? Color(lt.colorHex)
@@ -352,6 +350,43 @@ class LoadoutScreen extends StatelessWidget {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: NightPalette.bgDeep.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: NightPalette.crimsonMoon
+                                    .withValues(alpha: 0.45),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                NightSpriteIcon(
+                                  assetPath: NightArtRegistry.mutantAttackAsset(
+                                    targetMutant,
+                                  ),
+                                  fallbackAssetPath:
+                                      NightArtRegistry.mutantAsset(targetMutant),
+                                  fallbackIcon: Icons.pest_control_rounded,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '표적 ${targetMutant.name.split(' ').last}',
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    color: NightPalette.accentGold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -365,10 +400,158 @@ class LoadoutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCompanionTacticsTab(PlayerProgress p, LoadoutPreset preset) {
+  Widget _buildCompanionTacticsTab(
+    BuildContext context,
+    PlayerProgress p,
+    LoadoutPreset preset,
+  ) {
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       children: [
+        // 1) 출전 영웅 3인 + 수호 영수 전신 공격 진형 무대
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Container(
+              height: 176,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: NightPalette.accentGold, width: 1.6),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    NightArtRegistry.cardAllyPavilion,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        const ColoredBox(color: NightPalette.bgPanel),
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x55141F33),
+                          Color(0xDC162238),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '출전 영웅 분대 (${preset.companions.length}/3인) & ${preset.equippedBeast.name}',
+                              style: const TextStyle(
+                                fontFamily: 'BlackHanSans',
+                                fontSize: 15.5,
+                                color: NightPalette.accentGold,
+                              ),
+                            ),
+                            if (p.nextRescueStage != null)
+                              Text(
+                                '다음 구출: ${p.nextRescueStage!.code}',
+                                style: const TextStyle(
+                                  fontSize: 11.8,
+                                  color: NightPalette.jadeGreen,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                          ],
+                        ),
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              for (final hero in preset.companions)
+                                Flexible(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Expanded(
+                                        child: Image.asset(
+                                          NightArtRegistry.heroAttackAsset(hero),
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, _, _) =>
+                                              Image.asset(
+                                            NightArtRegistry.heroIdleAsset(hero),
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, _, _) =>
+                                                const Icon(Icons.person),
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xE0141F33),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: NightPalette.accentGold
+                                                .withValues(alpha: 0.7),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          '${hero.name} Lv.${p.companionLevels[hero] ?? 1}',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 10.8,
+                                            color: NightPalette.accentGold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  NightSpriteIcon(
+                                    assetPath: NightArtRegistry.beastAsset(
+                                      preset.equippedBeast,
+                                    ),
+                                    fallbackIcon: Icons.pets_rounded,
+                                    size: 56,
+                                    borderRadius: 14,
+                                    showFrame: true,
+                                    frameColor: NightPalette.jadeGreen,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    preset.equippedBeast.name.split(' ').last,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: NightPalette.jadeGreen,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -377,63 +560,13 @@ class LoadoutScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (p.nextRescueStage != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: NightPalette.bgDeep.withValues(alpha: 0.72),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: NightPalette.jadeGreen.withValues(alpha: 0.45),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.volunteer_activism_rounded,
-                            color: NightPalette.jadeGreen,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              '🆘 구출 현황: 동료 ${p.unlockedCompanionCount}/14인 · 영수 ${p.unlockedBeastCount}/5종\n'
-                              '다음 구출 관문: [${p.nextRescueStage!.code}] ${p.nextRescueStage!.rescueBadgeText}',
-                              style: const TextStyle(
-                                fontSize: 12.4,
-                                color: NightPalette.jadeGreen,
-                                height: 1.38,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  const Text(
+                    '수호 영수 동행 & 자동 발동 조건',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: NightPalette.jadeGreen,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(height: 14),
-                  ],
-                  Row(
-                    children: [
-                      NightSpriteIcon(
-                        assetPath: NightArtRegistry.beastAsset(
-                          preset.equippedBeast,
-                        ),
-                        fallbackIcon: Icons.pets_rounded,
-                        size: 42,
-                        color: Color(preset.equippedBeast.colorHex),
-                        showFrame: true,
-                      ),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          '수호 영수 동행 & 자동 발동 조건',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: NightPalette.jadeGreen,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<SpiritBeast>(
@@ -457,7 +590,7 @@ class LoadoutScreen extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    '${b.name} (Lv.${p.beastLevels[b]})',
+                                    '${b.name} (Lv.${p.beastLevels[b]}) — ${b.skillSummary}',
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -497,13 +630,13 @@ class LoadoutScreen extends StatelessWidget {
                   ),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Divider(height: 1),
+                    child: Divider(height: 1, color: Colors.white12),
                   ),
                   const Text(
                     '방어 초소 동료 편성 (최대 3인 · 조건부 자동 개입)',
                     style: TextStyle(
                       fontSize: 16,
-                      color: NightPalette.elixirPurple,
+                      color: NightPalette.accentGold,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -518,8 +651,13 @@ class LoadoutScreen extends StatelessWidget {
                       return FilterChip(
                         selected: selected,
                         backgroundColor: NightPalette.bgDeep,
-                        selectedColor: const Color(0xFF3E295E),
+                        selectedColor: const Color(0xFF1E3A54),
                         checkmarkColor: NightPalette.accentGold,
+                        side: BorderSide(
+                          color: selected
+                              ? NightPalette.accentGold
+                              : Colors.white24,
+                        ),
                         avatar: NightSpriteIcon(
                           assetPath: NightArtRegistry.heroFaceAsset(hero),
                           fallbackIcon: Icons.person_rounded,
@@ -555,14 +693,14 @@ class LoadoutScreen extends StatelessWidget {
                       child: Row(
                         children: [
                           NightSpriteIcon(
-                            assetPath: NightArtRegistry.heroIdleAsset(hero),
+                            assetPath: NightArtRegistry.heroAttackAsset(hero),
                             fallbackAssetPath:
-                                NightArtRegistry.heroFaceAsset(hero),
+                                NightArtRegistry.heroIdleAsset(hero),
                             fallbackIcon: Icons.person_rounded,
-                            size: 46,
+                            size: 52,
                             borderRadius: 10,
                             showFrame: true,
-                            frameColor: NightPalette.elixirPurple,
+                            frameColor: NightPalette.accentGold,
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -599,7 +737,7 @@ class LoadoutScreen extends StatelessWidget {
                   }),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Divider(height: 1),
+                    child: Divider(height: 1, color: Colors.white12),
                   ),
                   Row(
                     children: [
@@ -613,7 +751,7 @@ class LoadoutScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          '지원패 「무림수호단 출두야~~!!」 자동 발동 기준 (방어막 ${(preset.supportTriggerShieldRatio * 100).round()}% 이하)',
+                          '지원패 「무림수호단 출두」 자동 발동 기준 (방어막 ${(preset.supportTriggerShieldRatio * 100).round()}% 이하)',
                           style: const TextStyle(
                             fontSize: 15,
                             color: NightPalette.accentGold,
@@ -652,9 +790,12 @@ class UpgradeScreen extends StatelessWidget {
     super.key,
     required this.controller,
     this.initialTab = 0,
+    this.embeddedInShell = false,
   });
+
   final GameController controller;
   final int initialTab;
+  final bool embeddedInShell;
 
   @override
   Widget build(BuildContext context) {
@@ -666,9 +807,14 @@ class UpgradeScreen extends StatelessWidget {
           initialIndex: initialTab,
           length: 2,
           child: Scaffold(
+            backgroundColor: Colors.transparent,
             appBar: AppBar(
+              automaticallyImplyLeading: !embeddedInShell,
               title: const Text('대장간(증표) · 영약각(영약)'),
               bottom: const TabBar(
+                indicatorColor: NightPalette.accentGold,
+                labelColor: NightPalette.accentGold,
+                unselectedLabelColor: NightPalette.textMuted,
                 tabs: [
                   Tab(text: '🪙 증표 대장간 (발사대·알)'),
                   Tab(text: '🧪 영약각 (영수·동료·내공)'),
@@ -682,26 +828,65 @@ class UpgradeScreen extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
-                      vertical: 10,
+                      vertical: 8,
                     ),
-                    color: NightPalette.bgPanel.withValues(alpha: 0.92),
+                    color: NightPalette.bgPanel.withValues(alpha: 0.94),
                     child: Wrap(
-                      spacing: 10,
+                      spacing: 8,
                       runSpacing: 6,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        ResourcePill(
-                          iconAsset: NightArtRegistry.nightToken,
-                          icon: Icons.toll_rounded,
-                          label: '변이 토벌 증표',
-                          value: '${p.tokens}',
-                          color: NightPalette.accentGold,
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            ResourcePill(
+                              iconAsset: NightArtRegistry.nightToken,
+                              icon: Icons.toll_rounded,
+                              label: '변이 토벌 증표',
+                              value: '${p.tokens}',
+                              color: NightPalette.accentGold,
+                            ),
+                            ResourcePill(
+                              iconAsset: NightArtRegistry.nightElixir,
+                              icon: Icons.science_rounded,
+                              label: '신비 영약',
+                              value: '${p.elixirs}',
+                              color: NightPalette.jadeShield,
+                            ),
+                          ],
                         ),
-                        ResourcePill(
-                          iconAsset: NightArtRegistry.nightElixir,
-                          icon: Icons.science_rounded,
-                          label: '신비 영약',
-                          value: '${p.elixirs}',
-                          color: NightPalette.elixirPurple,
+                        FilledButton.icon(
+                          key: const Key('forge_batch_upgrade_btn'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(136, 40),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            backgroundColor: NightPalette.accentGold,
+                            foregroundColor: NightPalette.hanjiInk,
+                          ),
+                          onPressed: () {
+                            final logs =
+                                controller.upgradeRecommendedBatch(maxSteps: 5);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: NightPalette.bgCard,
+                                content: Text(
+                                  logs.isEmpty
+                                      ? '현재 보유 재화로 즉시 강화 가능한 항목이 없습니다.'
+                                      : '추천 일괄 강화 완료: ${logs.join(" · ")}',
+                                  style: const TextStyle(
+                                    color: NightPalette.accentGold,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.bolt_rounded, size: 18),
+                          label: const Text('추천 일괄 강화'),
                         ),
                       ],
                     ),
@@ -728,130 +913,198 @@ class UpgradeScreen extends StatelessWidget {
       p.centralGuardianLevel,
     );
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       children: [
-        // 1) 상단 한지 명패 + 핵심 본진 제련 통합반 (게슈탈트 제1덩어리 · 시각 주인공)
+        // 1) 상단 주인공: 대장간 연노포 대 강철 거괴 격돌 원화 + 핵심 본진 제련 한지판
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
             child: Container(
-              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(0xFFF3E7CC),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: NightPalette.accentGold, width: 1.6),
+                color: NightPalette.hanjiLight,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: NightPalette.accentGold, width: 2.0),
               ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      const NightSpriteIcon(
-                        assetPath: NightArtRegistry.towerGuardian,
-                        fallbackIcon: Icons.fort_rounded,
-                        size: 62,
-                        showFrame: true,
-                        frameColor: Color(0xFF233048),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  SizedBox(
+                    height: 224,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          NightArtRegistry.cardForgeSanctum,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const ColoredBox(color: NightPalette.bgPanel),
+                        ),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0x22141F33), Color(0xD4162238)],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 14,
+                          bottom: 12,
+                          right: 14,
+                          child: Row(
+                            children: [
+                              NightSpriteIcon(
+                                assetPath:
+                                    NightArtRegistry.charMotion('jeonggak'),
+                                fallbackAssetPath:
+                                    NightArtRegistry.charAttack('jeonggak'),
+                                fallbackIcon: Icons.build_circle_rounded,
+                                size: 64,
+                                borderRadius: 14,
+                                fit: BoxFit.cover,
+                                showFrame: true,
+                                frameColor: NightPalette.accentGold,
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Text(
+                                  '명장 정각의 신기 화포 대장간 · 중갑 변이 파쇄 제련소',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: 'BlackHanSans',
+                                    fontSize: 18.0,
+                                    color: NightPalette.accentGold,
+                                  ),
+                                ),
+                              ),
+                              NightSpriteIcon(
+                                assetPath: NightArtRegistry.mutantMotionAsset(
+                                  MutantKind.ironColossusBoss,
+                                ),
+                                fallbackAssetPath:
+                                    NightArtRegistry.showcaseBossIron,
+                                fallbackIcon: Icons.shield_rounded,
+                                size: 64,
+                                borderRadius: 14,
+                                fit: BoxFit.cover,
+                                showFrame: true,
+                                frameColor: NightPalette.crimsonMoon,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            const Text(
-                              '수호 본진 중추 제련 · 무한 신기 연마',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF394B6D),
+                            const NightSpriteIcon(
+                              assetPath: NightArtRegistry.towerGuardian,
+                              fallbackIcon: Icons.fort_rounded,
+                              size: 56,
+                              showFrame: true,
+                              frameColor: NightPalette.hanjiInk,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '중앙 자동 보호 장치 · 기명 수호탑 (${p.centralGuardianLevel}단)',
+                                    style: const TextStyle(
+                                      fontFamily: 'BlackHanSans',
+                                      fontSize: 19.5,
+                                      color: NightPalette.hanjiInk,
+                                    ),
+                                  ),
+                                  const Text(
+                                    '외곽 기공 방어막 · 본체 내구도 · 360도 자동 연사력 동시 상승',
+                                    style: TextStyle(
+                                      fontSize: 12.4,
+                                      color: NightPalette.hanjiSubInk,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            Text(
-                              '중앙 자동 보호 장치 · 기명 수호탑 (${p.centralGuardianLevel}단)',
-                              style: const TextStyle(
-                                fontFamily: 'BlackHanSans',
-                                fontSize: 21,
-                                color: Color(0xFF1B2538),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: NightPalette.hanjiInk,
+                                foregroundColor: NightPalette.accentGold,
+                                disabledBackgroundColor: const Color(0x241F2B42),
+                                disabledForegroundColor: const Color(0x9E1F2B42),
                               ),
-                            ),
-                            const Text(
-                              '외곽 기공 방어막 내구도 · 본체 내구도 · 360도 자동 연사력 동시 상승',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: Color(0xFF3B4A66),
-                              ),
+                              onPressed: p.tokens >= centralCost
+                                  ? controller.upgradeCentralGuardian
+                                  : null,
+                              child: Text('증표 $centralCost 강화'),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF1F2B42),
-                          foregroundColor: NightPalette.accentGold,
-                          disabledBackgroundColor: const Color(0x241F2B42),
-                          disabledForegroundColor: const Color(0x9E1F2B42),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Divider(height: 1, color: Color(0x331B2538)),
                         ),
-                        onPressed: p.tokens >= centralCost
-                            ? controller.upgradeCentralGuardian
-                            : null,
-                        child: Text('증표 $centralCost 강화'),
-                      ),
-                    ],
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1, color: Color(0x331B2538)),
-                  ),
-                  Row(
-                    children: [
-                      const NightSpriteIcon(
-                        assetPath: NightArtRegistry.cardForgeSanctum,
-                        fallbackAssetPath: NightArtRegistry.fxCritical,
-                        fallbackIcon: Icons.auto_fix_high_rounded,
-                        size: 46,
-                        showFrame: true,
-                        frameColor: Color(0xFF233048),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Row(
                           children: [
-                            Text(
-                              '태초 신기 무한 연마 (${p.forgeMasteryLevel}단 · 공방 +${(p.forgeMasteryPowerBonus * 100).toStringAsFixed(1)}%)',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15.5,
-                                color: Color(0xFF1B2538),
+                            const NightSpriteIcon(
+                              assetPath: NightArtRegistry.fxCritical,
+                              fallbackIcon: Icons.auto_fix_high_rounded,
+                              size: 44,
+                              showFrame: true,
+                              frameColor: NightPalette.hanjiInk,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '태초 신기 무한 연마 (${p.forgeMasteryLevel}단 · 공방 +${(p.forgeMasteryPowerBonus * 100).toStringAsFixed(1)}%)',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15.2,
+                                      color: NightPalette.hanjiInk,
+                                    ),
+                                  ),
+                                  const Text(
+                                    '남는 증표를 무한 주입해 전 발사대 화력·중앙 탑·결계를 끝없이 연마',
+                                    style: TextStyle(
+                                      fontSize: 12.2,
+                                      color: NightPalette.hanjiSubInk,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              '남는 수호 증표를 무한 주입해 전 발사대 화력·중앙 탑·외곽 결계를 끝없이 연마',
-                              style: TextStyle(
-                                fontSize: 12.2,
-                                color: Color(0xFF3B4A66),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              key: const Key('upgrade_forge_mastery_btn'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: NightPalette.hanjiInk,
+                                foregroundColor: NightPalette.jadeGreen,
+                                disabledBackgroundColor: const Color(0x241F2B42),
+                                disabledForegroundColor: const Color(0x9E1F2B42),
                               ),
+                              onPressed: p.tokens >= p.forgeMasteryCost
+                                  ? controller.upgradeForgeMastery
+                                  : null,
+                              child: Text('증표 ${p.forgeMasteryCost}'),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        key: const Key('upgrade_forge_mastery_btn'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF1F2B42),
-                          foregroundColor: NightPalette.jadeGreen,
-                          disabledBackgroundColor: const Color(0x241F2B42),
-                          disabledForegroundColor: const Color(0x9E1F2B42),
-                        ),
-                        onPressed: p.tokens >= p.forgeMasteryCost
-                            ? controller.upgradeForgeMastery
-                            : null,
-                        child: Text('증표 ${p.forgeMasteryCost}'),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -860,7 +1113,7 @@ class UpgradeScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // 2) 길목 자동 발사대 5종 통합 제련반 (게슈탈트 제2덩어리 · 같은 정보 한 상자)
+        // 2) 길목 자동 발사대 5종 통합 제련반 (게슈탈트 제2덩어리)
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -941,7 +1194,7 @@ class UpgradeScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // 3) 수호 알 1~13단 통합 합성반 (게슈탈트 제3덩어리 · 같은 정보 한 상자)
+        // 3) 수호 알 1~13단 통합 합성반 (게슈탈트 제3덩어리)
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -970,7 +1223,8 @@ class UpgradeScreen extends StatelessWidget {
                         final s = StoneMaterial.values[idx];
                         final owned = p.unlockedStones.contains(s);
                         final shards = p.stoneShards[s] ?? 0;
-                        final chapterLocked = p.highestUnlockedChapter < s.minChapter;
+                        final chapterLocked =
+                            p.highestUnlockedChapter < s.minChapter;
                         final canCraft = p.canUnlockStone(s);
                         return Row(
                           children: [
@@ -1043,134 +1297,173 @@ class UpgradeScreen extends StatelessWidget {
         p.elixirs >= nextRealm.reqElixir;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 28),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
       children: [
-        // 1) 상단 한지 명패 주인공: 내공 8경지 승급 + 호법 영기 무한 공명 (게슈탈트 제1덩어리)
+        // 1) 상단 한지 주인공: 황금 경맥 각성 원화 + 내공 8경지 승급 & 호법 영기 공명
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
             child: Container(
-              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(0xFFF3E7CC),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: NightPalette.accentGold, width: 1.6),
+                color: NightPalette.hanjiLight,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: NightPalette.accentGold, width: 2.0),
               ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      const NightSpriteIcon(
-                        assetPath: NightArtRegistry.nightMeridian,
-                        fallbackAssetPath: NightArtRegistry.fxQi,
-                        fallbackIcon: Icons.self_improvement_rounded,
-                        size: 58,
-                        color: Color(0xFF4A2574),
-                        showFrame: true,
-                        frameColor: Color(0xFF233048),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '영약각 단전 승급 · 호법 영기 무한 공명',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF4A2574),
-                              ),
-                            ),
-                            Text(
-                              '내공 경지 승급 · 현재 [${p.realm.name}]',
-                              style: const TextStyle(
-                                fontFamily: 'BlackHanSans',
-                                fontSize: 20.5,
-                                color: Color(0xFF1B2538),
-                              ),
-                            ),
-                            Text(
-                              nextRealm != null
-                                  ? '다음 [${nextRealm.name}] 조건: 내공 ${p.naegongPoints}/${nextRealm.reqNaegong} · 영약 ${nextRealm.reqElixir}개 (동행 알 ${nextRealm.eogieoseokCount}기 · 공방 대폭 상승!)'
-                                  : '최고 경지 [생사경] 완성! 남는 영약은 아래 무한 공명에 주입하세요.',
-                              style: const TextStyle(
-                                fontSize: 12.4,
-                                color: Color(0xFF3B4A66),
-                              ),
-                            ),
-                          ],
+                  SizedBox(
+                    height: 136,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          NightArtRegistry.cardTrainingHall,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const ColoredBox(color: NightPalette.bgPanel),
                         ),
-                      ),
-                      if (nextRealm != null) ...[
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF1F2B42),
-                            foregroundColor: NightPalette.accentGold,
-                            disabledBackgroundColor: const Color(0x241F2B42),
-                            disabledForegroundColor: const Color(0x9E1F2B42),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0x22141F33), Color(0xCC162238)],
+                            ),
                           ),
-                          onPressed: canRealmUp ? controller.breakthroughRealm : null,
-                          child: Text('영약 ${nextRealm.reqElixir} 승급'),
+                        ),
+                        const Positioned(
+                          left: 14,
+                          bottom: 10,
+                          right: 14,
+                          child: Text(
+                            '천년 영약각 · 내공 8경지 등극 및 영웅·신수 각성',
+                            style: TextStyle(
+                              fontFamily: 'BlackHanSans',
+                              fontSize: 16.5,
+                              color: NightPalette.accentGold,
+                            ),
+                          ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1, color: Color(0x331B2538)),
-                  ),
-                  Row(
-                    children: [
-                      const NightSpriteIcon(
-                        assetPath: NightArtRegistry.nightElixir,
-                        fallbackAssetPath: NightArtRegistry.fxQi,
-                        fallbackIcon: Icons.auto_awesome_rounded,
-                        size: 46,
-                        showFrame: true,
-                        frameColor: Color(0xFF233048),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Text(
-                              '☯️ 호법 영기 무한 공명 (${p.elixirResonanceLevel}단 · 영수/동료 화력 +${(p.elixirResonanceBonus * 100).toStringAsFixed(1)}%)',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15.2,
-                                color: Color(0xFF1B2538),
+                            const NightSpriteIcon(
+                              assetPath: NightArtRegistry.nightMeridian,
+                              fallbackAssetPath: NightArtRegistry.fxQi,
+                              fallbackIcon: Icons.self_improvement_rounded,
+                              size: 54,
+                              color: NightPalette.hanjiInk,
+                              showFrame: true,
+                              frameColor: NightPalette.hanjiInk,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '내공 경지 승급 · 현재 [${p.realm.name}]',
+                                    style: const TextStyle(
+                                      fontFamily: 'BlackHanSans',
+                                      fontSize: 20.0,
+                                      color: NightPalette.hanjiInk,
+                                    ),
+                                  ),
+                                  Text(
+                                    nextRealm != null
+                                        ? '다음 [${nextRealm.name}] 조건: 내공 ${p.naegongPoints}/${nextRealm.reqNaegong} · 영약 ${nextRealm.reqElixir}개'
+                                        : '최고 경지 [생사경] 완성! 남는 영약은 무한 공명에 주입하세요.',
+                                    style: const TextStyle(
+                                      fontSize: 12.4,
+                                      color: NightPalette.hanjiSubInk,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              '남는 영약을 주입해 영수 5종·동료 14인 화력과 결계 재생력을 무한 증폭',
-                              style: TextStyle(
-                                fontSize: 12.2,
-                                color: Color(0xFF3B4A66),
+                            if (nextRealm != null) ...[
+                              const SizedBox(width: 8),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: NightPalette.hanjiInk,
+                                  foregroundColor: NightPalette.accentGold,
+                                  disabledBackgroundColor:
+                                      const Color(0x241F2B42),
+                                  disabledForegroundColor:
+                                      const Color(0x9E1F2B42),
+                                ),
+                                onPressed: canRealmUp
+                                    ? controller.breakthroughRealm
+                                    : null,
+                                child: Text('영약 ${nextRealm.reqElixir} 승급'),
                               ),
+                            ],
+                          ],
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Divider(height: 1, color: Color(0x331B2538)),
+                        ),
+                        Row(
+                          children: [
+                            const NightSpriteIcon(
+                              assetPath: NightArtRegistry.nightElixir,
+                              fallbackAssetPath: NightArtRegistry.fxQi,
+                              fallbackIcon: Icons.auto_awesome_rounded,
+                              size: 44,
+                              showFrame: true,
+                              frameColor: NightPalette.hanjiInk,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '☯️ 호법 영기 무한 공명 (${p.elixirResonanceLevel}단 · 영수/동료 화력 +${(p.elixirResonanceBonus * 100).toStringAsFixed(1)}%)',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15.0,
+                                      color: NightPalette.hanjiInk,
+                                    ),
+                                  ),
+                                  const Text(
+                                    '남는 영약을 주입해 영수 5종·동료 14인 화력과 결계 재생력을 무한 증폭',
+                                    style: TextStyle(
+                                      fontSize: 12.2,
+                                      color: NightPalette.hanjiSubInk,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              key: const Key('upgrade_elixir_resonance_btn'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: NightPalette.hanjiInk,
+                                foregroundColor: NightPalette.jadeGreen,
+                                disabledBackgroundColor: const Color(0x241F2B42),
+                                disabledForegroundColor: const Color(0x9E1F2B42),
+                              ),
+                              onPressed: p.elixirs >= p.elixirResonanceCost
+                                  ? controller.upgradeElixirResonance
+                                  : null,
+                              child: Text('영약 ${p.elixirResonanceCost}'),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        key: const Key('upgrade_elixir_resonance_btn'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF1F2B42),
-                          foregroundColor: NightPalette.jadeGreen,
-                          disabledBackgroundColor: const Color(0x241F2B42),
-                          disabledForegroundColor: const Color(0x9E1F2B42),
-                        ),
-                        onPressed: p.elixirs >= p.elixirResonanceCost
-                            ? controller.upgradeElixirResonance
-                            : null,
-                        child: Text('영약 ${p.elixirResonanceCost}'),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1179,7 +1472,7 @@ class UpgradeScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // 2) 수호 영수 5종 통합 단련반 (게슈탈트 제2덩어리 · 같은 정보 한 상자)
+        // 2) 수호 영수 5종 통합 단련반
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -1207,13 +1500,14 @@ class UpgradeScreen extends StatelessWidget {
                       builder: (_) {
                         final b = SpiritBeast.values[idx];
                         final lv = p.beastLevels[b] ?? 0;
-                        final cost = lv == 0 ? b.unlockElixirs : b.upgradeElixirCost(lv);
+                        final cost =
+                            lv == 0 ? b.unlockElixirs : b.upgradeElixirCost(lv);
                         return Row(
                           children: [
                             NightSpriteIcon(
                               assetPath: NightArtRegistry.beastAsset(b),
                               fallbackIcon: Icons.pets_rounded,
-                              size: 46,
+                              size: 48,
                               color: Color(b.colorHex),
                               dimmed: lv == 0,
                               showFrame: true,
@@ -1264,7 +1558,7 @@ class UpgradeScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // 3) 방어 초소 동료 14인 통합 단련반 (게슈탈트 제3덩어리 · 같은 정보 한 상자)
+        // 3) 방어 초소 동료 14인 전신 원화 단련반
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -1274,7 +1568,7 @@ class UpgradeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    '방어 초소 동료 강화',
+                    '방어 초소 영웅 14인 강화',
                     style: TextStyle(
                       fontFamily: 'BlackHanSans',
                       fontSize: 18,
@@ -1292,17 +1586,19 @@ class UpgradeScreen extends StatelessWidget {
                       builder: (_) {
                         final h = CompanionHero.values[idx];
                         final lv = p.companionLevels[h] ?? 0;
-                        final cost = lv == 0 ? h.unlockElixirs : h.upgradeElixirCost(lv);
+                        final cost =
+                            lv == 0 ? h.unlockElixirs : h.upgradeElixirCost(lv);
                         final canAcquire = lv > 0 ||
                             (h.unlockElixirs > 0 &&
                                 p.highestUnlockedChapter >= h.unlockChapter);
                         return Row(
                           children: [
                             NightSpriteIcon(
-                              assetPath: NightArtRegistry.heroIdleAsset(h),
-                              fallbackAssetPath: NightArtRegistry.heroFaceAsset(h),
+                              assetPath: NightArtRegistry.heroAttackAsset(h),
+                              fallbackAssetPath:
+                                  NightArtRegistry.heroIdleAsset(h),
                               fallbackIcon: Icons.person_rounded,
-                              size: 46,
+                              size: 54,
                               borderRadius: 12,
                               dimmed: lv == 0,
                               showFrame: true,
@@ -1310,7 +1606,7 @@ class UpgradeScreen extends StatelessWidget {
                                   ? NightPalette.accentGold
                                   : NightPalette.borderGold,
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1319,7 +1615,7 @@ class UpgradeScreen extends StatelessWidget {
                                     '${h.name} · ${h.title} ${lv > 0 ? "(Lv.$lv)" : "(${h.unlockChapter}장 합류)"}',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 14.6,
+                                      fontSize: 14.8,
                                     ),
                                   ),
                                   Text(
@@ -1334,9 +1630,10 @@ class UpgradeScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             FilledButton(
-                              onPressed: (canAcquire && lv < 10 && p.elixirs >= cost)
-                                  ? () => controller.upgradeCompanion(h)
-                                  : null,
+                              onPressed:
+                                  (canAcquire && lv < 10 && p.elixirs >= cost)
+                                      ? () => controller.upgradeCompanion(h)
+                                      : null,
                               child: Text(
                                 !canAcquire
                                     ? '${h.unlockChapter}장 개방'

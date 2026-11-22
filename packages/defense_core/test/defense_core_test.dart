@@ -829,9 +829,9 @@ void main() {
     });
   });
 
-  group('돌연변이 12종 전투력 3대 분화 · 중간보스 동반 침공 · 실시간 모션 물리 검증', () {
-    test('12종 변이체·중간보스·대수괴의 원화 식별자(id), 3대 등급(스피드·맷집·공격력), 전투력 지수(combatPower)가 정밀 분화된다', () {
-      expect(MutantKind.values.length, 12);
+  group('돌연변이 14종(공중 비행 2종 포함) 전투력 분화 · 중간보스 동반 침공 · 실시간 모션 물리 검증', () {
+    test('14종 변이체·공중비행·중간보스·대수괴의 원화 식별자(id), 3대 등급, 전투력 지수(combatPower)가 정밀 분화된다', () {
+      expect(MutantKind.values.length, 14);
       final expectedIds = [
         'swarmRat',
         'sickHound',
@@ -839,6 +839,8 @@ void main() {
         'shieldYacha',
         'plagueToad',
         'bloodCocoon',
+        'bloodWingBat',
+        'abyssalGargoyle',
         'swiftShadowBoss',
         'ironColossusBoss',
         'crimsonBreakerBoss',
@@ -847,6 +849,10 @@ void main() {
         'chapterBoss',
       ];
       expect(MutantKind.values.map((m) => m.id).toList(), expectedIds);
+      expect(MutantKind.bloodWingBat.isFlying, isTrue);
+      expect(MutantKind.abyssalGargoyle.isFlying, isTrue);
+      expect(MutantKind.abyssalGargoyle.baseHitShield, greaterThanOrEqualTo(100));
+      expect(MutantKind.chapterOverlord.baseHitShield, greaterThanOrEqualTo(1000));
 
       for (final m in MutantKind.values) {
         expect(m.speedRating, inInclusiveRange(1, 5));
@@ -1133,7 +1139,7 @@ void main() {
         kind: MutantKind.crimsonBreakerBoss, // attackPower 64.0, attackRating 5
         laneIndex: 0,
         waypoints: sim.chapter.lanes.first,
-        pos: CampaignCatalog.villageCenter + const Vec2(0, -CampaignCatalog.outerShieldRadius),
+        pos: sim.shieldCenter + const Vec2(0, -CampaignCatalog.outerShieldRadius),
         maxHp: 600.0,
         speed: 45.0,
       );
@@ -1165,8 +1171,9 @@ void main() {
       expect(sim.nextRecommendedSlotIndex(), 0);
       expect(CampaignCatalog.arenaWidth, 720.0);
       expect(CampaignCatalog.arenaHeight, 1360.0);
-      expect(CampaignCatalog.villageCenter.y, greaterThanOrEqualTo(1200.0));
-      expect(CampaignCatalog.centralTowerPos.y, greaterThanOrEqualTo(1150.0));
+      expect(sim.towerPos, sim.chapter.towerPos);
+      expect(sim.chapter.towerPos.y, inInclusiveRange(820.0, 1020.0));
+      expect(sim.chapter.cropsPos.y, greaterThanOrEqualTo(1040.0));
       expect(p.activePreset.autoUpgradeInBattle, isFalse, reason: '무지성 자동 승급이 기본 켜져 있으면 안 됨!');
 
       // 180프레임 진행해도 autoBuildForSimVerify == false 이면 빈 초소에 자동 설치되지 않음!
@@ -1223,8 +1230,8 @@ void main() {
         for (int l = 0; l < ch.lanes.length; l++) {
           final curve = ch.smoothedLane(l);
           expect(curve.length, greaterThan(40));
-          expect(curve.first.y, lessThan(55.0));
-          expect(curve.last.y, greaterThan(1180.0));
+          expect(curve.first.distanceTo(ch.towerPos), greaterThanOrEqualTo(380.0));
+          expect(curve.last.distanceTo(ch.towerPos), lessThan(5.0));
         }
       }
     });
@@ -1436,12 +1443,12 @@ void main() {
           kind: MutantKind.swarmRat,
           laneIndex: 0,
           waypoints: sim.chapter.smoothedLane(0),
-          pos: const Vec2(360, 1015),
+          pos: sim.mountSlotByIndex(0)!.pos + const Vec2(18, 28),
           maxHp: 5.0,
           speed: 20.0,
         ),
       );
-      for (int f = 0; f < 35; f++) {
+      for (int f = 0; f < 20; f++) {
         sim.step(1 / 60);
       }
       expect(sim.dangerPulseLevel, greaterThan(0.0));
@@ -1559,18 +1566,19 @@ void main() {
       expect(sim.rouletteSpinsAvailable, 0);
     });
 
-    test('720×1360 천리협곡 12굽이 장거리 경로(3,800px 이상)와 제한된 전술 사거리·비거리 소멸·실시간 사거리 강화가 작동한다', () {
-      // 1) 전 10장의 침공 경로가 3,800px 이상의 초장거리 12굽이 천리협곡으로 구성되었는지 검증
+    test('720×1360 장별 차별화 경로(1장 ~2,860px → 10장 ~7,250px 단조 증가)와 제한된 전술 사거리·비거리 소멸·실시간 사거리 강화가 작동한다', () {
+      // 1) 1장부터 10장까지 침공 경로 평균 길이가 장이 올라갈수록 엄격히 단조 증가하는지 검증!
+      double prevAvgLen = 2500.0;
       for (final ch in CampaignCatalog.chapters) {
-        for (int l = 0; l < ch.lanes.length; l++) {
-          final pts = ch.smoothedLane(l);
-          double totalLen = 0.0;
-          for (int i = 1; i < pts.length; i++) {
-            totalLen += pts[i].distanceTo(pts[i - 1]);
-          }
-          expect(totalLen, greaterThan(3800.0), reason: '${ch.number}장 $l번 경로 길이 부족: $totalLen');
-        }
+        final avgLen = ch.averageLaneLengthPx;
+        expect(
+          avgLen,
+          greaterThan(prevAvgLen),
+          reason: '${ch.number}장 평균 경로 길이($avgLen)가 이전 장($prevAvgLen)보다 길어져야 함',
+        );
+        prevAvgLen = avgLen;
       }
+      expect(CampaignCatalog.chapterOf(10).averageLaneLengthPx, greaterThan(6800.0));
 
       // 2) 초소 사거리가 제한(138~265px)되어 남단 초소가 북단 스폰구 괴물을 절대 공격하지 못하며 비거리 한계에서 소멸함!
       final p = PlayerProgress();
@@ -1608,6 +1616,7 @@ void main() {
       expect(sim.placeLauncherInBattle(1, LauncherType.heavy), isTrue);
       sim.step(2.35);
       final heavyL = sim.launcherAtSlot(1)!;
+      sim.projectiles.clear();
       sim.mutants
         ..clear()
         ..add(
@@ -2052,21 +2061,22 @@ void main() {
       expect(sim.padConditionOf(2).state, PadConditionState.rubbleBlocked);
       expect(sim.placeLauncherInBattle(2, LauncherType.rapid), isFalse);
 
-      // 개척 실행(24⚡ 차감) 후 포대 건설 가능!
+      // 개척 실행(장별 개척 배율 반영 차감) 후 포대 건설 가능!
       final beforeExcav = sim.fieldTokens;
+      final expectedExcav = sim.excavationCostForSlot(sim.mountSlotByIndex(2)!);
       expect(sim.excavateSlotInBattle(2), isTrue);
-      expect(sim.fieldTokens, beforeExcav - 24);
+      expect(sim.fieldTokens, beforeExcav - expectedExcav);
       expect(sim.isSlotExcavated(2), isTrue);
       expect(sim.padConditionOf(2).state, PadConditionState.readyFullBuild);
 
-      final cost1st = sim.buildCostForType(LauncherType.rapid); // 45
+      final cost1st = sim.buildCostForType(LauncherType.rapid);
       expect(sim.placeLauncherInBattle(0, LauncherType.rapid), isTrue);
-      final cost2nd = sim.buildCostForType(LauncherType.rapid); // 45 + 14 = 59
-      expect(cost2nd, cost1st + 14);
+      final cost2nd = sim.buildCostForType(LauncherType.rapid);
+      expect(cost2nd, greaterThanOrEqualTo(cost1st + 14));
       expect(sim.placeLauncherInBattle(2, LauncherType.rapid), isTrue);
 
       // 3) 변이 두목의 포탑 🕸️마기 침식 투사 및 플레이어 실시간 터치 정화(cleanseLauncherAtSlot) 검증!
-      sim.step(2.4); // 포대 2.2초 축조 완료!
+      sim.step(2.6); // 포대 축조 완료!
       final targetL = sim.launcherAtSlot(0)!;
       expect(targetL.isConstructing, isFalse);
       expect(targetL.isCorrupted, isFalse);
@@ -2200,6 +2210,288 @@ void main() {
           .length;
       expect(rescuesWithStory, totalRescues);
       expect(CampaignCatalog.stageAt(10, 10).outroDialogue.length, greaterThanOrEqualTo(3));
+    });
+
+    test('v1.0.0+22 편의성 강화: 원터치 일괄 보상 수령·자동 재파견(claimAllReadyRewards) 및 스마트 일괄 강화(upgradeRecommendedBatch) 검증', () {
+      final rng = Random(20261122);
+      final p = PlayerProgress(
+        tokens: 600,
+        elixirs: 30,
+        trainingSeals: 40,
+        naegongPoints: 180,
+        moonOmenGauge: 100,
+        highestClearedGlobalStage: 45, // 제5장 해금 상태 (호송·탐색 모두 가능)
+        convoyActive: true,
+        convoyBattlesRemaining: 0,
+        exploreActive: true,
+        exploreBattlesRemaining: 0,
+      );
+
+      expect(p.hasAnyReadyAction(todayKey: '2026-11-22'), isTrue);
+      final summary = p.claimAllReadyRewards(rng, todayKey: '2026-11-22');
+      expect(summary.hasAnyAction, isTrue);
+      expect(summary.claimedCount, greaterThanOrEqualTo(5)); // 보름달 + 호송 + 탐색 + 출석 + 업적들
+      expect(summary.gainedTokens, greaterThan(200));
+      expect(summary.gainedSupportTokens, greaterThanOrEqualTo(2));
+      // 수령 직후 비어 있는 호송 마차와 심야 탐색대가 자동으로 재파견되었는지 검증
+      expect(summary.redispatchedConvoy, isTrue);
+      expect(summary.redispatchedExplore, isTrue);
+      expect(p.convoyActive, isTrue);
+      expect(p.convoyBattlesRemaining, 2);
+      expect(p.exploreActive, isTrue);
+      expect(p.exploreBattlesRemaining, 2);
+
+      // 스마트 추천 일괄 강화 검증
+      final logs = p.upgradeRecommendedBatch(maxSteps: 6);
+      expect(logs.length, 6);
+      expect(p.openedMeridianStep, greaterThanOrEqualTo(2));
+    });
+
+    test('v1.0.0+24 정밀 검증: 10개 장 개별 맵 지형 정합 · 공중 비행 변이 · 각 장 행동대장(100타+) & 중간보스 & 천련보스(1,000타+) 계층 · 위험 비상 알림 및 확대 추적 검증', () {
+      // 1) 1~10장 모두 서로 다른 코덱스 맵 원화(floorAsset)와 고유 석조 도로·초소 좌표를 가짐을 검증
+      final floorSet = <String>{};
+      final firstMountSignatures = <String>{};
+      for (int ch = 1; ch <= 10; ch++) {
+        final spec = CampaignCatalog.chapterOf(ch);
+        expect(floorSet.add(spec.floorAsset), isTrue, reason: '$ch장 맵 파일 중복 불가');
+        expect(spec.actionCaptainTitle, isNotEmpty);
+        expect(spec.midBossSquadTitle, isNotEmpty);
+        final sig = '${spec.mounts[0].pos.x},${spec.mounts[0].pos.y}_${spec.towerPos.y}';
+        expect(firstMountSignatures.add(sig), isTrue, reason: '$ch장 고유 초소·제단 좌표 필요');
+
+        // 각 장마다 행동대장(100타+) · 중간보스(200타+) · 최종 장 보스(1,000타+)가 모두 편성되어 있는지 전수 확인!
+        final chStages = CampaignCatalog.stagesOfChapter(ch);
+        bool hasActionCaptain100 = false;
+        bool hasMidBoss200 = false;
+        bool hasChapterOverlord1000 = false;
+        bool hasFlyingMutant = false;
+        for (final st in chStages) {
+          for (final w in st.waves) {
+            for (final g in w) {
+              if (g.kind.isFlying) hasFlyingMutant = true;
+              final shield = g.customHitShield ?? g.kind.baseHitShield;
+              if (shield >= 100 && (g.hierarchyRank?.contains('행동대장') ?? false)) {
+                hasActionCaptain100 = true;
+              }
+              if (shield >= 200 && g.hierarchyRank == '중간보스') {
+                hasMidBoss200 = true;
+              }
+              if (shield >= 1000 && g.hierarchyRank == '장 보스') {
+                hasChapterOverlord1000 = true;
+              }
+            }
+          }
+        }
+        expect(hasFlyingMutant, isTrue, reason: '$ch장 공중 비행 변이 편성 누락');
+        expect(hasActionCaptain100, isTrue, reason: '$ch장 100타+ 행동대장 누락');
+        expect(hasMidBoss200, isTrue, reason: '$ch장 200타+ 중간보스 누락');
+        expect(hasChapterOverlord1000, isTrue, reason: '$ch장 1,000타+ 장 보스 누락');
+      }
+
+      // 2) 공중 비행 변이(bloodWingBat, abyssalGargoyle) 절벽 추락 면역 검증!
+      final p = PlayerProgress(tokens: 1000, centralGuardianLevel: 5);
+      final sim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 10),
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        allowSerendipity: false,
+      );
+      sim.mutants.clear();
+      final cliff = sim.chapter.cliffs.first;
+      final bat = ActiveMutant(
+        uid: 9801,
+        kind: MutantKind.bloodWingBat,
+        laneIndex: 0,
+        waypoints: sim.chapter.aerialLane(0),
+        pos: cliff.center, // 낭떠러지 한복판 상공!
+        maxHp: 200.0,
+        speed: 60.0,
+      );
+      sim.mutants.add(bat);
+      sim.step(1.0 / 30.0);
+      expect(sim.mutants.contains(bat), isTrue, reason: '공중 비행 변이는 지상 절벽에서 추락사하지 않아야 함');
+
+      // 3) 100타 행동대장 & 1,000타 천련보스: 타수 실드가 0이 되기 전(totalHitsTaken < maxHitShield)에는 절대 죽지 않음 검증!
+      sim.mutants.clear();
+      sim.projectiles.clear();
+      final captain = ActiveMutant(
+        uid: 9802,
+        kind: MutantKind.abyssalGargoyle,
+        laneIndex: 0,
+        waypoints: sim.chapter.aerialLane(0),
+        pos: sim.shieldCenter + const Vec2(0, -92),
+        maxHp: 500.0,
+        speed: 0.0,
+      )
+        ..enableBossPhases(phases: 1, initialPlates: 0)
+        ..enableHitShield(120, rank: '공중 행동대장');
+      sim.mutants.add(captain);
+
+      // 단발 초고화력 포탄(99,999 데미지) 1발을 쏴도 120타 실드가 남아 있으므로 절대 즉사하지 않음!
+      sim.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'test_1hit',
+          sourceLabel: '중포 탄지기',
+          pos: captain.pos,
+          vel: const Vec2(0, -300),
+          material: StoneMaterial.taegeuk,
+          shape: StoneShape.round,
+          damage: 99999.0,
+          knockback: 0.0,
+          critChance: 1.0,
+          colorHex: 0xFFFFD166,
+          ignoresShield: true,
+        ),
+      );
+      sim.step(1.0 / 60.0);
+      expect(sim.mutants.contains(captain), isTrue, reason: '120타 실드가 남은 행동대장은 단발 고화력에 즉사하면 안 됨');
+      expect(captain.hitShieldLeft, greaterThan(0));
+
+      // 연속 다타격 세례로 120타 이상을 채우면 비로소 실드 파쇄 및 격파!
+      int capLoops = 0;
+      while (sim.mutants.contains(captain) && capLoops < 30) {
+        capLoops++;
+        sim.precisionStrikeCooldown = 0.0;
+        sim.firePrecisionStrikeAt(captain.pos);
+        for (int i = 0; i < 20 && sim.mutants.contains(captain); i++) {
+          sim.step(1.0 / 60.0);
+        }
+      }
+      expect(sim.mutants.contains(captain), isFalse);
+      expect(captain.totalHitsTaken, greaterThanOrEqualTo(120));
+      expect(captain.hitShieldLeft, 0);
+
+      // 1,000타 천련 대수괴 검증!
+      final overlord1000 = ActiveMutant(
+        uid: 9803,
+        kind: MutantKind.chapterOverlord,
+        laneIndex: 0,
+        waypoints: sim.chapter.smoothedLane(0),
+        pos: sim.shieldCenter + const Vec2(0, -90),
+        maxHp: 1200.0,
+        speed: 0.0,
+      )
+        ..enableBossPhases(phases: 1, initialPlates: 0)
+        ..enableHitShield(1000, rank: '장 보스');
+      sim.mutants.add(overlord1000);
+
+      // 4) 수호제단 결계 인근에서 공격 시 실시간 위험 비상 알림(activeCrisis) 및 한국어 구역명·확대 초점 작동 검증!
+      sim.step(1.0 / 30.0);
+      expect(sim.activeCrisis, isNotNull);
+      expect(sim.activeCrisis!.zoneName, contains('수호제단'));
+      expect(sim.activeCrisis!.maxHitShield, 1000);
+      expect(sim.activeCrisis!.severity, greaterThanOrEqualTo(0.9));
+
+      int guardLoops = 0;
+      while (sim.mutants.contains(overlord1000) && guardLoops < 45) {
+        guardLoops++;
+        overlord1000.pos = sim.shieldCenter + const Vec2(0, -90);
+        overlord1000.knockbackVel = const Vec2(0, 0);
+        sim.precisionStrikeCooldown = 0.0;
+        sim.firePrecisionStrikeAt(overlord1000.pos);
+        for (int i = 0; i < 20 && sim.mutants.contains(overlord1000); i++) {
+          sim.step(1.0 / 60.0);
+        }
+      }
+      expect(sim.mutants.contains(overlord1000), isFalse);
+      expect(overlord1000.totalHitsTaken, greaterThanOrEqualTo(1000));
+      expect(overlord1000.hitShieldLeft, 0);
+    });
+
+    test('v1.0.0+25 10장 완전 차별화 루트·수호탑 위치 다변화·설치 난도/물량 체증·5계통 고유 탄알 및 회심 충격파 검증', () {
+      // 1) 10개 장의 루트 위상 태그와 고유 전장 특색이 모두 100% 서로 다름!
+      final routeTags = CampaignCatalog.chapters.map((c) => c.routeTopologyTag).toSet();
+      final traitTitles = CampaignCatalog.chapters.map((c) => c.chapterTraitTitle).toSet();
+      expect(routeTags.length, 10);
+      expect(traitTitles.length, 10);
+
+      // 수호탑 도착지도 하단 고정 일변도가 아니라 우하단(1장)·좌하단(3,8,9장)·정중앙(4,6장)·최상단(7장)으로 완전히 분화!
+      expect(CampaignCatalog.chapterOf(1).towerPos.x, greaterThan(440.0));
+      expect(CampaignCatalog.chapterOf(3).towerPos.x, lessThan(220.0));
+      expect(CampaignCatalog.chapterOf(4).towerPos.y, inInclusiveRange(600.0, 720.0));
+      expect(CampaignCatalog.chapterOf(5).isOrthogonalLabyrinth, isTrue);
+      expect(CampaignCatalog.chapterOf(6).towerPos.y, inInclusiveRange(550.0, 650.0));
+      expect(CampaignCatalog.chapterOf(7).towerPos.y, lessThan(260.0)); // 남→북 역진격 상단 성채!
+
+      // 2) 난이도·장이 올라갈수록 건설비·축조시간·개척비·변이 출현 수량이 엄격히 상승!
+      for (int c = 1; c < 10; c++) {
+        final cur = CampaignCatalog.chapterOf(c);
+        final nxt = CampaignCatalog.chapterOf(c + 1);
+        expect(nxt.buildCostMultiplier, greaterThan(cur.buildCostMultiplier));
+        expect(nxt.buildDurationSec, greaterThan(cur.buildDurationSec));
+        expect(nxt.excavationCostMultiplier, greaterThan(cur.excavationCostMultiplier));
+        expect(nxt.swarmVolumeMultiplier, greaterThan(cur.swarmVolumeMultiplier));
+      }
+
+      // 제7장 상단 성채(towerPos.y == 212)에서 360° 하방 수동 조준 및 침투병(땅굴·월담·공중) 안전 소환 검증!
+      final p7 = PlayerProgress();
+      final sim7 = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(7, 2),
+        difficulty: DefenseDifficulty.nightmare,
+        progress: p7,
+        allowSerendipity: false,
+      );
+      expect(sim7.effectiveBuildConstructSec, greaterThan(3.1));
+      sim7.toggleCentralManualMode();
+      sim7.centralFireTimer = 0.0;
+      expect(sim7.fireCentralManualAt(const Vec2(360, 620)), isTrue);
+      expect(sim7.projectiles.first.vel.y, greaterThan(0.0)); // 아래쪽 사막 협곡으로 발사 가능!
+      final infTunnel7 = sim7.spawnOffPathInfiltrator(isTunnel: true);
+      final infFlank7 = sim7.spawnOffPathInfiltrator(isTunnel: false);
+      final infAir7 = sim7.spawnOffPathInfiltrator(isTunnel: false, isAirborne: true);
+      expect(infTunnel7.pos.y, greaterThan(sim7.towerPos.y));
+      expect(infFlank7.pos.y, greaterThan(sim7.towerPos.y));
+      expect(infAir7.pos.y, greaterThan(sim7.towerPos.y));
+
+      // 3) 5종 발사대마다 발사되는 투사체 스타일(projectileStyle)이 모두 고유하게 분화되고 회심 충격파가 생성됨!
+      final pAll = PlayerProgress();
+      final simAll = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(10, 5),
+        difficulty: DefenseDifficulty.normal,
+        progress: pAll,
+        allowSerendipity: false,
+      );
+      simAll.currentWaveIndex = 4;
+      simAll.fieldTokens = 5000;
+      for (int s = 0; s < 5; s++) {
+        simAll.excavatedSlots.add(s);
+        expect(simAll.placeLauncherInBattle(s, LauncherType.values[s]), isTrue);
+      }
+      simAll.step(4.0); // 축조 완료
+      simAll.projectiles.clear();
+      simAll.mutants.clear();
+      for (int i = 0; i < simAll.launchers.length; i++) {
+        final l = simAll.launchers[i];
+        l.cooldown = 0.0;
+        simAll.mutants.add(
+          ActiveMutant(
+            uid: 9901 + i,
+            kind: MutantKind.ironColossusBoss,
+            laneIndex: 0,
+            waypoints: simAll.chapter.smoothedLane(0),
+            pos: l.pos + const Vec2(0, -95),
+            maxHp: 50000.0,
+            speed: 0.0,
+          ),
+        );
+      }
+      simAll.auroraCritTimer = 5.0; // 확정 회심 점화!
+      simAll.step(1.0 / 60.0);
+      final firedStyles = simAll.projectiles.map((pr) => pr.projectileStyle).toSet();
+      expect(
+        firedStyles,
+        containsAll(<String>{
+          'rapidBolt',
+          'heavyMeteor',
+          'curveChakram',
+          'frostCrystal',
+          'qiBagua',
+        }),
+      );
+      for (int f = 0; f < 30; f++) {
+        simAll.step(1.0 / 60.0);
+      }
+      expect(simAll.shockwaveRings, isNotEmpty);
     });
   });
 }

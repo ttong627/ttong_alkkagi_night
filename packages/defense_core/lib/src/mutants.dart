@@ -1,4 +1,4 @@
-/// 심야 돌연변이·중간보스·대수괴 12종 분류 및 전투력 3대 분화(스피드·맷집·공격력) + 6단계 체급(초소형~초거대) 정의.
+/// 심야 돌연변이·공중 비행 변이·행동대장·중간보스·천련 대수괴 14종 분류 및 전투력 분화 정의.
 enum MutantKind {
   swarmRat(
     id: 'swarmRat',
@@ -162,6 +162,64 @@ enum MutantKind {
     colorHex: 0xFFD90429,
     screams: ['펑! 어라 왜 안 갈라져?!', '박살 났다아!', '으악!'],
   ),
+  bloodWingBat(
+    id: 'bloodWingBat',
+    name: '혈익 흡혈박쥐',
+    roleTag: '공중 강습형',
+    sizeClassLabel: '소형 공중군집',
+    speedRating: 5,
+    toughnessRating: 2,
+    attackRating: 2,
+    baseHp: 42.0,
+    swarmHpFactor: 0.48,
+    speed: 74.0,
+    mass: 0.72,
+    radius: 10.2,
+    visualDiameter: 30.0,
+    bodyWidthRatio: 1.24,
+    dropTokens: 2,
+    attackPower: 14.0,
+    armorReduction: 0.0,
+    frontShieldReduction: 0.0,
+    poisonAura: false,
+    splitsOnDeath: false,
+    isMidBoss: false,
+    isBoss: false,
+    isFlying: true,
+    baseHitShield: 0,
+    gaitId: 'wingFlap',
+    colorHex: 0xFFE63946,
+    screams: ['끼이이익— 날개가!!', '하늘에서 추락한다아!', '대공 탄막이다!'],
+  ),
+  abyssalGargoyle(
+    id: 'abyssalGargoyle',
+    name: '심연 철익귀',
+    roleTag: '공중 폭격 행동대장',
+    sizeClassLabel: '특대형 공중대장',
+    speedRating: 4,
+    toughnessRating: 4,
+    attackRating: 4,
+    baseHp: 235.0,
+    swarmHpFactor: 1.0,
+    speed: 48.0,
+    mass: 2.15,
+    radius: 22.5,
+    visualDiameter: 78.0,
+    bodyWidthRatio: 1.22,
+    dropTokens: 22,
+    attackPower: 42.0,
+    armorReduction: 0.10,
+    frontShieldReduction: 0.08,
+    poisonAura: false,
+    splitsOnDeath: false,
+    isMidBoss: true,
+    isBoss: true,
+    isFlying: true,
+    baseHitShield: 130,
+    gaitId: 'skyDiveBoss',
+    colorHex: 0xFF7209B7,
+    screams: ['크아악! 내 강철 날개가 꺾였다!', '상공에서 격추당하다니!'],
+  ),
   swiftShadowBoss(
     id: 'swiftShadowBoss',
     name: '혈영 질풍귀',
@@ -185,6 +243,7 @@ enum MutantKind {
     splitsOnDeath: false,
     isMidBoss: true,
     isBoss: true,
+    baseHitShield: 120,
     gaitId: 'shadowDash',
     colorHex: 0xFFC77DFF,
     screams: ['크악! 내 질풍보를 따라잡다니!', '그림자 속으로 후퇴한다!'],
@@ -212,6 +271,7 @@ enum MutantKind {
     splitsOnDeath: false,
     isMidBoss: true,
     isBoss: true,
+    baseHitShield: 180,
     gaitId: 'colossusTread',
     colorHex: 0xFF90A4AE,
     screams: ['쿠구궁… 내 삼중 현철갑이…!', '이 무거운 몸이 밀리다니!'],
@@ -239,6 +299,7 @@ enum MutantKind {
     splitsOnDeath: false,
     isMidBoss: true,
     isBoss: true,
+    baseHitShield: 150,
     gaitId: 'breakerSlam',
     colorHex: 0xFFFF4D00,
     screams: ['으아악! 내 파성 철퇴가 부러졌다!', '방어막 한 방만 더 치면 됐는데!'],
@@ -266,6 +327,7 @@ enum MutantKind {
     splitsOnDeath: false,
     isMidBoss: true,
     isBoss: true,
+    baseHitShield: 360,
     gaitId: 'dualCleaverRush',
     portraitPrefix: 'budumok',
     colorHex: 0xFFE63946,
@@ -294,6 +356,7 @@ enum MutantKind {
     splitsOnDeath: false,
     isMidBoss: true,
     isBoss: true,
+    baseHitShield: 450,
     gaitId: 'swordGlide',
     portraitPrefix: 'mukhyeon',
     colorHex: 0xFF5A189A,
@@ -302,8 +365,8 @@ enum MutantKind {
   chapterOverlord(
     id: 'chapterBoss',
     name: '심야 대요마',
-    roleTag: '천상 대수괴',
-    sizeClassLabel: '초거대 대수괴',
+    roleTag: '천상 천련 대수괴',
+    sizeClassLabel: '초거대 천련보스',
     speedRating: 2,
     toughnessRating: 5,
     attackRating: 5,
@@ -322,10 +385,11 @@ enum MutantKind {
     splitsOnDeath: false,
     isMidBoss: false,
     isBoss: true,
+    baseHitShield: 1000,
     gaitId: 'overlordFloat',
     portraitPrefix: 'tansin',
     colorHex: 0xFFFF0054,
-    screams: ['크아아아— 독기가 걷힌다!!', '새벽빛이… 눈부시다…!'],
+    screams: ['크아아아— 천련 마갑이 깨지고 독기가 걷힌다!!', '새벽빛이… 눈부시다…!'],
   );
 
   const MutantKind({
@@ -354,6 +418,8 @@ enum MutantKind {
     required this.gaitId,
     required this.colorHex,
     required this.screams,
+    this.isFlying = false,
+    this.baseHitShield = 0,
     this.portraitPrefix,
   });
 
@@ -379,6 +445,8 @@ enum MutantKind {
   final bool splitsOnDeath;
   final bool isMidBoss;
   final bool isBoss;
+  final bool isFlying;
+  final int baseHitShield;
   final String gaitId;
   final String? portraitPrefix;
   final int colorHex;
@@ -420,18 +488,22 @@ enum MutantKind {
         return '[대형 맹독수] 묵직하게 도약 전진하며 마을 근처에서 독안개를 뿜어 논밭을 시들게 합니다. 사거리 밖에서 회심 타격으로 조기 정화하세요.';
       case MutantKind.bloodCocoon:
         return '[중소형 분열충] 등 위의 붉은 독주머니가 터지면 독쥐 무리로 분열합니다. 회심 박살을 일으키면 분열을 봉쇄하고 연쇄 폭발을 터뜨립니다.';
+      case MutantKind.bloodWingBat:
+        return '[소형 공중군집 · 🪽비행] 낭떠러지와 지상 장애물을 무시하고 상공에서 급강하 습격합니다! 속사 탄지기와 곡사 회전기의 대공 화망으로 격추하세요.';
+      case MutantKind.abyssalGargoyle:
+        return '[특대형 공중 행동대장 · 🪽비행 · 🛡️100타+ 백련마갑] 창공을 가르며 강림하는 공중 행동대장입니다! 100대 이상의 연타 세례와 정밀 약점 저격으로 날개를 꺾으세요.';
       case MutantKind.swiftShadowBoss:
-        return '[특대형 기습보스] 질풍보를 발동해 1.55배 초고속으로 기습하는 중간보스입니다! 한빙 역장기와 수동 탄지 조준으로 기동력을 꺾으세요.';
+        return '[특대형 기습 행동대장 · 🛡️100타+ 백련마갑] 질풍보를 발동해 1.55배 초고속으로 기습하는 두목입니다! 한빙 역장기 감속과 연타 집중으로 기동력을 꺾으세요.';
       case MutantKind.ironColossusBoss:
-        return '[거신형 철갑보스] 길을 가득 메우는 거대한 삼중 현철갑 골렘입니다! 중포 탄지기와 고밀도 수호석으로 두꺼운 장갑을 반관통하세요.';
+        return '[거신형 철갑 중간보스 · 🛡️180타+ 백련마갑] 길을 가득 메우는 거대한 삼중 현철갑 골렘입니다! 중포 파편 연타와 약점 저격으로 두꺼운 마갑을 부수세요.';
       case MutantKind.crimsonBreakerBoss:
-        return '[특대형 파성보스] 방어막과 수호탑에 치명적인 파성 철퇴 강타를 퍼붓습니다! 마을 접근 전 내공탄과 수동 탄지로 집중 제압하세요.';
+        return '[특대형 파성 중간보스 · 🛡️150타+ 백련마갑] 방어막과 수호탑에 치명적인 파성 철퇴 강타를 퍼붓습니다! 150타 이상 연타 화망으로 제압하세요.';
       case MutantKind.raiderHeukpung:
-        return '[특대형 돌격장] 대규모 약탈 무리를 이끌고 쌍식칼로 맹돌격하는 선봉장입니다. 중포 탄지기 승급과 동료 석두의 밀침으로 저지하세요.';
+        return '[특대형 약탈 부두목 · 🛡️360타+ 백련마갑] 대규모 약탈 무리를 이끌고 쌍식칼로 맹돌격하는 부두목입니다. 전 초소 다중 연타와 정밀 저격으로 격퇴하세요.';
       case MutantKind.rivalMukhyeon:
-        return '[특대형 흑화검귀] 빠른 검기 활보와 독기 오라, 매서운 참격을 겸비한 숙적입니다. 내공 증폭기와 정화 회심탄으로 독기를 씻어내세요.';
+        return '[특대형 흑화 숙적 · 🛡️450타+ 백련마갑] 검기 활보와 독기 오라를 두른 숙적입니다. 내공 증폭기와 수백 회 정화 연타로 독기를 씻어내세요.';
       case MutantKind.chapterOverlord:
-        return '[초거대 대수괴] 전장을 압도하는 거대한 마신 체구와 파멸적 공격력을 지닌 최종 재앙입니다. 6대 초소 완비와 영수·동료 총력전으로 맞서세요.';
+        return '[초거대 각 장 최종보스 · 🛡️1,000타+ 천련마갑] 각 장을 지배하는 3페이즈 최종 대수괴입니다! 1,000대 이상의 총력 연타와 🎯약점 파쇄 없이는 결코 쓰러지지 않습니다.';
     }
   }
 }

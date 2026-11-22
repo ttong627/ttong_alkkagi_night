@@ -11,10 +11,12 @@ class DailyAndQuestsScreen extends StatelessWidget {
     super.key,
     required this.controller,
     this.initialTab = 0,
+    this.embeddedInShell = false,
   });
 
   final GameController controller;
   final int initialTab;
+  final bool embeddedInShell;
 
   void _toast(BuildContext context, String msg) {
     ScaffoldMessenger.of(context)
@@ -38,7 +40,9 @@ class DailyAndQuestsScreen extends StatelessWidget {
         builder: (context, _) {
           final p = controller.progress;
           return Scaffold(
+            backgroundColor: Colors.transparent,
             appBar: AppBar(
+              automaticallyImplyLeading: !embeddedInShell,
               title: const Text('출석 · 수호 임무 · 전술 비약'),
               bottom: const TabBar(
                 isScrollable: true,

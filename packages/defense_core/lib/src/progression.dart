@@ -373,6 +373,34 @@ class LoadoutPreset {
   }
 }
 
+/// 원터치 일괄 보상 수령 및 자동 재파견 요약 결과.
+class BatchClaimSummary {
+  const BatchClaimSummary({
+    required this.claimedCount,
+    required this.gainedTokens,
+    required this.gainedElixirs,
+    required this.gainedSupportTokens,
+    required this.gainedSeals,
+    required this.gainedShards,
+    required this.redispatchedConvoy,
+    required this.redispatchedExplore,
+    required this.sources,
+  });
+
+  final int claimedCount;
+  final int gainedTokens;
+  final int gainedElixirs;
+  final int gainedSupportTokens;
+  final int gainedSeals;
+  final int gainedShards;
+  final bool redispatchedConvoy;
+  final bool redispatchedExplore;
+  final List<String> sources;
+
+  bool get hasAnyAction =>
+      claimedCount > 0 || redispatchedConvoy || redispatchedExplore;
+}
+
 /// 플레이어 전체 영구 진행 상태 (증표·영약·수련·기연·호송·탐색·지원패 통합).
 class PlayerProgress {
   PlayerProgress({
@@ -1178,6 +1206,226 @@ class PlayerProgress {
       if (canClaimAchievement(a)) return true;
     }
     return false;
+  }
+
+  /// 보름달 기연·호송·탐색·출석·임무·업적 또는 미출발 호송/탐색까지 포함해 원터치 행동 가능 여부.
+  bool hasAnyReadyAction({String? todayKey}) {
+    if (moonOmenGauge >= 100) return true;
+    if (convoyActive && convoyBattlesRemaining <= 0) return true;
+    if (exploreActive && exploreBattlesRemaining <= 0) return true;
+    if (highestUnlockedChapter >= 2 && !convoyActive) return true;
+    if (highestUnlockedChapter >= 4 && !exploreActive) return true;
+    return hasClaimableRewards(todayKey: todayKey);
+  }
+
+  /// 도착한 모든 보상(보름달·호송·탐색·출석·일일/주간/월간 임무·업적)을 한 번에 수령하고 호송/탐색을 자동 재파견!
+  BatchClaimSummary claimAllReadyRewards(
+    Random rng, {
+    String? todayKey,
+    bool autoRedispatch = true,
+  }) {
+    final beforeTokens = tokens;
+    final beforeElixirs = elixirs;
+    final beforeSupport = supportTokens;
+    final beforeSeals = trainingSeals;
+    final beforeShards = stoneShards.values.fold<int>(0, (a, b) => a + b);
+    final sources = <String>[];
+    int count = 0;
+
+    if (moonOmenGauge >= 100) {
+      final r = claimFullMoonSerendipity(rng);
+      if (r != null) {
+        count++;
+        sources.add('보름달 기연');
+      }
+    }
+    if (convoyActive && convoyBattlesRemaining <= 0) {
+      final r = claimSupplyConvoy(rng);
+      if (r != null) {
+        count++;
+        sources.add('물자 호송');
+      }
+    }
+    if (exploreActive && exploreBattlesRemaining <= 0) {
+      final r = claimNightExplore(rng);
+      if (r != null) {
+        count++;
+        sources.add('심야 탐색');
+      }
+    }
+    if (canClaimAttendance(todayKey: todayKey)) {
+      final b = claimAttendance(rng: rng, todayKey: todayKey);
+      if (b != null) {
+        count++;
+        sources.add('출석 보상');
+      }
+    }
+
+    int missionCnt = 0;
+    for (final m in todayDailyMissions(todayKey: todayKey)) {
+      if (claimMission(m, rng: rng, todayKey: todayKey) != null) {
+        count++;
+        missionCnt++;
+      }
+    }
+    if (claimDailyAllClear(rng: rng, todayKey: todayKey) != null) {
+      count++;
+      missionCnt++;
+    }
+    for (final m in NightQuestCatalog.weeklyMissions) {
+      if (claimMission(m, rng: rng, todayKey: todayKey) != null) {
+        count++;
+        missionCnt++;
+      }
+    }
+    for (final m in NightQuestCatalog.monthlyMissions) {
+      if (claimMission(m, rng: rng, todayKey: todayKey) != null) {
+        count++;
+        missionCnt++;
+      }
+    }
+    if (missionCnt > 0) {
+      sources.add('수호 임무 $missionCnt건');
+    }
+
+    int achCnt = 0;
+    for (final a in NightAchievementSpec.all) {
+      if (claimAchievement(a, rng: rng) != null) {
+        count++;
+        achCnt++;
+      }
+    }
+    if (achCnt > 0) {
+      sources.add('업적 $achCnt건');
+    }
+
+    bool sentConvoy = false;
+    bool sentExplore = false;
+    if (autoRedispatch) {
+      if (highestUnlockedChapter >= 2 && !convoyActive) {
+        sentConvoy = startSupplyConvoy();
+      }
+      if (highestUnlockedChapter >= 4 && !exploreActive) {
+        sentExplore = startNightExplore();
+      }
+    }
+
+    final afterShards = stoneShards.values.fold<int>(0, (a, b) => a + b);
+    return BatchClaimSummary(
+      claimedCount: count,
+      gainedTokens: max(0, tokens - beforeTokens),
+      gainedElixirs: max(0, elixirs - beforeElixirs),
+      gainedSupportTokens: max(0, supportTokens - beforeSupport),
+      gainedSeals: max(0, trainingSeals - beforeSeals),
+      gainedShards: max(0, afterShards - beforeShards),
+      redispatchedConvoy: sentConvoy,
+      redispatchedExplore: sentExplore,
+      sources: sources,
+    );
+  }
+
+  /// 보유 증표·영약·수련인장으로 가장 효율 높은 항목을 최대 [maxSteps]회 스마트 일괄 강화!
+  List<String> upgradeRecommendedBatch({int maxSteps = 5}) {
+    final logs = <String>[];
+    final limit = maxSteps.clamp(1, 15);
+
+    for (int step = 0; step < limit; step++) {
+      // 1순위: 경맥 즉시 개통 가능 시 개통 (무료 내공 조건 + 재화 보상 획득!)
+      final opened = openNextMeridian();
+      if (opened != null) {
+        logs.add('경맥 [${opened.name}] 개통');
+        continue;
+      }
+
+      // 2순위: 내공 경지 돌파 가능 시 돌파
+      if (breakthroughRealm()) {
+        logs.add('내공 경지 [${realm.name}] 승급');
+        continue;
+      }
+
+      // 3순위: 조각 수호석(11~13단) 해금 가능 시 해금
+      StoneMaterial? unlockedStoneNow;
+      for (final st in StoneMaterial.values.reversed) {
+        if (st.isShardStone && canUnlockStone(st) && unlockStoneWithTokens(st)) {
+          unlockedStoneNow = st;
+          activePreset.primaryStone = st;
+          break;
+        }
+      }
+      if (unlockedStoneNow != null) {
+        logs.add('${unlockedStoneNow.grade}단 [${unlockedStoneNow.name}] 해금');
+        continue;
+      }
+
+      // 4순위: 중앙 수호탑 vs 해금된 주력 발사대 중 최소 비용 강화
+      final unlockedLaunchers = LauncherType.values
+          .where((t) => t.unlockChapter <= highestUnlockedChapter + 1)
+          .toList();
+      LauncherType? cheapestLauncher;
+      int cheapestLauncherCost = 1 << 30;
+      for (final lt in unlockedLaunchers) {
+        final c = lt.permanentUpgradeCost(launcherPermanentLevels[lt] ?? 1);
+        if (c < cheapestLauncherCost) {
+          cheapestLauncherCost = c;
+          cheapestLauncher = lt;
+        }
+      }
+      final centralCost = CentralGuardianSpec.permanentUpgradeCost(centralGuardianLevel);
+      if (centralCost <= cheapestLauncherCost && upgradeCentralGuardian()) {
+        logs.add('중앙 수호탑 $centralGuardianLevel단');
+        continue;
+      }
+      if (cheapestLauncher != null && upgradeLauncherPermanent(cheapestLauncher)) {
+        logs.add('${cheapestLauncher.name} ${launcherPermanentLevels[cheapestLauncher]}단');
+        continue;
+      }
+      if (upgradeForgeMastery()) {
+        logs.add('태초 신기 연마 $forgeMasteryLevel단');
+        continue;
+      }
+
+      // 5순위: 영약으로 출전 영수·출전 동료·호법 영기 공명 강화
+      final activeBeast = activePreset.equippedBeast;
+      if ((beastLevels[activeBeast] ?? 0) > 0 &&
+          (beastLevels[activeBeast] ?? 0) < 10 &&
+          unlockOrUpgradeBeast(activeBeast)) {
+        logs.add('${activeBeast.name} ${beastLevels[activeBeast]}단');
+        continue;
+      }
+      CompanionHero? upgradedHero;
+      for (final h in activePreset.companions) {
+        final lv = companionLevels[h] ?? 0;
+        if (lv > 0 && lv < 10 && unlockOrUpgradeCompanion(h)) {
+          upgradedHero = h;
+          break;
+        }
+      }
+      if (upgradedHero != null) {
+        logs.add('${upgradedHero.name} ${companionLevels[upgradedHero]}단');
+        continue;
+      }
+      if (upgradeElixirResonance()) {
+        logs.add('호법 영기 공명 $elixirResonanceLevel단');
+        continue;
+      }
+
+      // 6순위: 수련 인장으로 3대 핵심 능력치 균형 단련
+      final sortedStats = CoreStatType.values.toList()
+        ..sort((a, b) => (coreStatLevels[a] ?? 0).compareTo(coreStatLevels[b] ?? 0));
+      bool statDone = false;
+      for (final st in sortedStats) {
+        if (upgradeCoreStat(st)) {
+          logs.add('${st.label} ${coreStatLevels[st]}단');
+          statDone = true;
+          break;
+        }
+      }
+      if (statDone) continue;
+
+      break;
+    }
+
+    return logs;
   }
 
   /// 13) 기기 변경용 오프라인 백업 부호 내보내기 / 복원 (위변조 검증 합산값 포함).

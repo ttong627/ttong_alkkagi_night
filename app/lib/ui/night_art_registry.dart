@@ -8,42 +8,85 @@ import 'package:flutter/services.dart';
 
 import '../theme/night_theme.dart';
 
-/// 《수호알까기 · 탄지무림 심야기습》 코덱스 원화 경로 정본 레지스트리 및 안전 렌더러.
+/// 《수호알까기 · 탄지무림 심야기습》 코덱스 대륙 지도 · 10대 전장 맵 · 디테일 캐릭터/돌연변이 4프레임 시트 · 3D 모션 루프 정본 레지스트리.
 class NightArtRegistry {
   NightArtRegistry._();
 
-  // 1. 심야 배경 및 바닥 · 게임 로비 원화 (assets/images/scenes/)
+  // 1. 코덱스 대륙 월드맵 · 라이브 3D 모션 루프 · 전각별 영웅 대 변이 실전 원화
+  static const String worldMapMurimNight =
+      'assets/images/scenes/world_map_murim_night.webp';
+  static const String worldMapLiveMotion =
+      'assets/images/motions/world_map_live.webp';
+  static const String splashClashLoop =
+      'assets/images/motions/splash_clash_loop.webp';
+  static const String homeCommandLoop =
+      'assets/images/motions/home_command_loop.webp';
+
   static const String bgNightSplash = 'assets/images/scenes/bg_night_splash.webp';
   static const String bgNightLobby = 'assets/images/scenes/bg_night_lobby.webp';
   static const String bgLobbyFallback = 'assets/images/scenes/bg_lobby.webp';
-  static const String lobbyStageFortress = 'assets/images/scenes/lobby_stage_fortress.webp';
-  static const String cardGateBattle = 'assets/images/scenes/card_gate_battle.webp';
-  static const String cardTrainingHall = 'assets/images/scenes/card_training_hall.webp';
-  static const String cardForgeSanctum = 'assets/images/scenes/card_forge_sanctum.webp';
-  static const String cardAllyPavilion = 'assets/images/scenes/card_ally_pavilion.webp';
-  static const String cardRescueBeacon = 'assets/images/scenes/card_rescue_beacon.webp';
-  static const String cardSupplyConvoy = 'assets/images/scenes/card_supply_convoy.webp';
-  static const String cardEndlessAbyss = 'assets/images/scenes/card_endless_abyss.webp';
+  static const String lobbyStageFortress =
+      'assets/images/scenes/lobby_stage_fortress.webp';
+  static const String cardGateBattle =
+      'assets/images/scenes/card_gate_battle.webp';
+  static const String cardTrainingHall =
+      'assets/images/scenes/card_training_hall.webp';
+  static const String cardForgeSanctum =
+      'assets/images/scenes/card_forge_sanctum.webp';
+  static const String cardAllyPavilion =
+      'assets/images/scenes/card_ally_pavilion.webp';
+  static const String cardRescueBeacon =
+      'assets/images/scenes/card_rescue_beacon.webp';
+  static const String cardSupplyConvoy =
+      'assets/images/scenes/card_supply_convoy.webp';
+  static const String cardEndlessAbyss =
+      'assets/images/scenes/card_endless_abyss.webp';
 
-  // 2. 중앙 수호탑 · 마을 생태 3종 · 전장 화약통 기물 (assets/images/launchers/)
-  static const String towerGuardian = 'assets/images/launchers/tower_guardian.webp';
-  static const String villageGranary = 'assets/images/launchers/village_granary.webp';
-  static const String villageCrops = 'assets/images/launchers/village_crops.webp';
-  static const String villageLivestock = 'assets/images/launchers/village_livestock.webp';
-  static const String propPowderKeg = 'assets/images/launchers/prop_powder_keg.webp';
+  // 영웅 대 변이 와이드 결전 배너 & 초정밀 돌연변이 보스 해부 쇼케이스 원화
+  static const String heroClashBanner =
+      'assets/images/scenes/hero_clash_banner.webp';
+  static const String mutantPackBanner =
+      'assets/images/scenes/mutant_pack_banner.webp';
+  static const String showcaseBossChapter =
+      'assets/images/scenes/showcase_boss_chapter.webp';
+  static const String showcaseBossCrimson =
+      'assets/images/scenes/showcase_boss_crimson.webp';
+  static const String showcaseBossIron =
+      'assets/images/scenes/showcase_boss_iron.webp';
+  static const String showcaseBossSwift =
+      'assets/images/scenes/showcase_boss_swift.webp';
+  static const String showcaseBossMukhyeon =
+      'assets/images/scenes/showcase_boss_mukhyeon.webp';
 
-  // 3. 전용 코덱스 아이콘 · 돌파 비급 · 운빨 소환패 (assets/images/icons/)
+  // 2. 중앙 수호탑 · 마을 생태 3종 · 전장 화약통 기물
+  static const String towerGuardian =
+      'assets/images/launchers/tower_guardian.webp';
+  static const String villageGranary =
+      'assets/images/launchers/village_granary.webp';
+  static const String villageCrops =
+      'assets/images/launchers/village_crops.webp';
+  static const String villageLivestock =
+      'assets/images/launchers/village_livestock.webp';
+  static const String propPowderKeg =
+      'assets/images/launchers/prop_powder_keg.webp';
+
+  // 3. 전용 코덱스 아이콘 · 돌파 비급 · 운빨 소환패
   static const String appLogo = 'assets/images/icons/app_logo.webp';
   static const String wslogisLogo = 'assets/images/icons/wslogis.webp';
   static const String nightToken = 'assets/images/icons/night_token.webp';
   static const String nightElixir = 'assets/images/icons/night_elixir.webp';
-  static const String nightSupportSeal = 'assets/images/icons/night_support_seal.webp';
-  static const String nightConvoyCart = 'assets/images/icons/night_convoy_cart.webp';
-  static const String nightSerendipity = 'assets/images/icons/night_serendipity.webp';
+  static const String nightSupportSeal =
+      'assets/images/icons/night_support_seal.webp';
+  static const String nightConvoyCart =
+      'assets/images/icons/night_convoy_cart.webp';
+  static const String nightSerendipity =
+      'assets/images/icons/night_serendipity.webp';
   static const String nightMeridian = 'assets/images/icons/night_meridian.webp';
   static const String nightEndless = 'assets/images/icons/night_endless.webp';
-  static const String iconRogueScroll = 'assets/images/icons/icon_rogue_scroll.webp';
-  static const String iconLuckyDice = 'assets/images/icons/icon_lucky_dice.webp';
+  static const String iconRogueScroll =
+      'assets/images/icons/icon_rogue_scroll.webp';
+  static const String iconLuckyDice =
+      'assets/images/icons/icon_lucky_dice.webp';
 
   // 보조 공용 아이콘
   static const String iconAttendance = 'assets/images/icons/attendance.webp';
@@ -69,33 +112,83 @@ class NightArtRegistry {
   static const String fxQi = 'assets/images/fx/fx_qi.webp';
   static const String fxCloneGate = 'assets/images/fx/fx_clone_gate.webp';
   static const String fxFeverAura = 'assets/images/fx/fx_fever_aura.webp';
-  static const String mutTreasureGoblin = 'assets/images/mutants/mut_treasure_goblin.webp';
+  static const String mutTreasureGoblin =
+      'assets/images/mutants/mut_treasure_goblin.webp';
+  static const String mutTreasureGoblinStrip =
+      'assets/images/sheets/mut_treasure_goblin_strip.webp';
 
-  /// 심야 돌연변이·중간보스·대수괴 12종 기본 행군 원화 경로 (`assets/images/mutants/mut_${kind.id}.webp`).
+  /// 심야 돌연변이·중간보스·대수괴 12종 기본 행군 원화 경로.
   static String mutantAsset(MutantKind kind) =>
       'assets/images/mutants/mut_${kind.id}.webp';
 
-  /// 심야 돌연변이·중간보스·대수괴 12종 돌격·강타 원화 경로 (`assets/images/mutants/mut_${kind.id}_atk.webp`).
+  /// 심야 돌연변이·중간보스·대수괴 12종 돌격·강타 원화 경로.
   static String mutantAttackAsset(MutantKind kind) =>
       'assets/images/mutants/mut_${kind.id}_atk.webp';
 
-  /// 길목 자동 발사대 5종 원화 경로 (`assets/images/launchers/launcher_${type.id}.webp`).
+  /// 코덱스 2x2 디테일 해부·3페이즈 진화 캐릭터 시트 경로 (`768x768`).
+  static String mutantSheetAsset(MutantKind kind) =>
+      'assets/images/sheets/mut_${kind.id}_sheet.webp';
+
+  /// 전장 60fps 4프레임 알파 투명 스프라이트 스트립 경로 (`1024x256`).
+  static String mutantStripAsset(MutantKind kind) =>
+      'assets/images/sheets/mut_${kind.id}_strip.webp';
+
+  /// 12프레임 3D 시네마틱 루프 모션 영상(`Animated WebP`) 경로.
+  static String mutantMotionAsset(MutantKind kind) =>
+      'assets/images/motions/mut_${kind.id}_anim.webp';
+
+  /// 보스 및 주요 변이체용 초고밀도 단독 쇼케이스 일러스트 경로.
+  static String mutantShowcaseAsset(MutantKind kind) {
+    switch (kind) {
+      case MutantKind.chapterOverlord:
+        return showcaseBossChapter;
+      case MutantKind.crimsonBreakerBoss:
+        return showcaseBossCrimson;
+      case MutantKind.ironColossusBoss:
+        return showcaseBossIron;
+      case MutantKind.swiftShadowBoss:
+        return showcaseBossSwift;
+      case MutantKind.rivalMukhyeon:
+      case MutantKind.raiderHeukpung:
+        return showcaseBossMukhyeon;
+      default:
+        return mutantAttackAsset(kind);
+    }
+  }
+
+  /// 발사대 종류별 주력 상성 표적 변이체 반환.
+  static MutantKind counterTargetOfLauncher(LauncherType type) {
+    switch (type) {
+      case LauncherType.rapid:
+        return MutantKind.swarmRat;
+      case LauncherType.heavy:
+        return MutantKind.ironColossusBoss;
+      case LauncherType.curveSpin:
+        return MutantKind.shieldYacha;
+      case LauncherType.frostField:
+        return MutantKind.swiftShadowBoss;
+      case LauncherType.qiAmplifier:
+        return MutantKind.chapterOverlord;
+    }
+  }
+
+  /// 길목 자동 발사대 5종 원화 경로.
   static String launcherAsset(LauncherType type) =>
       'assets/images/launchers/launcher_${type.id}.webp';
 
-  /// 수호석 13종 원화 경로 (`assets/images/stones/stone_${stone.id}.webp`).
+  /// 수호석 13종 원화 경로.
   static String stoneAsset(StoneMaterial stone) =>
       'assets/images/stones/stone_${stone.id}.webp';
 
-  /// 전술 비약 3종 원화 경로 (`assets/images/icons/potion_${consumable.name}.webp`).
+  /// 전술 비약 3종 원화 경로.
   static String consumableAsset(TacticalConsumable consumable) =>
       'assets/images/icons/potion_${consumable.name}.webp';
 
-  /// 제조 재료 4종 원화 경로 (`assets/images/icons/mat_${material.name}.webp`).
+  /// 제조 재료 4종 원화 경로.
   static String materialAsset(CraftMaterial material) =>
       'assets/images/icons/mat_${material.name}.webp';
 
-  /// 수호 영수 5종 원화 경로 (`assets/images/icons/pet_*.webp`).
+  /// 수호 영수 5종 원화 · 디테일 시트 · 4프레임 스트립 · 3D 모션 루프 경로.
   static String beastAsset(SpiritBeast beast) {
     switch (beast) {
       case SpiritBeast.nalssaendol:
@@ -111,7 +204,16 @@ class NightArtRegistry {
     }
   }
 
-  /// 동료/인물 초상화 원화 경로.
+  static String beastSheetAsset(SpiritBeast beast) =>
+      'assets/images/sheets/beast_${beast.id}_sheet.webp';
+
+  static String beastStripAsset(SpiritBeast beast) =>
+      'assets/images/sheets/beast_${beast.id}_strip.webp';
+
+  static String beastMotionAsset(SpiritBeast beast) =>
+      'assets/images/motions/beast_${beast.id}_anim.webp';
+
+  /// 동료/인물 초상화 · 전신 원화 · 디테일 캐릭터 시트 · 4프레임 스트립 · 3D 모션 루프 경로.
   static String heroFaceAsset(CompanionHero hero) =>
       'assets/images/chars/${hero.portraitPrefix}_face.webp';
 
@@ -121,14 +223,178 @@ class NightArtRegistry {
   static String heroAttackAsset(CompanionHero hero) =>
       'assets/images/chars/${hero.portraitPrefix}_attack.webp';
 
+  static String heroSheetAsset(CompanionHero hero) =>
+      'assets/images/sheets/hero_${hero.portraitPrefix}_sheet.webp';
+
+  static String heroStripAsset(CompanionHero hero) =>
+      'assets/images/sheets/hero_${hero.portraitPrefix}_strip.webp';
+
+  static String heroMotionAsset(CompanionHero hero) =>
+      'assets/images/motions/hero_${hero.portraitPrefix}_anim.webp';
+
   static String charFace(String portraitPrefix) =>
       'assets/images/chars/${portraitPrefix}_face.webp';
 
   static String charIdle(String portraitPrefix) =>
       'assets/images/chars/${portraitPrefix}_idle.webp';
+
+  static String charAttack(String portraitPrefix) =>
+      'assets/images/chars/${portraitPrefix}_attack.webp';
+
+  static String charSheet(String portraitPrefix) =>
+      'assets/images/sheets/hero_${portraitPrefix}_sheet.webp';
+
+  static String charStrip(String portraitPrefix) =>
+      'assets/images/sheets/hero_${portraitPrefix}_strip.webp';
+
+  static String charMotion(String portraitPrefix) =>
+      'assets/images/motions/hero_${portraitPrefix}_anim.webp';
 }
 
-/// 코덱스 손그림 원화를 우선 표시하고 미존재/로딩 실패 시 깔끔한 아이콘으로 폴백하는 안전 위젯.
+/// 코덱스 디테일 2×2 캐릭터·돌연변이 시트 & 3D 모션 영상 루프를 한눈에 감상하는 프리미엄 쇼케이스 다이얼로그.
+Future<void> showCodexCharacterSheetDialog(
+  BuildContext context, {
+  required String title,
+  required String subtitle,
+  required String motionAssetPath,
+  required String sheetAssetPath,
+  required String fallbackAssetPath,
+  required List<String> frameLabels,
+  Color accentColor = NightPalette.accentGold,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) {
+      return Dialog(
+        backgroundColor: NightPalette.hanjiLight,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: NightPalette.accentGold, width: 2.0),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760, maxHeight: 820),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    NightSpriteIcon(
+                      assetPath: motionAssetPath,
+                      fallbackAssetPath: fallbackAssetPath,
+                      fallbackIcon: Icons.auto_awesome_motion_rounded,
+                      size: 64,
+                      borderRadius: 14,
+                      fit: BoxFit.cover,
+                      showFrame: true,
+                      frameColor: NightPalette.hanjiInk,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontFamily: 'BlackHanSans',
+                              fontSize: 19,
+                              color: NightPalette.hanjiInk,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              fontSize: 12.6,
+                              color: NightPalette.hanjiSubInk,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: NightPalette.hanjiInk,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: NightPalette.hanjiInk,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '4단계 모션 · 변이 시트 구성: ${frameLabels.join("  ▶  ")}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12.0,
+                      fontWeight: FontWeight.bold,
+                      color: NightPalette.accentGold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    color: const Color(0xFF0E1626),
+                    child: InteractiveViewer(
+                      minScale: 1.0,
+                      maxScale: 3.0,
+                      child: Image.asset(
+                        sheetAssetPath,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => Image.asset(
+                          fallbackAssetPath,
+                          height: 280,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '두 손가락으로 확대하여 코덱스 원화의 갑주·근육·무기·변이 외피 디테일을 감상할 수 있습니다.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: NightPalette.hanjiSubInk,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: NightPalette.hanjiInk,
+                    foregroundColor: NightPalette.accentGold,
+                  ),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                  label: const Text('감상 완료 · 닫기'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// 손그림 원화 및 다중 프레임 Animated WebP 모션 클립을 표시하고 미존재 시 폴백하는 안전 위젯.
 class NightSpriteIcon extends StatelessWidget {
   const NightSpriteIcon({
     super.key,
@@ -164,7 +430,7 @@ class NightSpriteIcon extends StatelessWidget {
         height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: NightPalette.bgDeep.withValues(alpha: 0.72),
+          color: NightPalette.bgDeep.withValues(alpha: 0.78),
           borderRadius: BorderRadius.circular(borderRadius),
           border: Border.all(
             color: (frameColor ?? effectiveColor).withValues(alpha: 0.45),
@@ -183,6 +449,7 @@ class NightSpriteIcon extends StatelessWidget {
       width: size,
       height: size,
       fit: fit,
+      gaplessPlayback: true,
       errorBuilder: (_, _, _) {
         if (fallbackAssetPath != null && fallbackAssetPath!.isNotEmpty) {
           return Image.asset(
@@ -190,6 +457,7 @@ class NightSpriteIcon extends StatelessWidget {
             width: size,
             height: size,
             fit: fit,
+            gaplessPlayback: true,
             errorBuilder: (_, _, _) => fallbackWidget(),
           );
         }
@@ -205,10 +473,7 @@ class NightSpriteIcon extends StatelessWidget {
     }
 
     if (dimmed) {
-      imageWidget = Opacity(
-        opacity: 0.52,
-        child: imageWidget,
-      );
+      imageWidget = Opacity(opacity: 0.52, child: imageWidget);
     }
 
     if (!showFrame) {
@@ -220,10 +485,11 @@ class NightSpriteIcon extends StatelessWidget {
       height: size,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: NightPalette.bgDeep.withValues(alpha: 0.78),
+        color: NightPalette.bgDeep.withValues(alpha: 0.84),
         borderRadius: BorderRadius.circular(borderRadius + 2),
         border: Border.all(
-          color: (frameColor ?? effectiveColor).withValues(alpha: dimmed ? 0.32 : 0.72),
+          color: (frameColor ?? effectiveColor)
+              .withValues(alpha: dimmed ? 0.32 : 0.72),
           width: 1.2,
         ),
       ),
@@ -232,14 +498,14 @@ class NightSpriteIcon extends StatelessWidget {
   }
 }
 
-/// 수호 본영 및 보조 화면 공통 심야 배경 래퍼 (`bg_night_lobby.webp` + 수묵 암막 오버레이).
+/// 수호 본영 및 보조 화면 공통 심야 배경 래퍼.
 class NightSceneBackdrop extends StatelessWidget {
   const NightSceneBackdrop({
     super.key,
     required this.child,
     this.assetPath = NightArtRegistry.bgNightLobby,
     this.fallbackAssetPath = NightArtRegistry.bgLobbyFallback,
-    this.overlayOpacity = 0.82,
+    this.overlayOpacity = 0.72,
   });
 
   final Widget child;
@@ -255,12 +521,14 @@ class NightSceneBackdrop extends StatelessWidget {
         Image.asset(
           assetPath,
           fit: BoxFit.cover,
+          gaplessPlayback: true,
           errorBuilder: (_, _, _) {
             if (fallbackAssetPath != null) {
               return Image.asset(
                 fallbackAssetPath!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const ColoredBox(color: NightPalette.bgDeep),
+                errorBuilder: (_, _, _) =>
+                    const ColoredBox(color: NightPalette.bgDeep),
               );
             }
             return const ColoredBox(color: NightPalette.bgDeep);
@@ -272,9 +540,12 @@ class NightSceneBackdrop extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                NightPalette.bgDeep.withValues(alpha: (overlayOpacity * 0.92).clamp(0.0, 0.96)),
-                NightPalette.bgPanel.withValues(alpha: (overlayOpacity * 0.86).clamp(0.0, 0.96)),
-                NightPalette.bgDeep.withValues(alpha: (overlayOpacity * 1.04).clamp(0.0, 0.97)),
+                NightPalette.bgDeep
+                    .withValues(alpha: (overlayOpacity * 0.86).clamp(0.0, 0.92)),
+                NightPalette.bgPanel
+                    .withValues(alpha: (overlayOpacity * 0.82).clamp(0.0, 0.92)),
+                NightPalette.bgDeep
+                    .withValues(alpha: (overlayOpacity * 0.94).clamp(0.0, 0.95)),
               ],
             ),
           ),
@@ -285,9 +556,7 @@ class NightSceneBackdrop extends StatelessWidget {
   }
 }
 
-/// 60프레임 `NightBattlePainter` 전용 비동기 `dart:ui.Image` 스프라이트 캐시.
-/// 로드 전이거나 단위 위젯 시험 환경에서 자산 파일이 아직 없더라도 예외 없이 안전하게 `null`을 반환해
-/// 기존 벡터 모션그래픽 도형 렌더링과 자연스럽게 합성/폴백됩니다.
+/// 60프레임 `NightBattlePainter` 전용 비동기 `dart:ui.Image` 스프라이트 & 코덱스 4프레임 시트 스트립 캐시.
 class NightBattleSprites {
   NightBattleSprites._();
 
@@ -317,23 +586,45 @@ class NightBattleSprites {
   ui.Image? get fxFeverAura => _cache[NightArtRegistry.fxFeverAura];
   ui.Image? get propPowderKeg => _cache[NightArtRegistry.propPowderKeg];
   ui.Image? get mutTreasureGoblin => _cache[NightArtRegistry.mutTreasureGoblin];
+  ui.Image? get mutTreasureGoblinStrip =>
+      _cache[NightArtRegistry.mutTreasureGoblinStrip];
+  ui.Image? get sabuStrip => _cache[NightArtRegistry.charStrip('sabu')];
 
   ui.Image? floorOf(ChapterSpec chapter) => _cache[chapter.floorAsset];
-  ui.Image? mutantOf(MutantKind kind) => _cache[NightArtRegistry.mutantAsset(kind)];
+  ui.Image? mutantOf(MutantKind kind) =>
+      _cache[NightArtRegistry.mutantAsset(kind)];
   ui.Image? mutantAttackOf(MutantKind kind) =>
       _cache[NightArtRegistry.mutantAttackAsset(kind)];
-  ui.Image? launcherOf(LauncherType type) => _cache[NightArtRegistry.launcherAsset(type)];
-  ui.Image? stoneOf(StoneMaterial stone) => _cache[NightArtRegistry.stoneAsset(stone)];
-  ui.Image? beastOf(SpiritBeast beast) => _cache[NightArtRegistry.beastAsset(beast)];
+  ui.Image? mutantStripOf(MutantKind kind) =>
+      _cache[NightArtRegistry.mutantStripAsset(kind)];
 
-  /// 해당 장(Chapter) 전장에 필요한 모든 코덱스 스프라이트를 비동기로 미리 디코딩합니다.
+  ui.Image? launcherOf(LauncherType type) =>
+      _cache[NightArtRegistry.launcherAsset(type)];
+  ui.Image? stoneOf(StoneMaterial stone) =>
+      _cache[NightArtRegistry.stoneAsset(stone)];
+
+  ui.Image? beastOf(SpiritBeast beast) =>
+      _cache[NightArtRegistry.beastAsset(beast)];
+  ui.Image? beastStripOf(SpiritBeast beast) =>
+      _cache[NightArtRegistry.beastStripAsset(beast)];
+
+  ui.Image? heroIdleOf(CompanionHero hero) =>
+      _cache[NightArtRegistry.heroIdleAsset(hero)];
+  ui.Image? heroAttackOf(CompanionHero hero) =>
+      _cache[NightArtRegistry.heroAttackAsset(hero)];
+  ui.Image? heroStripOf(CompanionHero hero) =>
+      _cache[NightArtRegistry.heroStripAsset(hero)];
+
+  /// 해당 장(Chapter) 전장에 필요한 코덱스 지형 맵 · 4프레임 시트 스트립 · 발사대/이펙트를 비동기 디코딩합니다.
   Future<void> warmUpForChapter(
     ChapterSpec chapter, {
+    List<CompanionHero> activeHeroes = const <CompanionHero>[],
     VoidCallback? onSpritesUpdated,
   }) async {
     final corePaths = <String>[
       chapter.floorAsset,
       NightArtRegistry.towerGuardian,
+      NightArtRegistry.charStrip('sabu'),
       NightArtRegistry.villageGranary,
       NightArtRegistry.villageCrops,
       NightArtRegistry.villageLivestock,
@@ -341,6 +632,7 @@ class NightBattleSprites {
       NightArtRegistry.fxCloneGate,
       NightArtRegistry.fxFeverAura,
       NightArtRegistry.mutTreasureGoblin,
+      NightArtRegistry.mutTreasureGoblinStrip,
       NightArtRegistry.fxChuldu,
       NightArtRegistry.fxBarrier,
       NightArtRegistry.fxBreachGate,
@@ -354,9 +646,22 @@ class NightBattleSprites {
     final unitPaths = <String>[
       for (final lt in LauncherType.values) NightArtRegistry.launcherAsset(lt),
       for (final st in StoneMaterial.values) NightArtRegistry.stoneAsset(st),
-      for (final mk in MutantKind.values) NightArtRegistry.mutantAsset(mk),
-      for (final mk in MutantKind.values) NightArtRegistry.mutantAttackAsset(mk),
-      for (final sb in SpiritBeast.values) NightArtRegistry.beastAsset(sb),
+      for (final mk in MutantKind.values) ...[
+        NightArtRegistry.mutantStripAsset(mk),
+        NightArtRegistry.mutantAsset(mk),
+        NightArtRegistry.mutantAttackAsset(mk),
+      ],
+      for (final sb in SpiritBeast.values) ...[
+        NightArtRegistry.beastStripAsset(sb),
+        NightArtRegistry.beastAsset(sb),
+      ],
+      for (final ch in (activeHeroes.isEmpty
+          ? CompanionHero.values.take(4)
+          : activeHeroes)) ...[
+        NightArtRegistry.heroStripAsset(ch),
+        NightArtRegistry.heroIdleAsset(ch),
+        NightArtRegistry.heroAttackAsset(ch),
+      ],
     ];
 
     final coreResults = await Future.wait(corePaths.map(_decodeSingleAsset));

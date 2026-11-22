@@ -54,8 +54,9 @@ class _BattleScreenState extends State<BattleScreen>
   StoryLine? _liveStoryLine;
   double _liveStoryTimer = 0.0;
 
-  /// 광각 대협곡 전체 보기(기본) ↔ 1.4배 정밀 확대 보기 전환 상태!
+  /// 광각 대협곡 전체 보기(기본) ↔ 1.4배 정밀 확대 보기 전환 상태 & 비상 위험구역 2.8배 확대 영상 모니터 표시 상태!
   bool _zoomedView = false;
+  bool _showCrisisZoomPip = true;
   final TransformationController _zoomController = TransformationController();
 
   @override
@@ -69,6 +70,7 @@ class _BattleScreenState extends State<BattleScreen>
 
     NightBattleSprites.instance.warmUpForChapter(
       chapter,
+      activeHeroes: widget.controller.progress.activePreset.companions,
       onSpritesUpdated: () {
         if (mounted) {
           _frameNotifier.value++;
@@ -228,17 +230,17 @@ class _BattleScreenState extends State<BattleScreen>
   }
 
   double _computeAimAngleFromArenaPoint(Vec2 arenaPos, {required bool fromTower}) {
-    final tower = CampaignCatalog.centralTowerPos;
+    final tower = _sim.towerPos;
     final dx = arenaPos.x - tower.x;
     final dy = arenaPos.y - tower.y;
     if (dx.abs() < 3.0 && dy.abs() < 3.0) {
-      return -pi / 2;
+      return tower.y < 420.0 ? pi / 2 : -pi / 2;
     }
-    // 탑 아래쪽으로 당기면 새총 탄지처럼 반대 방향(위쪽)으로 조준, 위쪽 전장을 가리키면 가리킨 지점으로 조준!
-    if (fromTower && dy > 14.0) {
-      return DefenseBattleSim.sanitizeManualAimAngle(atan2(-dy, -dx));
+    // 하단 제단(y >= 820)에서 아래쪽으로 당기면 새총 탄지처럼 위쪽으로 조준, 중앙·상단 제단(4·6·7장)은 360° 전방위 직접 조준!
+    if (fromTower && dy > 14.0 && tower.y >= 820.0) {
+      return _sim.sanitizeAimAngleForChapter(atan2(-dy, -dx));
     }
-    return DefenseBattleSim.sanitizeManualAimAngle(atan2(dy, dx));
+    return _sim.sanitizeAimAngleForChapter(atan2(dy, dx));
   }
 
   /// ★ 멈춤 없는 실시간 전략 거점 반응 처리:
@@ -259,7 +261,7 @@ class _BattleScreenState extends State<BattleScreen>
     if (existing == null &&
         _sim.isSlotWaveUnlocked(slot.slotIndex) &&
         !_sim.isSlotExcavated(slot.slotIndex) &&
-        _sim.fieldTokens >= slot.excavationCost) {
+        _sim.fieldTokens >= _sim.excavationCostForSlot(slot)) {
       if (_sim.excavateSlotInBattle(slot.slotIndex)) {
         NightHaptics.instance.heavyImpact();
       }
@@ -301,10 +303,68 @@ class _BattleScreenState extends State<BattleScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // 승리/후퇴 시 영웅 전신 공격 원화 vs 대수괴 결전 배너
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SizedBox(
+                      height: 118,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.asset(
+                            summary.victory
+                                ? NightArtRegistry.cardGateBattle
+                                : NightArtRegistry.cardEndlessAbyss,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                const ColoredBox(color: NightPalette.bgPanel),
+                          ),
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0x38121B2E), Color(0xDC141E33)],
+                              ),
+                            ),
+                          ),
+                          Align(
+                            alignment: const Alignment(-0.82, 0.9),
+                            child: Image.asset(
+                              NightArtRegistry.heroAttackAsset(
+                                widget.controller.progress.activePreset.companions
+                                        .isNotEmpty
+                                    ? widget.controller.progress.activePreset
+                                        .companions.first
+                                    : CompanionHero.seokdu,
+                              ),
+                              height: 98,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, _, _) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                          Align(
+                            alignment: const Alignment(0.82, 0.85),
+                            child: NightSpriteIcon(
+                              assetPath: NightArtRegistry.showcaseBossChapter,
+                              fallbackIcon: Icons.whatshot_rounded,
+                              size: 74,
+                              borderRadius: 12,
+                              fit: BoxFit.cover,
+                              showFrame: true,
+                              frameColor: NightPalette.crimsonMoon,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   Text(
                     summary.victory
-                        ? '🌅 새벽 정화 승리! (${widget.stage.title})'
-                        : '🌑 방어선 붕괴 · 마을 후퇴',
+                        ? '새벽 정화 승리 (${widget.stage.title})'
+                        : '방어선 붕괴 · 마을 후퇴',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'BlackHanSans',
@@ -551,7 +611,7 @@ class _BattleScreenState extends State<BattleScreen>
                               Text(
                                 '재변이 돌파: ${_sim.bossPhaseBreakCount}단계',
                                 style: const TextStyle(
-                                  color: Color(0xFFC77DFF),
+                                  color: NightPalette.jadeGreen,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -995,28 +1055,40 @@ class _BattleScreenState extends State<BattleScreen>
                       ),
                       const SizedBox(height: 3),
 
-                      // ★ 다단 변이 보스(2단 두목 · 3페이즈 대수괴) 출현 시 실시간 페이즈·장갑판·약점 과녁 안내 바!
+                      // ★ 행동대장(100+타) · 중간보스(300+타) · 장 보스(1,000+타) 실시간 계급·다단페이즈·누적타수 안내 바!
                       Builder(
                         builder: (_) {
-                          final boss = _sim.activeMultiPhaseBoss;
+                          final boss = _sim.activeMultiPhaseBoss ??
+                              _sim.mutants
+                                  .where((m) => m.kind.isBoss || m.maxHitShield > 0)
+                                  .firstOrNull;
                           if (boss == null) return const SizedBox.shrink();
                           final pRatio = boss.currentMaxHp > 0
                               ? (boss.hp / boss.currentMaxHp).clamp(0.0, 1.0)
                               : 0.0;
+                          final hitRatio = boss.maxHitShield > 0
+                              ? (boss.hitShieldLeft / boss.maxHitShield)
+                                  .clamp(0.0, 1.0)
+                              : 0.0;
                           final remPhases =
                               (boss.totalPhases - boss.currentPhase + 1).clamp(1, 3);
-                          final gems =
-                              '${'◆' * remPhases}${'◇' * (boss.totalPhases - remPhases)}';
+                          final gems = boss.totalPhases > 1
+                              ? '${'◆' * remPhases}${'◇' * (boss.totalPhases - remPhases)} '
+                              : '';
+                          final hitSummary = boss.maxHitShield > 0
+                              ? '🔥${boss.totalHitsTaken}HIT · 🛡️남은 ${boss.hitShieldLeft}/${boss.maxHitShield}타'
+                              : '🔥누적 ${boss.totalHitsTaken}HIT';
                           final statusLabel = boss.phaseTransitionTimer > 0
-                              ? '⚡재변이 각성 중!'
+                              ? '⚡재변이 각성 중! · $hitSummary'
                               : (boss.carapacePlatesLeft > 0
-                                  ? '🛡️외각장갑 ${boss.carapacePlatesLeft}겹 · 🎯약점 터치 파쇄!'
+                                  ? '🛡️장갑${boss.carapacePlatesLeft}겹 🎯약점터치! · $hitSummary'
                                   : (boss.groggyExposeTimer > 0
-                                      ? '💥장갑붕괴 무방비(${boss.groggyExposeTimer.toStringAsFixed(1)}초 · ×1.85)'
-                                      : '⚔️정밀 타격 중'));
+                                      ? '💥무방비(×1.85) · $hitSummary'
+                                      : hitSummary));
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 3),
                             child: Container(
+                              key: const Key('battle_boss_hit_hud'),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
                                 vertical: 4,
@@ -1038,24 +1110,27 @@ class _BattleScreenState extends State<BattleScreen>
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          '👹 ${boss.displayName} [$gems ${boss.phaseTitleBadge}]',
+                                          '👹 [${boss.hierarchyRank}] ${boss.displayName} [$gems${boss.phaseTitleBadge}]',
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
-                                            fontSize: 11.2,
+                                            fontSize: 11.0,
                                             fontWeight: FontWeight.bold,
                                             color: NightPalette.accentGold,
                                           ),
                                         ),
                                       ),
                                       const SizedBox(width: 6),
-                                      Text(
-                                        statusLabel,
-                                        style: TextStyle(
-                                          fontSize: 10.6,
-                                          fontWeight: FontWeight.bold,
-                                          color: boss.groggyExposeTimer > 0
-                                              ? const Color(0xFF80ED99)
-                                              : const Color(0xFFFFD166),
+                                      Flexible(
+                                        child: Text(
+                                          statusLabel,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 10.4,
+                                            fontWeight: FontWeight.bold,
+                                            color: boss.groggyExposeTimer > 0
+                                                ? const Color(0xFF80ED99)
+                                                : const Color(0xFFFFD166),
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -1076,6 +1151,21 @@ class _BattleScreenState extends State<BattleScreen>
                                       ),
                                     ),
                                   ),
+                                  if (boss.maxHitShield > 0) ...[
+                                    const SizedBox(height: 2),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(3),
+                                      child: LinearProgressIndicator(
+                                        value: hitRatio,
+                                        minHeight: 3.5,
+                                        backgroundColor: Colors.white10,
+                                        valueColor:
+                                            const AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF48CAE4),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -1118,6 +1208,13 @@ class _BattleScreenState extends State<BattleScreen>
                             text: '내공 ${_sim.qiBars.toStringAsFixed(1)}/3칸',
                             color: NightPalette.jadeGreen,
                           ),
+                          _HudStatBadge(
+                            assetPath: chapter.floorAsset,
+                            fallbackIcon: Icons.route_rounded,
+                            text:
+                                '${chapter.routeTopologyTag} · ${chapter.chapterTraitTitle}',
+                            color: const Color(0xFF90E0EF),
+                          ),
                           if (_sim.activePerks.isNotEmpty)
                             _HudStatBadge(
                               assetPath: NightArtRegistry.iconRogueScroll,
@@ -1159,7 +1256,15 @@ class _BattleScreenState extends State<BattleScreen>
                   ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Color(0xD82E4060),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x18141F33),
+                          Color(0x2218253D),
+                          Color(0x2E121C2E),
+                        ],
+                      ),
                     ),
                   ),
                   Center(
@@ -1212,9 +1317,9 @@ class _BattleScreenState extends State<BattleScreen>
                                   return;
                                 }
 
-                                // 3) 맨 아래 중앙 기명 수호탑 터치 → 자동 발사 ↔ 수동 탄지 즉시 전환!
+                                // 3) 각 장의 실제 수호 제단(중앙 기명 수호탑) 터치 → 자동 발사 ↔ 수동 탄지 즉시 전환!
                                 if (tapPos.distanceTo(
-                                      CampaignCatalog.centralTowerPos,
+                                      _sim.towerPos,
                                     ) <=
                                     44.0) {
                                   _sim.toggleCentralManualMode();
@@ -1265,7 +1370,7 @@ class _BattleScreenState extends State<BattleScreen>
                                       _panStartArenaPos = null;
 
                                       final nearTower = startPos.distanceTo(
-                                            CampaignCatalog.centralTowerPos,
+                                            _sim.towerPos,
                                           ) <=
                                           68.0;
                                       if (!nearTower &&
@@ -1427,7 +1532,7 @@ class _BattleScreenState extends State<BattleScreen>
                     },
                   ),
 
-                  // 중간보스·우두머리 동반 침략 긴급 경보 배너
+                  // 중간보스·3페이즈 대수괴 각성 시 무정지(0.00초 멈춤) 영웅 대 보스 실전 컷인 배너
                   ValueListenableBuilder<int>(
                     valueListenable: _frameNotifier,
                     builder: (_, _, _) {
@@ -1437,37 +1542,44 @@ class _BattleScreenState extends State<BattleScreen>
                       }
                       final opacity =
                           (_sim.bossInvasionAlertTimer / 0.45).clamp(0.0, 1.0);
+                      final activeBoss = _sim.mutants
+                          .where((m) => m.kind.isBoss)
+                          .map((m) => m.kind)
+                          .firstOrNull;
+                      final leadHero = _sim.preset.companions.isNotEmpty
+                          ? _sim.preset.companions.first
+                          : CompanionHero.seokdu;
                       return Positioned(
-                        top: 10,
-                        left: 12,
-                        right: 12,
+                        top: 8,
+                        left: 10,
+                        right: 10,
                         child: IgnorePointer(
                           child: Opacity(
                             opacity: opacity,
                             child: Center(
                               child: Container(
                                 constraints:
-                                    const BoxConstraints(maxWidth: 460),
+                                    const BoxConstraints(maxWidth: 500),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 7,
+                                  horizontal: 10,
+                                  vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
                                     colors: [
-                                      Color(0xEE3A0812),
-                                      Color(0xEE5E0B1E),
-                                      Color(0xEE3A0812),
+                                      Color(0xEE18263E),
+                                      Color(0xEE4A161A),
+                                      Color(0xEE18263E),
                                     ],
                                   ),
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
                                     color: NightPalette.accentGold,
-                                    width: 1.5,
+                                    width: 1.6,
                                   ),
                                   boxShadow: const [
                                     BoxShadow(
-                                      color: Color(0x88E63946),
+                                      color: Color(0x66000000),
                                       blurRadius: 12,
                                     ),
                                   ],
@@ -1475,11 +1587,16 @@ class _BattleScreenState extends State<BattleScreen>
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const NightSpriteIcon(
-                                      assetPath: NightArtRegistry.fxBreachGate,
-                                      fallbackIcon: Icons.warning_amber_rounded,
-                                      size: 22,
-                                      borderRadius: 11,
+                                    NightSpriteIcon(
+                                      assetPath:
+                                          NightArtRegistry.heroAttackAsset(
+                                        leadHero,
+                                      ),
+                                      fallbackIcon: Icons.shield_rounded,
+                                      size: 40,
+                                      borderRadius: 10,
+                                      showFrame: true,
+                                      frameColor: NightPalette.accentGold,
                                     ),
                                     const SizedBox(width: 8),
                                     Flexible(
@@ -1489,11 +1606,28 @@ class _BattleScreenState extends State<BattleScreen>
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
-                                          fontSize: 12.5,
+                                          fontSize: 12.2,
                                           fontWeight: FontWeight.bold,
                                           color: NightPalette.accentGold,
                                         ),
                                       ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    NightSpriteIcon(
+                                      assetPath: NightArtRegistry
+                                          .mutantShowcaseAsset(
+                                        activeBoss ??
+                                            MutantKind.chapterOverlord,
+                                      ),
+                                      fallbackAssetPath:
+                                          NightArtRegistry.fxBreachGate,
+                                      fallbackIcon:
+                                          Icons.warning_amber_rounded,
+                                      size: 40,
+                                      borderRadius: 10,
+                                      fit: BoxFit.cover,
+                                      showFrame: true,
+                                      frameColor: NightPalette.crimsonMoon,
                                     ),
                                   ],
                                 ),
@@ -1606,6 +1740,261 @@ class _BattleScreenState extends State<BattleScreen>
                               ),
                             ],
                           ],
+                        ),
+                      );
+                    },
+                  ),
+
+                  // 🚨 위험 비상 알림 & 실시간 2.8배 공격 지점 확대 영상 모니터(PIP)
+                  ValueListenableBuilder<int>(
+                    valueListenable: _frameNotifier,
+                    builder: (_, _, _) {
+                      final crisis = _sim.activeCrisis;
+                      if (crisis == null ||
+                          _sim.isFinished ||
+                          _sim.pendingPerkChoices.isNotEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      final sirenPulse =
+                          0.5 + 0.5 * sin(_sim.elapsedSec * 10.0);
+                      final borderCol = Color.lerp(
+                        const Color(0xFFFF1E56),
+                        const Color(0xFFFFD166),
+                        sirenPulse,
+                      )!;
+                      return Positioned(
+                        top: 42,
+                        left: 10,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 214),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // 1) 비상 경보 사이렌 헤더 띠 (접기/펼치기 가능)
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  key: const Key('battle_crisis_alert_banner'),
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: () => setState(() {
+                                    _showCrisisZoomPip = !_showCrisisZoomPip;
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          const Color(0xEE590D22),
+                                          Color.lerp(
+                                            const Color(0xEE800F2F),
+                                            const Color(0xEEA4133C),
+                                            sirenPulse,
+                                          )!,
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: borderCol,
+                                        width: 1.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFFFF1E56)
+                                              .withValues(
+                                            alpha: 0.25 + sirenPulse * 0.30,
+                                          ),
+                                          blurRadius: 10,
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.crisis_alert_rounded,
+                                          size: 15,
+                                          color: borderCol,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Expanded(
+                                          child: Text(
+                                            crisis.headline,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 10.2,
+                                              height: 1.2,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Icon(
+                                          _showCrisisZoomPip
+                                              ? Icons.videocam_rounded
+                                              : Icons.videocam_off_rounded,
+                                          size: 14,
+                                          color: NightPalette.accentGold,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // 2) 실시간 2.8배 위험구역 공격 확대 영상 모니터 + 3D 모션 시트 + 원터치 정밀 타격!
+                              if (_showCrisisZoomPip) ...[
+                                const SizedBox(height: 5),
+                                GestureDetector(
+                                  key: const Key('battle_crisis_zoom_pip'),
+                                  onTap: () {
+                                    if (_sim.firePrecisionStrikeAt(
+                                      crisis.rawTargetPos,
+                                    )) {
+                                      NightHaptics.instance.heavyImpact();
+                                      _frameNotifier.value++;
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 196,
+                                    height: 132,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xF2080E1A),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: borderCol,
+                                        width: 1.8,
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x99000000),
+                                          blurRadius: 12,
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          // 실시간 전장 2.8배 확대 라이브 카메라 렌더링
+                                          CustomPaint(
+                                            size: Size.infinite,
+                                            painter: NightBattlePainter(
+                                              sim: _sim,
+                                              repaintTick: _frameNotifier,
+                                              zoomFocusPos: crisis.focusPos,
+                                              zoomScale: 2.8,
+                                            ),
+                                          ),
+                                          // 상단 LIVE 위치 표시 바
+                                          Positioned(
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 3,
+                                              ),
+                                              color: const Color(0xCC1A0610),
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    width: 7,
+                                                    height: 7,
+                                                    decoration: BoxDecoration(
+                                                      shape: BoxShape.circle,
+                                                      color: sirenPulse > 0.45
+                                                          ? const Color(
+                                                              0xFFFF1E56,
+                                                            )
+                                                          : const Color(
+                                                              0x55FF1E56,
+                                                            ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'LIVE 2.8× [${crisis.zoneName}]',
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 9.6,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: Color(
+                                                          0xFFFFD166,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          // 우하단 공격 변이 3D 애니메이션 루프 인셋
+                                          Positioned(
+                                            right: 4,
+                                            bottom: 22,
+                                            child: NightSpriteIcon(
+                                              assetPath: NightArtRegistry
+                                                  .mutantMotionAsset(
+                                                crisis.attackerKind,
+                                              ),
+                                              fallbackAssetPath:
+                                                  NightArtRegistry
+                                                      .mutantShowcaseAsset(
+                                                crisis.attackerKind,
+                                              ),
+                                              fallbackIcon:
+                                                  Icons.warning_rounded,
+                                              size: 36,
+                                              borderRadius: 8,
+                                              fit: BoxFit.cover,
+                                              showFrame: true,
+                                              frameColor: borderCol,
+                                            ),
+                                          ),
+                                          // 하단 타수·즉시 정밀타격 안내 띠
+                                          Positioned(
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 3,
+                                              ),
+                                              color: const Color(0xDD0B1324),
+                                              child: Text(
+                                                crisis.maxHitShield > 0
+                                                    ? '🎯터치 즉시타격 · 🛡️${crisis.hitShieldLeft}/${crisis.maxHitShield}타'
+                                                    : '🎯화면 터치 → 위험구역 즉시 정밀타격!',
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 9.2,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF80ED99),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -2465,7 +2854,7 @@ class _BattleScreenState extends State<BattleScreen>
                               key: const Key('quick_lucky_summon_btn'),
                               visualDensity: VisualDensity.compact,
                               backgroundColor: canQuickLucky
-                                  ? const Color(0xFF281D45)
+                                  ? const Color(0xFF1E3252)
                                   : NightPalette.bgDeep,
                               side: BorderSide(
                                 color: canQuickLucky
@@ -2940,22 +3329,29 @@ class _HudStatBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        NightSpriteIcon(
-          assetPath: assetPath,
-          fallbackIcon: fallbackIcon,
-          size: 15,
-          color: color,
-          borderRadius: 3,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(fontSize: 11.8, color: color),
-        ),
-      ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 240),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          NightSpriteIcon(
+            assetPath: assetPath,
+            fallbackIcon: fallbackIcon,
+            size: 15,
+            color: color,
+            borderRadius: 3,
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.4, color: color),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

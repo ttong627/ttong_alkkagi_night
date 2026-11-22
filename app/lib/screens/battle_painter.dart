@@ -15,6 +15,8 @@ class NightBattlePainter extends CustomPainter {
     required this.repaintTick,
     this.manualAimPreviewAngleRad,
     this.selectedSlotIndex,
+    this.zoomFocusPos,
+    this.zoomScale = 1.0,
     NightBattleSprites? sprites,
   })  : sprites = sprites ?? NightBattleSprites.instance,
         super(repaint: repaintTick);
@@ -23,18 +25,33 @@ class NightBattlePainter extends CustomPainter {
   final Listenable repaintTick;
   final double? manualAimPreviewAngleRad;
   final int? selectedSlotIndex;
+  final Vec2? zoomFocusPos;
+  final double zoomScale;
   final NightBattleSprites sprites;
+
+  bool get _isPipZoom => zoomFocusPos != null && zoomScale > 1.01;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final sx = size.width / CampaignCatalog.arenaWidth;
-    final sy = size.height / CampaignCatalog.arenaHeight;
     canvas.save();
-    canvas.scale(sx, sy);
+    if (_isPipZoom) {
+      final focus = zoomFocusPos!;
+      final aspect = size.height / max(1.0, size.width);
+      final viewW = (CampaignCatalog.arenaWidth / zoomScale).clamp(160.0, CampaignCatalog.arenaWidth);
+      final viewH = (viewW * aspect).clamp(120.0, CampaignCatalog.arenaHeight);
+      final left = (focus.x - viewW * 0.5).clamp(0.0, CampaignCatalog.arenaWidth - viewW);
+      final top = (focus.y - viewH * 0.5).clamp(0.0, CampaignCatalog.arenaHeight - viewH);
+      canvas.scale(size.width / viewW, size.height / viewH);
+      canvas.translate(-left, -top);
+    } else {
+      final sx = size.width / CampaignCatalog.arenaWidth;
+      final sy = size.height / CampaignCatalog.arenaHeight;
+      canvas.scale(sx, sy);
+    }
 
     // 우두머리 등장·파성 강타·중포 포격 시 전장 진동 연출
     if (sim.screenShakeTimer > 0) {
-      final amp = (sim.screenShakeIntensity * 1.15).clamp(0.0, 6.8);
+      final amp = (sim.screenShakeIntensity * (_isPipZoom ? 0.55 : 1.15)).clamp(0.0, 6.8);
       final dx = sin(sim.elapsedSec * 58.0) * amp;
       final dy = cos(sim.elapsedSec * 47.0) * amp * 0.75;
       canvas.translate(dx, dy);
@@ -45,25 +62,35 @@ class NightBattlePainter extends CustomPainter {
     _drawInvasionLanes(canvas);
     _drawRotatingPillars(canvas);
     _drawFieldPinballGimmicks(canvas);
-    _drawSynergyAndRangeRings(canvas);
+    if (!_isPipZoom) {
+      _drawSynergyAndRangeRings(canvas);
+    }
     _drawVillageEcosystem(canvas);
     _drawOuterQiShield(canvas);
-    _drawManualAimRay(canvas);
+    if (!_isPipZoom) {
+      _drawManualAimRay(canvas);
+    }
     _drawCentralGuardianTower(canvas);
     _drawPathLaunchers(canvas);
     _drawMuzzleFlashes(canvas);
     _drawGoldenToad(canvas);
     _drawDeathRagdollsAndShards(canvas);
+    _drawCrisisTargetBeacon(canvas);
     _drawMutants(canvas);
     _drawProjectilesAndTrails(canvas);
     _drawLightningAndFlyingQiOrbs(canvas);
     _drawFxBursts(canvas);
+    _drawShockwaveRingsAndCritImpacts(canvas);
     _drawChulduSweepWave(canvas);
     _drawDawnPurifyWave(canvas);
-    _drawDangerTensionPulse(canvas);
-    _drawFeverFrameAura(canvas);
+    if (!_isPipZoom) {
+      _drawDangerTensionPulse(canvas);
+      _drawFeverFrameAura(canvas);
+    }
     _drawDamagePopups(canvas);
-    _drawFloatingCallouts(canvas);
+    if (!_isPipZoom) {
+      _drawFloatingCallouts(canvas);
+    }
 
     canvas.restore();
   }
@@ -110,6 +137,50 @@ class NightBattlePainter extends CustomPainter {
     canvas.restore();
   }
 
+  /// 코덱스 4프레임 알파 투명 스트립(`1024x256`)에서 지정 프레임(`0..3`)을 중심 기준으로 렌더링.
+  void _drawStripFrameCentered(
+    Canvas canvas,
+    ui.Image stripImage,
+    int frameIndex,
+    Offset center, {
+    required double width,
+    required double height,
+    int totalFrames = 4,
+    double rotationRad = 0.0,
+    double opacity = 1.0,
+    Color? tintColor,
+    BlendMode tintBlendMode = BlendMode.srcATop,
+  }) {
+    final alpha = opacity.clamp(0.0, 1.0);
+    if (alpha <= 0.01) return;
+
+    final safeIdx = ((frameIndex % totalFrames) + totalFrames) % totalFrames;
+    final cellW = stripImage.width.toDouble() / totalFrames;
+    final cellH = stripImage.height.toDouble();
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    if (rotationRad != 0.0) {
+      canvas.rotate(rotationRad);
+    }
+
+    final paint = Paint()..filterQuality = FilterQuality.low;
+    if (tintColor != null) {
+      paint.colorFilter = ColorFilter.mode(tintColor, tintBlendMode);
+    } else if (alpha < 0.999) {
+      paint.color = Color.fromRGBO(255, 255, 255, alpha);
+    }
+
+    final src = Rect.fromLTWH(safeIdx * cellW, 0, cellW, cellH);
+    final dst = Rect.fromCenter(
+      center: Offset.zero,
+      width: width,
+      height: height,
+    );
+    canvas.drawImageRect(stripImage, src, dst, paint);
+    canvas.restore();
+  }
+
   void _drawFloorAndNightAtmosphere(Canvas canvas) {
     const arenaRect = Rect.fromLTWH(
       0,
@@ -118,7 +189,8 @@ class NightBattlePainter extends CustomPainter {
       CampaignCatalog.arenaHeight,
     );
 
-    // 장별 심야 바닥 텍스처 (floor_night_ch1~10.webp) 은은하게 합성
+    // 1) 코덱스 3D 탑다운 전장 맵 원화(floor_night_ch1~10.webp)를 100% 무손실 선명도로 풀렌더링!
+    canvas.drawRect(arenaRect, Paint()..color = const Color(0xFF1E2D46));
     final floorImg = sprites.floorOf(sim.chapter);
     if (floorImg != null) {
       final src = Rect.fromLTWH(
@@ -131,153 +203,95 @@ class NightBattlePainter extends CustomPainter {
         floorImg,
         src,
         arenaRect,
-        Paint()
-          ..filterQuality = FilterQuality.low
-          ..color = const Color.fromRGBO(255, 255, 255, 0.48),
+        Paint()..filterQuality = FilterQuality.medium,
       );
     }
 
-    // 위쪽 심야 침공 산악 협곡(은은한 달빛 청람 석판) → 아래쪽 마을 본진 깊이감 그라데이션
-    canvas.drawRect(arenaRect, Paint()..color = const Color(0xFF334463));
-    if (floorImg != null) {
-      final src = Rect.fromLTWH(
-        0,
-        0,
-        floorImg.width.toDouble(),
-        floorImg.height.toDouble(),
-      );
-      canvas.drawImageRect(
-        floorImg,
-        src,
-        arenaRect,
-        Paint()
-          ..filterQuality = FilterQuality.low
-          ..color = const Color.fromRGBO(255, 255, 255, 0.36),
-      );
-    }
-    final skyPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        stops: [0.0, 0.62, 1.0],
-        colors: [
-          Color(0x522D3D5B),
-          Color(0x363A4E73),
-          Color(0x522E3E5C),
-        ],
-      ).createShader(arenaRect);
-    canvas.drawRect(arenaRect, skyPaint);
-
-    // 북쪽 상단 적월(붉은 달) 침공 광원 (720×1360 천리협곡 상공)
+    // 북쪽 상단 적월(붉은 달) 침공 광원
     final moonGlow = Paint()
-      ..color = const Color(0x38E63946)
+      ..color = const Color(0x28E63946)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
-    canvas.drawCircle(const Offset(632, 52), 36, moonGlow);
-    canvas.drawCircle(
-      const Offset(632, 52),
-      17,
-      Paint()..color = const Color(0xCCFF6B6B),
-    );
+    canvas.drawCircle(const Offset(360, 38), 32, moonGlow);
 
-    // 남단 마을 본진 따뜻한 횃불 바닥 온기
+    // 각 장의 실제 원형 수호 제단(sim.towerPos) 따뜻한 등불 광원
+    final altarCenter = Offset(sim.towerPos.x, sim.towerPos.y);
     final villageWarmth = Paint()
-      ..shader = RadialGradient(
+      ..shader = const RadialGradient(
         colors: [
-          const Color(0x38FFD166),
-          const Color(0x1872EFDD),
-          const Color(0x00000000),
+          Color(0x28FFD166),
+          Color(0x1272EFDD),
+          Color(0x00000000),
         ],
       ).createShader(
-        Rect.fromCircle(
-          center: Offset(
-            CampaignCatalog.villageCenter.x,
-            CampaignCatalog.villageCenter.y + 8,
-          ),
-          radius: 178,
-        ),
+        Rect.fromCircle(center: altarCenter, radius: 138),
       );
-    canvas.drawCircle(
-      Offset(
-        CampaignCatalog.villageCenter.x,
-        CampaignCatalog.villageCenter.y + 8,
-      ),
-      178,
-      villageWarmth,
-    );
+    canvas.drawCircle(altarCenter, 138, villageWarmth);
   }
 
   void _drawCliffZones(Canvas canvas) {
+    // 코덱스 맵 외곽 벼랑·해자 위에는 가짜 빈 초소처럼 오인될 수 있는 하늘색 원 테두리를 그리지 않고 은은한 심연 그림자만 드리운다!
     for (final cliff in sim.chapter.cliffs) {
       final c = Offset(cliff.center.x, cliff.center.y);
       final swirlPaint = Paint()
         ..shader = const RadialGradient(
-          colors: [Color(0xDD03050A), Color(0x88240046), Color(0x00000000)],
+          colors: [Color(0x55060B16), Color(0x220E1B30), Color(0x00000000)],
         ).createShader(Rect.fromCircle(center: c, radius: cliff.radius));
       canvas.drawCircle(c, cliff.radius, swirlPaint);
-
-      final ringPaint = Paint()
-        ..color = const Color(0x779D4EDD)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.9;
-      canvas.drawCircle(c, cliff.radius * 0.72, ringPaint);
     }
   }
 
   void _drawInvasionLanes(Canvas canvas) {
-    final borderShadow = Paint()
-      ..color = const Color(0x9C080D18)
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 22.0;
-    final outerRoad = Paint()
-      ..color = const Color(0x9224314A)
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 17.5;
-    final innerRoad = Paint()
-      ..color = const Color(0x8855688A)
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 10.0;
+    // 1단계: 불투명 파이프를 100% 제거하고, 각 장의 고유 다중 침공로(smoothedVisualGuides)마다 은은한 기맥 유도선과 진행 화살표만 표시!
+    final guideLanes = sim.chapter.smoothedVisualGuides;
+    final avgEnergy = sim.lanePortalEnergy.isEmpty
+        ? 0.38
+        : (sim.lanePortalEnergy.fold<double>(0.0, (a, b) => a + b) /
+                sim.lanePortalEnergy.length)
+            .clamp(0.0, 1.0);
+    final arrowAlpha = (0.22 + avgEnergy * 0.36).clamp(0.18, 0.58);
 
-    // 1단계: 모든 곡선 산길 바닥을 먼저 연결감 있게 렌더링
-    for (int laneIdx = 0; laneIdx < sim.chapter.lanes.length; laneIdx++) {
-      final smoothPts = sim.chapter.smoothedLane(laneIdx);
-      if (smoothPts.length < 2) continue;
+    for (int gIdx = 0; gIdx < guideLanes.length; gIdx++) {
+      final spinePts = guideLanes[gIdx];
+      if (spinePts.length < 2) continue;
 
-      final path = Path()..moveTo(smoothPts.first.x, smoothPts.first.y);
-      for (int i = 1; i < smoothPts.length; i++) {
-        path.lineTo(smoothPts[i].x, smoothPts[i].y);
+      final glowColor = gIdx == 0
+          ? const Color(0x22F4CC6A)
+          : (gIdx == 1 ? const Color(0x2072EFDD) : const Color(0x20FF758F));
+      final coreColor = gIdx == 0
+          ? const Color(0x36FFE599)
+          : (gIdx == 1 ? const Color(0x3490E0EF) : const Color(0x34FFB3C1));
+
+      final subtleGlow = Paint()
+        ..color = glowColor
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 4.6;
+      final subtleCore = Paint()
+        ..color = coreColor
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = 1.5;
+
+      final path = Path()..moveTo(spinePts.first.x, spinePts.first.y);
+      for (int i = 1; i < spinePts.length; i++) {
+        path.lineTo(spinePts[i].x, spinePts[i].y);
       }
-      canvas.drawPath(path, borderShadow);
-      canvas.drawPath(path, outerRoad);
-      canvas.drawPath(path, innerRoad);
-    }
+      canvas.drawPath(path, subtleGlow);
+      canvas.drawPath(path, subtleCore);
 
-    // 2단계: 곡선 산길 위를 흐르는 침공 방향 화살표 & 최상단 독기 균열문(위→아래 침공 명시)
-    for (int laneIdx = 0; laneIdx < sim.chapter.lanes.length; laneIdx++) {
-      final smoothPts = sim.chapter.smoothedLane(laneIdx);
-      if (smoothPts.length < 4) continue;
-
-      final energy = laneIdx < sim.lanePortalEnergy.length
-          ? sim.lanePortalEnergy[laneIdx].clamp(0.0, 1.0)
-          : 0.35;
-
-      final arrowAlpha = (0.18 + energy * 0.34).clamp(0.14, 0.54);
       final arrowPaint = Paint()
         ..color = const Color(0xFFFF5C77).withValues(alpha: arrowAlpha)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
-        ..strokeWidth = 1.9;
+        ..strokeWidth = 2.0;
 
-      const stride = 9;
-      final phaseOffset = ((sim.elapsedSec * 7.5) % stride).floor();
-      for (int idx = 3 + phaseOffset; idx < smoothPts.length - 6; idx += stride) {
-        final prev = smoothPts[idx - 1];
-        final tip = smoothPts[idx + 1];
+      const stride = 7;
+      final phaseOffset = ((sim.elapsedSec * 6.5 + gIdx * 2) % stride).floor();
+      for (int idx = 2 + phaseOffset; idx < spinePts.length - 3; idx += stride) {
+        final prev = spinePts[idx - 1];
+        final tip = spinePts[idx + 1];
         final seg = tip - prev;
         if (seg.length < 1.0) continue;
         final dir = seg.normalized;
@@ -290,29 +304,42 @@ class NightBattlePainter extends CustomPainter {
           ..lineTo(rightWing.x, rightWing.y);
         canvas.drawPath(chev, arrowPaint);
       }
+    }
 
-      // 북쪽 최상단 침공 입구: 심야 독기 침공 균열문(fx_breach_gate.webp)
+    // 2단계: 각 장의 실제 침공 관문(북문·측면 X자 성문·남쪽 빙하/사막 성문·해적 현측 도교) 정위치에 독기 균열문 표시!
+    final drawnGates = <Offset>[];
+    for (int laneIdx = 0; laneIdx < sim.chapter.lanes.length; laneIdx++) {
+      final smoothPts = sim.chapter.smoothedLane(laneIdx);
+      if (smoothPts.isEmpty) continue;
       final gateCenter = Offset(
-        smoothPts.first.x.clamp(26.0, CampaignCatalog.arenaWidth - 26.0),
-        smoothPts.first.y.clamp(22.0, 68.0),
+        smoothPts.first.x.clamp(28.0, CampaignCatalog.arenaWidth - 28.0),
+        smoothPts.first.y.clamp(28.0, CampaignCatalog.arenaHeight - 28.0),
       );
+      if (drawnGates.any((g) => (g - gateCenter).distance < 44.0)) {
+        continue;
+      }
+      drawnGates.add(gateCenter);
+
+      final energy = laneIdx < sim.lanePortalEnergy.length
+          ? sim.lanePortalEnergy[laneIdx].clamp(0.0, 1.0)
+          : 0.35;
       final gateRadius =
-          19.5 + energy * 8.5 + sin(sim.elapsedSec * 4.2 + laneIdx) * 1.8;
+          18.5 + energy * 7.5 + sin(sim.elapsedSec * 4.2 + laneIdx) * 1.6;
 
       canvas.drawCircle(
         gateCenter,
-        gateRadius * 1.15,
+        gateRadius * 1.12,
         Paint()
           ..shader = RadialGradient(
             colors: [
-              const Color(0xCC9D4EDD)
-                  .withValues(alpha: (0.28 + energy * 0.42).clamp(0.0, 0.82)),
-              const Color(0x88E63946)
-                  .withValues(alpha: (0.18 + energy * 0.30).clamp(0.0, 0.60)),
+              const Color(0xCCE05248)
+                  .withValues(alpha: (0.26 + energy * 0.40).clamp(0.0, 0.80)),
+              const Color(0x88F4CC6A)
+                  .withValues(alpha: (0.16 + energy * 0.28).clamp(0.0, 0.56)),
               const Color(0x00000000),
             ],
           ).createShader(
-            Rect.fromCircle(center: gateCenter, radius: gateRadius * 1.15),
+            Rect.fromCircle(center: gateCenter, radius: gateRadius * 1.12),
           ),
       );
 
@@ -322,19 +349,19 @@ class NightBattlePainter extends CustomPainter {
           canvas,
           gateImg,
           gateCenter,
-          width: gateRadius * 2.25,
-          height: gateRadius * 2.25,
+          width: gateRadius * 2.15,
+          height: gateRadius * 2.15,
           rotationRad: sim.elapsedSec *
               (0.85 + energy * 0.9) *
               (laneIdx.isEven ? 1.0 : -1.0),
-          opacity: (0.65 + energy * 0.35).clamp(0.0, 1.0),
+          opacity: (0.62 + energy * 0.35).clamp(0.0, 1.0),
         );
       } else {
         canvas.drawCircle(
           gateCenter,
           gateRadius * 0.72,
           Paint()
-            ..color = const Color(0xFFC77DFF).withValues(alpha: 0.65)
+            ..color = const Color(0xFFE05248).withValues(alpha: 0.65)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2.4,
         );
@@ -379,128 +406,63 @@ class NightBattlePainter extends CustomPainter {
   }
 
   void _drawVillageEcosystem(Canvas canvas) {
-    // 남단 맨 아래 중앙 마을 본진 (720×1360 천리협곡 남단 수호 거점!)
-    // 1) 좌하단: 식량 창고 (village_granary.webp)
-    final granaryOk = sim.granaryHealth > 0.5;
-    const gPos = Offset(164, 1290);
-    final granaryImg = sprites.granary;
-    if (granaryImg != null) {
+    // 각 장 코덱스 맵 원화에 직접 그려진 식량창고·황금논밭·외양간 건물 위에 결계 상태 고리와 내구도 배지만 깔끔하게 표시!
+    void drawLandmarkStatus({
+      required Vec2 anchor,
+      required String title,
+      required double health,
+      required Color okColor,
+    }) {
+      final ok = health > 0.5;
+      final c = Offset(anchor.x, anchor.y);
+      final ringCol = ok ? okColor : NightPalette.crimsonMoon;
       canvas.drawCircle(
-        gPos,
-        28,
+        c,
+        30,
         Paint()
-          ..color = granaryOk
-              ? const Color(0x33FFD166)
-              : const Color(0x55E63946),
+          ..color = ringCol.withValues(alpha: ok ? 0.24 : 0.48)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = ok ? 1.8 : 2.6,
       );
-      _drawSpriteCentered(
-        canvas,
-        granaryImg,
-        gPos,
-        width: 60,
-        height: 54,
-        tintColor: granaryOk ? null : const Color(0x55E63946),
-      );
-    } else {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: gPos, width: 64, height: 38),
-          const Radius.circular(6),
-        ),
-        Paint()
-          ..color = granaryOk ? const Color(0xDD5C4033) : const Color(0xDD4A1C1C),
-      );
-    }
-    _paintMiniText(
-      canvas,
-      '식량 ${(sim.granaryHealth * 100).round()}%',
-      gPos + const Offset(0, 31),
-      granaryOk ? NightPalette.accentGold : NightPalette.crimsonMoon,
-      11.8,
-    );
-
-    // 2) 정중앙 최하단: 논밭 농산물 (village_crops.webp)
-    final cropsOk = sim.cropsHealth > 0.5;
-    const cPos = Offset(360, 1304);
-    final cropsImg = sprites.crops;
-    if (cropsImg != null) {
-      final swayRad = sin(sim.elapsedSec * 2.4) * 0.035;
-      _drawSpriteCentered(
-        canvas,
-        cropsImg,
-        cPos + const Offset(0, -2),
-        width: 72,
-        height: 46,
-        rotationRad: swayRad,
-        tintColor: cropsOk ? null : const Color(0x559D4EDD),
-      );
-    } else {
-      for (int i = -3; i <= 3; i++) {
-        final sway = sin(sim.elapsedSec * 3.0 + i) * 2.5;
-        final stalkX = cPos.dx + i * 11.5;
-        canvas.drawLine(
-          Offset(stalkX, cPos.dy + 8),
-          Offset(stalkX + sway, cPos.dy - 8 * (0.4 + 0.6 * sim.cropsHealth)),
-          Paint()
-            ..color = cropsOk ? const Color(0xFF80ED99) : const Color(0xFF9D4EDD)
-            ..strokeWidth = 2.8
-            ..strokeCap = StrokeCap.round,
+      if (!ok) {
+        canvas.drawCircle(
+          c,
+          28,
+          Paint()..color = const Color(0x38E63946),
         );
       }
-    }
-    _paintMiniText(
-      canvas,
-      '논밭 ${(sim.cropsHealth * 100).round()}%',
-      cPos + const Offset(0, 24),
-      cropsOk ? const Color(0xFF80ED99) : const Color(0xFFC77DFF),
-      11.8,
-    );
-
-    // 3) 우하단: 외양간 가축 (village_livestock.webp)
-    final liveOk = sim.livestockHealth > 0.5;
-    const lPos = Offset(556, 1290);
-    final livestockImg = sprites.livestock;
-    if (livestockImg != null) {
-      canvas.drawCircle(
-        lPos,
-        28,
-        Paint()
-          ..color = liveOk
-              ? const Color(0x3372EFDD)
-              : const Color(0x55E63946),
-      );
-      _drawSpriteCentered(
+      _paintMiniText(
         canvas,
-        livestockImg,
-        lPos,
-        width: 60,
-        height: 54,
-        tintColor: liveOk ? null : const Color(0x55E63946),
-      );
-    } else {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: lPos, width: 64, height: 38),
-          const Radius.circular(6),
-        ),
-        Paint()
-          ..color = liveOk ? const Color(0xDD3D5A45) : const Color(0xDD4A1C2A),
+        '$title ${(health * 100).round()}%',
+        c + const Offset(0, 34),
+        ringCol,
+        11.2,
+        withBg: true,
       );
     }
-    _paintMiniText(
-      canvas,
-      '가축 ${(sim.livestockHealth * 100).round()}%',
-      lPos + const Offset(0, 31),
-      liveOk ? NightPalette.jadeGreen : NightPalette.crimsonMoon,
-      11.8,
+
+    drawLandmarkStatus(
+      anchor: sim.chapter.granaryPos,
+      title: '🌾식량',
+      health: sim.granaryHealth,
+      okColor: NightPalette.accentGold,
+    );
+    drawLandmarkStatus(
+      anchor: sim.chapter.cropsPos,
+      title: '🌱논밭',
+      health: sim.cropsHealth,
+      okColor: const Color(0xFF80ED99),
+    );
+    drawLandmarkStatus(
+      anchor: sim.chapter.livestockPos,
+      title: '🐄가축',
+      health: sim.livestockHealth,
+      okColor: NightPalette.jadeGreen,
     );
   }
 
   void _drawOuterQiShield(Canvas canvas) {
-    final center = Offset(
-      CampaignCatalog.villageCenter.x,
-      CampaignCatalog.villageCenter.y,
-    );
+    final center = Offset(sim.shieldCenter.x, sim.shieldCenter.y);
     if (sim.shieldHp <= 0) {
       canvas.drawCircle(
         center,
@@ -627,10 +589,7 @@ class NightBattlePainter extends CustomPainter {
   }
 
   void _drawCentralGuardianTower(Canvas canvas) {
-    final center = Offset(
-      CampaignCatalog.centralTowerPos.x,
-      CampaignCatalog.centralTowerPos.y,
-    );
+    final center = Offset(sim.towerPos.x, sim.towerPos.y);
     const r = CampaignCatalog.centralTowerRadius;
 
     // 수동 탄지 모드일 때 장전 완료 맥동 고리 표시
@@ -722,23 +681,20 @@ class NightBattlePainter extends CustomPainter {
 
     final towerImg = sprites.towerGuardian;
     if (towerImg != null) {
+      canvas.drawCircle(
+        center,
+        30.0 + sin(sim.elapsedSec * 4.2) * 2.5,
+        Paint()
+          ..color = const Color(0x38FFD166)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+      );
       _drawSpriteCentered(
         canvas,
         towerImg,
-        center + const Offset(0, -2) + recoilOffset,
-        width: 58,
-        height: 58,
+        center + const Offset(0, -4) + recoilOffset,
+        width: 68,
+        height: 68,
       );
-      final coreStoneImg = sprites.stoneOf(sim.preset.primaryStone);
-      if (coreStoneImg != null) {
-        _drawSpriteCentered(
-          canvas,
-          coreStoneImg,
-          center + const Offset(0, 7) + recoilOffset,
-          width: 17,
-          height: 17,
-        );
-      }
     } else {
       canvas.drawCircle(center, r, Paint()..color = const Color(0xFF1B263B));
       canvas.drawCircle(
@@ -756,18 +712,96 @@ class NightBattlePainter extends CustomPainter {
       );
     }
 
-    // 동행 수호 영수(pet_*.webp) 호위 연출
+    // 동행 수호 영수 & 사부 기명 & 출전 무협 영웅단(최대 3인) 코덱스 4프레임 연속 3D 모션 렌더링!
+    final isFiringBurst = sim.centralRecoilAnim > 0.15 || sim.feverTimer > 0;
+    final beastStrip = sprites.beastStripOf(sim.preset.equippedBeast);
     final beastImg = sprites.beastOf(sim.preset.equippedBeast);
-    if (beastImg != null &&
+    if ((beastStrip != null || beastImg != null) &&
         (sim.progress.beastLevels[sim.preset.equippedBeast] ?? 0) > 0) {
-      final hoverY = sin(sim.elapsedSec * 3.2) * 2.8;
-      _drawSpriteCentered(
+      final hoverY = sin(sim.elapsedSec * 3.4) * 3.2;
+      final bFrame = isFiringBurst
+          ? (sim.centralRecoilAnim > 0.45 ? 2 : 3)
+          : ((sim.elapsedSec * 5.0).floor() % 2);
+      if (beastStrip != null) {
+        _drawStripFrameCentered(
+          canvas,
+          beastStrip,
+          bFrame,
+          center + Offset(-50, -24 + hoverY),
+          width: 44,
+          height: 44,
+        );
+      } else if (beastImg != null) {
+        _drawSpriteCentered(
+          canvas,
+          beastImg,
+          center + Offset(-50, -24 + hoverY),
+          width: 38,
+          height: 38,
+        );
+      }
+    }
+
+    // 중앙 수호탑 바로 옆 지휘 단상의 사부 기명 4프레임 탄지 신공 액션!
+    final sabuStrip = sprites.sabuStrip;
+    if (sabuStrip != null) {
+      final sabuFrame = sim.centralRecoilAnim > 0.42
+          ? 2
+          : (sim.centralRecoilAnim > 0.12
+              ? 3
+              : ((sim.elapsedSec * 3.8).floor() % 2));
+      final sabuBob = sin(sim.elapsedSec * 3.2) * 1.8 -
+          (sim.centralRecoilAnim > 0.12 ? 3.2 : 0.0);
+      _drawStripFrameCentered(
         canvas,
-        beastImg,
-        center + Offset(-42, -10 + hoverY),
-        width: 29,
-        height: 29,
+        sabuStrip,
+        sabuFrame,
+        center + Offset(0, -34 + sabuBob),
+        width: 48,
+        height: 48,
       );
+    }
+
+    final heroOffsets = const <Offset>[
+      Offset(-82, 4),
+      Offset(82, 4),
+      Offset(50, -24),
+    ];
+    for (int hi = 0;
+        hi < sim.preset.companions.length && hi < heroOffsets.length;
+        hi++) {
+      final hero = sim.preset.companions[hi];
+      final hStrip = sprites.heroStripOf(hero);
+      final bobY = sin(sim.elapsedSec * 4.0 + hi * 1.4) * 2.4 -
+          (isFiringBurst ? 3.8 : 0.0);
+      if (hStrip != null) {
+        final cycleIdx =
+            ((sim.elapsedSec * 4.8 + hi * 1.3).floor()) % 4;
+        final hFrame = isFiringBurst
+            ? (cycleIdx.isEven ? 2 : 3)
+            : (cycleIdx % 2);
+        _drawStripFrameCentered(
+          canvas,
+          hStrip,
+          hFrame,
+          center + heroOffsets[hi] + Offset(0, bobY),
+          width: 56,
+          height: 56,
+        );
+      } else {
+        final heroImg = isFiringBurst
+            ? (sprites.heroAttackOf(hero) ?? sprites.heroIdleOf(hero))
+            : (sprites.heroIdleOf(hero) ?? sprites.heroAttackOf(hero));
+        if (heroImg != null) {
+          _drawSpriteCentered(
+            canvas,
+            heroImg,
+            center + heroOffsets[hi] + Offset(0, bobY),
+            width: 50,
+            height: 54,
+          );
+        }
+      }
     }
 
     // 중앙 탑 바로 아래 직관적인 자동/수동 상태 알약 배지
@@ -965,10 +999,7 @@ class NightBattlePainter extends CustomPainter {
 
   /// 초소 간 진법 시너지 광선 연결 & 각 초소·중앙탑의 실제 제한된 전술 사거리 원 표시!
   void _drawSynergyAndRangeRings(Canvas canvas) {
-    final tc = Offset(
-      CampaignCatalog.centralTowerPos.x,
-      CampaignCatalog.centralTowerPos.y,
-    );
+    final tc = Offset(sim.towerPos.x, sim.towerPos.y);
     if (!sim.centralManualMode) {
       final autoR = sim.effectiveCentralAutoRange;
       canvas.drawCircle(
@@ -981,20 +1012,31 @@ class NightBattlePainter extends CustomPainter {
       );
     } else {
       final manualR = sim.effectiveCentralManualRange;
-      canvas.drawArc(
-        Rect.fromCircle(center: tc, radius: manualR),
-        pi * 1.04,
-        pi * 0.92,
-        false,
-        Paint()
-          ..color = NightPalette.accentGold.withValues(alpha: 0.34)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6,
-      );
+      if (sim.towerPos.y < 820.0) {
+        canvas.drawCircle(
+          tc,
+          manualR,
+          Paint()
+            ..color = NightPalette.accentGold.withValues(alpha: 0.34)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.6,
+        );
+      } else {
+        canvas.drawArc(
+          Rect.fromCircle(center: tc, radius: manualR),
+          pi * 1.04,
+          pi * 0.92,
+          false,
+          Paint()
+            ..color = NightPalette.accentGold.withValues(alpha: 0.34)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.6,
+        );
+      }
       _paintMiniText(
         canvas,
-        '🎯수동 유효 사거리 한계',
-        tc + Offset(0, -manualR - 8),
+        sim.towerPos.y < 820.0 ? '🎯360° 수동 유효 사거리' : '🎯수동 유효 사거리 한계',
+        tc + Offset(0, sim.towerPos.y < 420.0 ? manualR + 10 : -manualR - 8),
         NightPalette.accentGold,
         9.0,
         withBg: true,
@@ -1096,22 +1138,18 @@ class NightBattlePainter extends CustomPainter {
     required bool isBuilt,
   }) {
     final tCol = isLocked
-        ? const Color(0xFF6C757D)
+        ? const Color(0xFF8D99AE)
         : Color(terrain.colorHex);
-    final fillCol = isLocked ? const Color(0xAA0A0F1A) : const Color(0xDD10192B);
+    // 코덱스 원화에 그려진 실제 원형 석조 포대 좌대가 그대로 비쳐 보이도록 반투명 음각 진법 고리로 일체감 있게 렌더링!
+    final fillCol = isLocked ? const Color(0x520A0F1A) : const Color(0x6210192B);
 
     switch (terrain) {
       case MountTerrainType.highWatchtower:
-        // 🏔️ 고지 망루: 2단 석조 절벽 단상 + 4귀퉁이 봉화 기둥
-        canvas.drawCircle(
-          c + const Offset(0, 3),
-          25.0,
-          Paint()..color = const Color(0x66050811),
-        );
+        // 🏔️ 고지 망루: 원형 석조 좌대에 꼭 맞는 팔각 각인 테두리 + 4귀퉁이 봉화 점
         final outerOct = Path();
         for (int k = 0; k < 8; k++) {
           final a = (pi / 8) + k * (pi / 4);
-          final p = c + Offset(cos(a) * 23.5, sin(a) * 23.5);
+          final p = c + Offset(cos(a) * 20.5, sin(a) * 20.5);
           if (k == 0) {
             outerOct.moveTo(p.dx, p.dy);
           } else {
@@ -1119,44 +1157,40 @@ class NightBattlePainter extends CustomPainter {
           }
         }
         outerOct.close();
-        canvas.drawPath(outerOct, Paint()..color = const Color(0xCC241C12));
+        canvas.drawPath(outerOct, Paint()..color = fillCol);
         canvas.drawPath(
           outerOct,
           Paint()
-            ..color = tCol.withValues(alpha: isLocked ? 0.35 : 0.85)
+            ..color = tCol.withValues(alpha: isLocked ? 0.42 : 0.88)
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.0,
+            ..strokeWidth = 1.9,
         );
-        canvas.drawCircle(c, 17.5, Paint()..color = fillCol);
         for (final corner in const [
-          Offset(-16, -16),
-          Offset(16, -16),
-          Offset(-16, 16),
-          Offset(16, 16),
+          Offset(-14, -14),
+          Offset(14, -14),
+          Offset(-14, 14),
+          Offset(14, 14),
         ]) {
-          canvas.drawCircle(c + corner, 3.0, Paint()..color = tCol);
+          canvas.drawCircle(c + corner, 2.5, Paint()..color = tCol);
         }
         break;
 
       case MountTerrainType.chokeGate:
-        // ⛩️ 협곡 관문: 좌우 청옥 수문장 석주 + 관문 결계 문턱
-        final baseRect = RRect.fromRectAndRadius(
-          Rect.fromCenter(center: c, width: 44, height: 38),
-          const Radius.circular(9),
-        );
-        canvas.drawRRect(baseRect, Paint()..color = fillCol);
-        canvas.drawRRect(
-          baseRect,
+        // ⛩️ 협곡 관문: 원형 좌대 위에 꼭 맞게 얹히는 청옥 관문 링 + 좌우 석주 포인트
+        canvas.drawCircle(c, 19.5, Paint()..color = fillCol);
+        canvas.drawCircle(
+          c,
+          19.5,
           Paint()
-            ..color = tCol.withValues(alpha: isLocked ? 0.35 : 0.82)
+            ..color = tCol.withValues(alpha: isLocked ? 0.42 : 0.86)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.9,
         );
-        for (final sideX in const [-21.0, 21.0]) {
+        for (final sideX in const [-18.5, 18.5]) {
           canvas.drawRRect(
             RRect.fromRectAndRadius(
-              Rect.fromCenter(center: c + Offset(sideX, 0), width: 6.5, height: 30),
-              const Radius.circular(3),
+              Rect.fromCenter(center: c + Offset(sideX, 0), width: 5.2, height: 18),
+              const Radius.circular(2.5),
             ),
             Paint()..color = tCol.withValues(alpha: isLocked ? 0.45 : 0.90),
           );
@@ -1164,45 +1198,37 @@ class NightBattlePainter extends CustomPainter {
         break;
 
       case MountTerrainType.fortressBastion:
-        // 🏯 성루 포대: 철갑 치성(성벽 여장) 사각 보루
-        final fortRect = RRect.fromRectAndRadius(
-          Rect.fromCenter(center: c, width: 42, height: 42),
-          const Radius.circular(6),
-        );
-        canvas.drawRRect(fortRect, Paint()..color = fillCol);
-        canvas.drawRRect(
-          fortRect,
+        // 🏯 성루 포대: 석조 좌대 반경에 딱 맞춘 치성 원형 보루
+        canvas.drawCircle(c, 19.5, Paint()..color = fillCol);
+        canvas.drawCircle(
+          c,
+          19.5,
           Paint()
-            ..color = tCol.withValues(alpha: isLocked ? 0.35 : 0.88)
+            ..color = tCol.withValues(alpha: isLocked ? 0.42 : 0.88)
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.2,
+            ..strokeWidth = 2.0,
         );
         for (final merlon in const [
-          Offset(-18, -18),
-          Offset(18, -18),
-          Offset(-18, 18),
-          Offset(18, 18),
+          Offset(-14.5, -14.5),
+          Offset(14.5, -14.5),
+          Offset(-14.5, 14.5),
+          Offset(14.5, 14.5),
         ]) {
           canvas.drawRect(
-            Rect.fromCenter(center: c + merlon, width: 7.5, height: 7.5),
-            Paint()..color = tCol.withValues(alpha: isLocked ? 0.40 : 0.88),
+            Rect.fromCenter(center: c + merlon, width: 5.8, height: 5.8),
+            Paint()..color = tCol.withValues(alpha: isLocked ? 0.42 : 0.88),
           );
         }
         break;
 
       case MountTerrainType.spiritSpring:
-        // ☯️ 기맥 영천: 소용돌이치는 자수정 영천 수맥 진법진
-        canvas.drawCircle(
-          c,
-          24.0,
-          Paint()..color = tCol.withValues(alpha: isLocked ? 0.08 : 0.20),
-        );
+        // ☯️ 기맥 영천: 소용돌이치는 자수정 영천 원형 진법진
         canvas.drawCircle(c, 19.0, Paint()..color = fillCol);
         canvas.drawCircle(
           c,
-          22.0,
+          19.5,
           Paint()
-            ..color = tCol.withValues(alpha: isLocked ? 0.35 : 0.85)
+            ..color = tCol.withValues(alpha: isLocked ? 0.42 : 0.88)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.9,
         );
@@ -1210,8 +1236,8 @@ class NightBattlePainter extends CustomPainter {
           for (int k = 0; k < 3; k++) {
             final a = sim.elapsedSec * 2.1 + k * (2 * pi / 3);
             canvas.drawCircle(
-              c + Offset(cos(a) * 22.0, sin(a) * 22.0),
-              2.8,
+              c + Offset(cos(a) * 19.5, sin(a) * 19.5),
+              2.5,
               Paint()..color = tCol,
             );
           }
@@ -1219,20 +1245,20 @@ class NightBattlePainter extends CustomPainter {
         break;
 
       case MountTerrainType.ambushRidge:
-        // 🗡️ 측면 매복암: 예리한 비취색 마름모 기습 암반
+        // 🗡️ 측면 매복암: 원형 석조 좌대 안에 꼭 들어맞는 비취 진법 문양
+        canvas.drawCircle(c, 19.0, Paint()..color = fillCol);
         final diamond = Path()
-          ..moveTo(c.dx, c.dy - 25.0)
-          ..lineTo(c.dx + 24.0, c.dy)
-          ..lineTo(c.dx, c.dy + 25.0)
-          ..lineTo(c.dx - 24.0, c.dy)
+          ..moveTo(c.dx, c.dy - 20.5)
+          ..lineTo(c.dx + 20.5, c.dy)
+          ..lineTo(c.dx, c.dy + 20.5)
+          ..lineTo(c.dx - 20.5, c.dy)
           ..close();
-        canvas.drawPath(diamond, Paint()..color = fillCol);
         canvas.drawPath(
           diamond,
           Paint()
-            ..color = tCol.withValues(alpha: isLocked ? 0.35 : 0.88)
+            ..color = tCol.withValues(alpha: isLocked ? 0.42 : 0.88)
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.0,
+            ..strokeWidth = 1.9,
         );
         break;
     }
@@ -1366,17 +1392,17 @@ class NightBattlePainter extends CustomPainter {
         _paintMiniText(
           canvas,
           slot.terrainType.shortBadge,
-          c + const Offset(0, -29),
+          c + const Offset(0, -25.5),
           isLocked ? const Color(0xFFADB5BD) : Color(slot.terrainType.colorHex),
-          9.6,
+          9.2,
           withBg: true,
         );
         _paintMiniText(
           canvas,
           cond.shortBadge,
-          c + const Offset(0, 29),
+          c + const Offset(0, 25.5),
           ringColor,
-          9.8,
+          9.4,
           withBg: true,
         );
         continue;
@@ -1474,30 +1500,89 @@ class NightBattlePainter extends CustomPainter {
         );
       }
 
+      // 발사대 5계통 고유 내공 오라 연출 (청옥 연노·흑철 용두화포·비취 쌍륜·만년빙 수정·팔괘 뇌전루)
+      switch (l.type) {
+        case LauncherType.rapid:
+          canvas.drawArc(
+            Rect.fromCircle(center: c, radius: 22.5),
+            sim.elapsedSec * 4.5,
+            pi * 1.25,
+            false,
+            Paint()
+              ..color = const Color(0x884EA8DE)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.0,
+          );
+          break;
+        case LauncherType.heavy:
+          canvas.drawCircle(
+            c,
+            23.0 + sin(sim.elapsedSec * 6.0) * 1.6,
+            Paint()
+              ..color = const Color(0x44FF6B35)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+          );
+          break;
+        case LauncherType.curveSpin:
+          for (int k = 0; k < 2; k++) {
+            canvas.drawArc(
+              Rect.fromCircle(center: c, radius: 23.5),
+              sim.elapsedSec * 5.6 + k * pi,
+              pi * 0.65,
+              false,
+              Paint()
+                ..color = const Color(0xAA72EFDD)
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 2.2,
+            );
+          }
+          break;
+        case LauncherType.frostField:
+          for (int k = 0; k < 6; k++) {
+            final a = sim.elapsedSec * 1.4 + k * (pi / 3);
+            canvas.drawCircle(
+              c + Offset(cos(a) * 22.0, sin(a) * 22.0),
+              2.2,
+              Paint()..color = const Color(0xCCCAF0F8),
+            );
+          }
+          break;
+        case LauncherType.qiAmplifier:
+          canvas.drawCircle(
+            c,
+            24.0 + sin(sim.elapsedSec * 5.0) * 1.8,
+            Paint()
+              ..color = const Color(0x99C77DFF)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.9,
+          );
+          break;
+      }
+
       final launcherImg = sprites.launcherOf(l.type);
       if (launcherImg != null) {
         canvas.save();
         canvas.translate(c.dx, c.dy);
         canvas.rotate(l.aimAngleRad);
         final aimTip = Path()
-          ..moveTo(26.5, 0)
-          ..lineTo(19.5, -4.5)
-          ..lineTo(19.5, 4.5)
+          ..moveTo(28.5, 0)
+          ..lineTo(20.5, -5.0)
+          ..lineTo(20.5, 5.0)
           ..close();
         canvas.drawPath(aimTip, Paint()..color = baseColor);
         canvas.restore();
 
         final recoilShift = Offset(
-          cos(l.aimAngleRad) * (-l.recoilAnim * 4.5),
-          sin(l.aimAngleRad) * (-l.recoilAnim * 4.5),
+          cos(l.aimAngleRad) * (-l.recoilAnim * 5.2),
+          sin(l.aimAngleRad) * (-l.recoilAnim * 5.2),
         );
-        final scale = 1.0 + l.recoilAnim * 0.10;
+        final scale = (1.0 + (l.tier - 1) * 0.04) + l.recoilAnim * 0.12;
         _drawSpriteCentered(
           canvas,
           launcherImg,
-          c + recoilShift,
-          width: 46 * scale,
-          height: 46 * scale,
+          c + const Offset(0, -3.0) + recoilShift,
+          width: 54 * scale,
+          height: 54 * scale,
         );
       } else {
         canvas.save();
@@ -1659,6 +1744,53 @@ class NightBattlePainter extends CustomPainter {
     canvas.restore();
   }
 
+  void _drawMutantFootPivotedStripFrame(
+    Canvas canvas,
+    ui.Image stripImage,
+    int frameIndex,
+    Offset center, {
+    required double width,
+    required double height,
+    required double scaleX,
+    required double scaleY,
+    required double tiltRad,
+    int totalFrames = 4,
+    double opacity = 1.0,
+    Color? tintColor,
+    BlendMode tintBlendMode = BlendMode.srcATop,
+  }) {
+    final alpha = opacity.clamp(0.0, 1.0);
+    if (alpha <= 0.01) return;
+
+    final safeIdx = ((frameIndex % totalFrames) + totalFrames) % totalFrames;
+    final cellW = stripImage.width.toDouble() / totalFrames;
+    final cellH = stripImage.height.toDouble();
+    final footAnchorY = height * 0.42;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy + footAnchorY);
+    if (tiltRad != 0.0) {
+      canvas.rotate(tiltRad);
+    }
+    canvas.scale(scaleX, scaleY);
+
+    final paint = Paint()..filterQuality = FilterQuality.low;
+    if (tintColor != null) {
+      paint.colorFilter = ColorFilter.mode(tintColor, tintBlendMode);
+    } else if (alpha < 0.999) {
+      paint.color = Color.fromRGBO(255, 255, 255, alpha);
+    }
+
+    final src = Rect.fromLTWH(safeIdx * cellW, 0, cellW, cellH);
+    final dst = Rect.fromCenter(
+      center: Offset(0, -footAnchorY),
+      width: width,
+      height: height,
+    );
+    canvas.drawImageRect(stripImage, src, dst, paint);
+    canvas.restore();
+  }
+
   /// 6단계 체급(`19px` 소형 독쥐 → `58px` 중갑 멧돼지 → `80px` 중간보스 → `108px` 대요마) & 연속 생체 모션 렌더링!
   void _drawMutants(Canvas canvas) {
     if (sim.mutants.isEmpty) return;
@@ -1701,21 +1833,25 @@ class NightBattlePainter extends CustomPainter {
           headingDir * (motion.forwardThrust * swayScale) +
           Offset(0, motion.liftY * swayScale);
 
-      // 1) 체급에 비례하는 발밑 타원 접지 그림자
-      final shadowW = visualW * 0.82 * motion.shadowScale;
-      final shadowH = visualH * 0.30 * motion.shadowScale;
+      // 1) 체급에 비례하는 발밑 타원 접지 그림자 (비행 변이는 지상 아래 멀찍이 고도차 그림자로 표현!)
+      final shadowDropY = m.kind.isFlying ? halfVisualH * 0.96 + 18.0 : halfVisualH * 0.64;
+      final shadowW = visualW * (m.kind.isFlying ? 0.62 : 0.82) * motion.shadowScale;
+      final shadowH = visualH * (m.kind.isFlying ? 0.22 : 0.30) * motion.shadowScale;
       canvas.drawOval(
         Rect.fromCenter(
-          center: groundCenter + Offset(0, halfVisualH * 0.64),
+          center: groundCenter + Offset(0, shadowDropY),
           width: shadowW,
           height: shadowH,
         ),
-        Paint()..color = Colors.black.withValues(alpha: motion.shadowAlpha),
+        Paint()
+          ..color = Colors.black.withValues(
+            alpha: m.kind.isFlying ? motion.shadowAlpha * 0.68 : motion.shadowAlpha,
+          ),
       );
 
-      // 1-B) 길 밖 비정규 침투 괴물(월담·땅굴) 전용 붉은 침투 경보 점선 & 땅굴 분출 파문!
+      // 1-B) 길 밖 비정규 침투 괴물(월담·땅굴·공중강습) 전용 붉은 침투 경보 점선 & 분출 파문!
       if (m.isInfiltrator) {
-        if (m.emergeAnimTimer > 0) {
+        if (m.emergeAnimTimer > 0 && !m.kind.isFlying) {
           final ep = (1.0 - m.emergeAnimTimer / 0.85).clamp(0.0, 1.0);
           canvas.drawOval(
             Rect.fromCenter(
@@ -1730,8 +1866,8 @@ class NightBattlePainter extends CustomPainter {
           );
         }
         final targetVillage = Offset(
-          CampaignCatalog.centralTowerPos.x,
-          CampaignCatalog.centralTowerPos.y,
+          sim.towerPos.x,
+          sim.towerPos.y,
         );
         final vec = targetVillage - c;
         final distV = vec.distance;
@@ -1751,12 +1887,24 @@ class NightBattlePainter extends CustomPainter {
             );
           }
         }
+        final raidLabel = m.infiltratorStyle == 'air'
+            ? '🪽공중강습'
+            : (m.infiltratorStyle == 'tunnel' ? '🕳️땅굴기습' : '🌲월담기습');
         _paintMiniText(
           canvas,
-          m.infiltratorStyle == 'tunnel' ? '🕳️땅굴기습' : '🌲월담기습',
+          raidLabel,
           bodyCenter + Offset(0, -halfVisualH * 0.92 - 12),
           const Color(0xFFFF4D6D),
           8.6,
+          withBg: true,
+        );
+      } else if (m.kind.isFlying && !m.kind.isBoss) {
+        _paintMiniText(
+          canvas,
+          '🪽공중비행',
+          bodyCenter + Offset(0, -halfVisualH * 0.90 - 9),
+          const Color(0xFF90E0EF),
+          8.2,
           withBg: true,
         );
       }
@@ -1835,11 +1983,69 @@ class NightBattlePainter extends CustomPainter {
         );
       }
 
-      // 5) 코덱스 기본 행군 원화 ↔ 공격·돌진 원화 연속 크로스페이드 렌더링!
+      // 5) 코덱스 4프레임 캐릭터·돌연변이 시트 & 3페이즈 보스 실시간 외형 변이 렌더링!
+      final mutStrip = sprites.mutantStripOf(m.kind);
       final baseSprite = sprites.mutantOf(m.kind);
       final atkSprite = sprites.mutantAttackOf(m.kind);
 
-      if (baseSprite != null || atkSprite != null) {
+      Color? hitOrFreezeTint;
+      if (m.hitFlashTimer > 0) {
+        final flashA = (m.hitFlashTimer / 0.12).clamp(0.0, 0.72);
+        hitOrFreezeTint = Colors.white.withValues(alpha: flashA);
+      } else if (m.freezeTimer > 0) {
+        hitOrFreezeTint = const Color(0x6690E0EF);
+      } else if (m.phaseTransitionTimer > 0) {
+        // 보스 페이즈 변이 탈피 중 황금·진홍 번쩍임 연출!
+        final blink = (sin(sim.elapsedSec * 28.0) * 0.5 + 0.5) * 0.65;
+        hitOrFreezeTint = const Color(0xFFFF6B35).withValues(alpha: blink);
+      }
+
+      if (mutStrip != null) {
+        int primaryFrame;
+        if (m.kind.isBoss) {
+          // 보스 4프레임 시트: 0=1페이즈 강림, 1=2페이즈 변이 각성, 2=3페이즈 심연 폭주, 3=파성 필살 강타!
+          final phaseFrame = (m.currentPhase - 1).clamp(0, 2);
+          primaryFrame = motion.attackBlend >= 0.52 ? 3 : phaseFrame;
+        } else {
+          // 일반 변이 4프레임 연속 보행·도약·강타 사이클(0 -> 1 -> 2 -> 1, 공격 시 3)
+          const walkCycle = <int>[0, 1, 2, 1];
+          final stepIdx =
+              (((m.animPhase * 1.45 + m.uid * 0.7).abs()).floor()) % 4;
+          primaryFrame = motion.attackBlend >= 0.55 ? 3 : walkCycle[stepIdx];
+        }
+
+        if (motion.afterimageCount > 0 && m.freezeTimer <= 0) {
+          for (int k = motion.afterimageCount; k >= 1; k--) {
+            final ghostPos = bodyCenter - headingDir * (6.8 * k);
+            _drawMutantFootPivotedStripFrame(
+              canvas,
+              mutStrip,
+              primaryFrame,
+              ghostPos,
+              width: visualW * (1.0 - k * 0.05),
+              height: visualH * (1.0 - k * 0.05),
+              scaleX: motion.scaleX,
+              scaleY: motion.scaleY,
+              tiltRad: motion.tiltRad,
+              opacity: (0.26 / k).clamp(0.06, 0.26),
+              tintColor: Color(m.kind.colorHex).withValues(alpha: 0.45),
+            );
+          }
+        }
+
+        _drawMutantFootPivotedStripFrame(
+          canvas,
+          mutStrip,
+          primaryFrame,
+          bodyCenter,
+          width: visualW,
+          height: visualH,
+          scaleX: motion.scaleX,
+          scaleY: motion.scaleY,
+          tiltRad: motion.tiltRad,
+          tintColor: hitOrFreezeTint,
+        );
+      } else if (baseSprite != null || atkSprite != null) {
         final mainSprite = baseSprite ?? atkSprite!;
 
         if (motion.afterimageCount > 0 && m.freezeTimer <= 0) {
@@ -1860,14 +2066,6 @@ class NightBattlePainter extends CustomPainter {
               tintColor: Color(m.kind.colorHex).withValues(alpha: 0.45),
             );
           }
-        }
-
-        Color? hitOrFreezeTint;
-        if (m.hitFlashTimer > 0) {
-          final flashA = (m.hitFlashTimer / 0.12).clamp(0.0, 0.72);
-          hitOrFreezeTint = Colors.white.withValues(alpha: flashA);
-        } else if (m.freezeTimer > 0) {
-          hitOrFreezeTint = const Color(0x6690E0EF);
         }
 
         final blend = (atkSprite != null && baseSprite != null)
@@ -1899,7 +2097,6 @@ class NightBattlePainter extends CustomPainter {
             tintColor: hitOrFreezeTint,
           );
         } else {
-          // 연속 크로스페이드로 자세 전환 스냅 현상 완벽 제거
           _drawMutantFootPivotedSprite(
             canvas,
             mainSprite,
@@ -2128,12 +2325,55 @@ class NightBattlePainter extends CustomPainter {
           final gems = m.totalPhases > 1
               ? ' ${'◆' * remPhases}${'◇' * (m.totalPhases - remPhases)}'
               : '';
+          double labelOffsetY = -12.5;
+          if (m.maxHitShield > 0) {
+            final shieldRatio =
+                (m.hitShieldLeft / m.maxHitShield).clamp(0.0, 1.0);
+            final shieldRect = Rect.fromCenter(
+              center: barCenter + const Offset(0, -7.2),
+              width: barW,
+              height: 4.4,
+            );
+            canvas.drawRRect(
+              RRect.fromRectAndRadius(shieldRect, const Radius.circular(2.2)),
+              Paint()..color = const Color(0xDD0B1324),
+            );
+            if (shieldRatio > 0) {
+              canvas.drawRRect(
+                RRect.fromRectAndRadius(
+                  Rect.fromLTWH(
+                    shieldRect.left,
+                    shieldRect.top,
+                    barW * shieldRatio,
+                    shieldRect.height,
+                  ),
+                  const Radius.circular(2.2),
+                ),
+                Paint()..color = const Color(0xFF48CAE4),
+              );
+            }
+            final hitBadge = m.hitShieldLeft > 0
+                ? '🛡️${m.hitShieldLeft}/${m.maxHitShield}타 · 🔥${m.totalHitsTaken}HIT'
+                : '💥마갑파쇄 완료 · 🔥${m.totalHitsTaken}HIT!';
+            _paintMiniText(
+              canvas,
+              hitBadge,
+              barCenter + const Offset(0, -17.5),
+              m.hitShieldLeft > 0
+                  ? const Color(0xFF90E0EF)
+                  : const Color(0xFFFFD166),
+              9.0,
+              withBg: true,
+            );
+            labelOffsetY = -30.5;
+          }
+          final flyPrefix = m.kind.isFlying ? '🪽' : '';
           _paintMiniText(
             canvas,
-            '${m.displayName}$gems',
-            barCenter + const Offset(0, -12.5),
+            '$flyPrefix[${m.hierarchyRank}] ${m.displayName}$gems',
+            barCenter + Offset(0, labelOffsetY),
             m.currentPhase >= 2 ? const Color(0xFFFFD166) : NightPalette.accentGold,
-            11.4,
+            10.8,
             withBg: true,
           );
         }
@@ -2144,17 +2384,29 @@ class NightBattlePainter extends CustomPainter {
   void _drawProjectilesAndTrails(Canvas canvas) {
     for (final p in sim.projectiles) {
       final col = Color(p.colorHex);
+      final style = p.projectileStyle;
+      final heading = atan2(p.vel.y, p.vel.x);
+
+      // 1) 발사대 계통별 완전히 다른 내공 궤적(Trail) 렌더링!
       if (p.trail.length >= 2) {
         for (int i = 1; i < p.trail.length; i++) {
           final tRatio = i / p.trail.length;
           final aPt = Offset(p.trail[i - 1].x, p.trail[i - 1].y);
           final bPt = Offset(p.trail[i].x, p.trail[i].y);
+          final isHeavy = style == 'heavyMeteor' || style == 'sectFist';
+          final isBlade = style == 'curveChakram' || style == 'sectSword';
+          final trailW = p.radius *
+              (p.isPrecisionShot
+                  ? (0.85 + 1.35 * tRatio)
+                  : (isHeavy
+                      ? (0.75 + 1.25 * tRatio)
+                      : (isBlade ? (0.65 + 1.15 * tRatio) : (0.45 + 0.92 * tRatio))));
           canvas.drawLine(
             aPt,
             bPt,
             Paint()
-              ..color = col.withValues(alpha: (p.isPrecisionShot ? 0.88 : 0.58) * tRatio)
-              ..strokeWidth = p.radius * (p.isPrecisionShot ? (0.75 + 1.25 * tRatio) : (0.45 + 0.95 * tRatio))
+              ..color = col.withValues(alpha: (p.isPrecisionShot ? 0.90 : 0.66) * tRatio)
+              ..strokeWidth = trailW
               ..strokeCap = StrokeCap.round,
           );
           if (p.isPrecisionShot || i >= p.trail.length - 3) {
@@ -2162,22 +2414,36 @@ class NightBattlePainter extends CustomPainter {
               aPt,
               bPt,
               Paint()
-                ..color = Colors.white.withValues(alpha: (p.isPrecisionShot ? 0.92 : 0.62) * tRatio)
-                ..strokeWidth = p.radius * (p.isPrecisionShot ? 0.52 : 0.36) * tRatio
+                ..color = Colors.white.withValues(alpha: (p.isPrecisionShot ? 0.95 : 0.72) * tRatio)
+                ..strokeWidth = trailW * 0.42
                 ..strokeCap = StrokeCap.round,
+            );
+          }
+          // 중포 운석 불티 · 한빙 설화 눈꽃 입자 잔상!
+          if (style == 'heavyMeteor' && i.isEven) {
+            canvas.drawCircle(
+              bPt,
+              p.radius * 0.34 * tRatio,
+              Paint()..color = const Color(0xAAFFD166).withValues(alpha: 0.55 * tRatio),
+            );
+          } else if (style == 'frostCrystal' && i.isOdd) {
+            canvas.drawCircle(
+              bPt,
+              2.2 * tRatio,
+              Paint()..color = const Color(0xDDCAF0F8).withValues(alpha: 0.75 * tRatio),
             );
           }
         }
       }
 
       final c = Offset(p.pos.x, p.pos.y);
-      if (p.isPrecisionShot) {
+      if (p.isPrecisionShot || style == 'eogiUltimate') {
         canvas.drawCircle(
           c,
-          p.radius * 1.9,
+          p.radius * 2.0,
           Paint()
-            ..color = const Color(0x88FFD166)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+            ..color = const Color(0x99FFD166)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
         );
       } else if (p.isGiantCritSerendipity) {
         if (sprites.fxLucky != null) {
@@ -2185,38 +2451,256 @@ class NightBattlePainter extends CustomPainter {
             canvas,
             sprites.fxLucky!,
             c,
-            width: p.radius * 3.1,
-            height: p.radius * 3.1,
-            rotationRad: sim.elapsedSec * 4.0,
-            opacity: 0.72,
-          );
-        } else {
-          canvas.drawCircle(
-            c,
-            p.radius + 5,
-            Paint()..color = const Color(0x66FFD166),
+            width: p.radius * 3.2,
+            height: p.radius * 3.2,
+            rotationRad: sim.elapsedSec * 4.5,
+            opacity: 0.78,
           );
         }
       }
 
-      final stoneImg = sprites.stoneOf(p.material);
-      if (stoneImg != null) {
-        final spinAngle = sim.elapsedSec * 7.0 + (p.pos.x + p.pos.y) * 0.03;
-        _drawSpriteCentered(
-          canvas,
-          stoneImg,
-          c,
-          width: p.radius * 2.45,
-          height: p.radius * 2.45,
-          rotationRad: spinAngle,
-        );
-      } else {
-        canvas.drawCircle(c, p.radius, Paint()..color = col);
-        canvas.drawCircle(
-          c + Offset(-p.radius * 0.28, -p.radius * 0.28),
-          p.radius * 0.32,
-          Paint()..color = Colors.white.withValues(alpha: 0.65),
-        );
+      // 2) 발사대·비기 종류별 완전히 차별화된 투사체(돌·화살·화염철환·비취쌍륜·만년빙·팔괘뇌구·검기) 외형 렌더링!
+      switch (style) {
+        case 'rapidBolt':
+        case 'precisionLance':
+          // 청옥 연노 천기탑 / 정밀 신궁탄: 초음속 파공 비전창 + 마하 충격파 날개!
+          final isGoldLance = style == 'precisionLance';
+          canvas.save();
+          canvas.translate(c.dx, c.dy);
+          canvas.rotate(heading);
+          final len = p.radius * (isGoldLance ? 2.7 : 2.25);
+          final wid = p.radius * (isGoldLance ? 0.92 : 0.74);
+          final spear = Path()
+            ..moveTo(len, 0)
+            ..lineTo(-len * 0.55, -wid)
+            ..lineTo(-len * 0.25, 0)
+            ..lineTo(-len * 0.55, wid)
+            ..close();
+          canvas.drawPath(
+            spear,
+            Paint()..color = isGoldLance ? const Color(0xFFFFD166) : const Color(0xFF4CC9F0),
+          );
+          canvas.drawLine(
+            Offset(-len * 0.35, 0),
+            Offset(len * 0.88, 0),
+            Paint()
+              ..color = Colors.white
+              ..strokeWidth = 2.2
+              ..strokeCap = StrokeCap.round,
+          );
+          canvas.restore();
+          break;
+
+        case 'heavyMeteor':
+        case 'sectFist':
+          // 흑철 용두 파성루 / 금강 철권: 용암 화염 오라를 두른 거대 파성 운석 철환!
+          canvas.drawCircle(
+            c,
+            p.radius * 1.55,
+            Paint()
+              ..color = const Color(0x88FF4D00)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+          );
+          final stoneImg = sprites.stoneOf(p.material);
+          if (stoneImg != null) {
+            _drawSpriteCentered(
+              canvas,
+              stoneImg,
+              c,
+              width: p.radius * 2.65,
+              height: p.radius * 2.65,
+              rotationRad: sim.elapsedSec * 6.0,
+            );
+          } else {
+            canvas.drawCircle(c, p.radius * 1.15, Paint()..color = const Color(0xFF3D1E10));
+          }
+          canvas.drawCircle(
+            c,
+            p.radius * 0.98,
+            Paint()
+              ..color = const Color(0xDDFF9F1C)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.2,
+          );
+          break;
+
+        case 'curveChakram':
+        case 'sectSword':
+          // 비취 쌍륜 진법대 / 화산 검기: 고속 자전하는 초승달 비취 풍륜도 & 반월 검기파!
+          final spin = style == 'sectSword' ? heading : sim.elapsedSec * 16.0 + p.pos.x * 0.05;
+          canvas.save();
+          canvas.translate(c.dx, c.dy);
+          canvas.rotate(spin);
+          final bladeR = p.radius * (style == 'sectSword' ? 1.85 : 1.52);
+          for (int b = 0; b < (style == 'sectSword' ? 1 : 2); b++) {
+            canvas.save();
+            canvas.rotate(b * pi);
+            canvas.drawArc(
+              Rect.fromCircle(center: Offset.zero, radius: bladeR),
+              -pi * 0.42,
+              pi * 0.84,
+              false,
+              Paint()
+                ..color = style == 'sectSword' ? const Color(0xFF4CC9F0) : const Color(0xFF72EFDD)
+                ..style = PaintingStyle.stroke
+                ..strokeCap = StrokeCap.round
+                ..strokeWidth = 3.8,
+            );
+            canvas.drawArc(
+              Rect.fromCircle(center: Offset.zero, radius: bladeR * 0.88),
+              -pi * 0.34,
+              pi * 0.68,
+              false,
+              Paint()
+                ..color = Colors.white
+                ..style = PaintingStyle.stroke
+                ..strokeCap = StrokeCap.round
+                ..strokeWidth = 1.6,
+            );
+            canvas.restore();
+          }
+          canvas.drawCircle(Offset.zero, p.radius * 0.48, Paint()..color = const Color(0xFF80ED99));
+          canvas.restore();
+          break;
+
+        case 'frostCrystal':
+          // 만년빙 수정탑: 반투명 육각 설화 프리즘 결정탄!
+          canvas.save();
+          canvas.translate(c.dx, c.dy);
+          canvas.rotate(sim.elapsedSec * 5.0);
+          final rIce = p.radius * 1.48;
+          for (int k = 0; k < 3; k++) {
+            final a = k * (pi / 3);
+            canvas.drawLine(
+              Offset(cos(a) * -rIce, sin(a) * -rIce),
+              Offset(cos(a) * rIce, sin(a) * rIce),
+              Paint()
+                ..color = const Color(0xFF90E0EF)
+                ..strokeWidth = 2.6
+                ..strokeCap = StrokeCap.round,
+            );
+          }
+          canvas.drawCircle(Offset.zero, p.radius * 0.62, Paint()..color = Colors.white);
+          canvas.restore();
+          break;
+
+        case 'qiBagua':
+        case 'sectTaiji':
+        case 'eogiUltimate':
+          // 팔괘 증폭루 / 태극 유수 / 어기어석: 번개가 감기는 황금·자색 음양 내공구!
+          final orbCol = style == 'eogiUltimate'
+              ? const Color(0xFFFFD166)
+              : const Color(0xFFC77DFF);
+          canvas.drawCircle(
+            c,
+            p.radius * 1.55,
+            Paint()
+              ..color = orbCol.withValues(alpha: 0.45)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+          );
+          canvas.drawCircle(c, p.radius * 0.96, Paint()..color = orbCol);
+          canvas.drawArc(
+            Rect.fromCircle(center: c, radius: p.radius * 1.28),
+            sim.elapsedSec * 10.0,
+            pi * 1.3,
+            false,
+            Paint()
+              ..color = const Color(0xFFFFD166)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.0,
+          );
+          canvas.drawCircle(c, p.radius * 0.42, Paint()..color = Colors.white);
+          break;
+
+        default:
+          final stoneImg = sprites.stoneOf(p.material);
+          if (stoneImg != null) {
+            final spinAngle = sim.elapsedSec * 7.0 + (p.pos.x + p.pos.y) * 0.03;
+            _drawSpriteCentered(
+              canvas,
+              stoneImg,
+              c,
+              width: p.radius * 2.45,
+              height: p.radius * 2.45,
+              rotationRad: spinAngle,
+            );
+          } else {
+            canvas.drawCircle(c, p.radius, Paint()..color = col);
+            canvas.drawCircle(
+              c + Offset(-p.radius * 0.28, -p.radius * 0.28),
+              p.radius * 0.32,
+              Paint()..color = Colors.white.withValues(alpha: 0.65),
+            );
+          }
+          break;
+      }
+    }
+  }
+
+  /// 치명타(회심)·중포 운석·한빙 설화·팔괘 공명·문파 절기 발동 시 강렬한 다중 충격파 & 십자 스타버스트 연출!
+  void _drawShockwaveRingsAndCritImpacts(Canvas canvas) {
+    for (final sw in sim.shockwaveRings) {
+      final prog = sw.progress;
+      final alpha = (1.0 - prog).clamp(0.0, 1.0);
+      final c = Offset(sw.pos.x, sw.pos.y);
+      final curR = sw.maxRadius * (0.18 + prog * 0.82);
+      final mainCol = Color(sw.colorHex).withValues(alpha: alpha);
+      final subCol = Color(sw.secondaryColorHex).withValues(alpha: alpha * 0.92);
+
+      // 외곽 주 충격파 고리 + 내부 공명 고리
+      canvas.drawCircle(
+        c,
+        curR,
+        Paint()
+          ..color = mainCol
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = (sw.style == 'skillUltimate' ? 5.2 : 3.6) * (1.0 - prog * 0.45),
+      );
+      canvas.drawCircle(
+        c,
+        curR * 0.66,
+        Paint()
+          ..color = subCol
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0 * (1.0 - prog * 0.4),
+      );
+
+      if (sw.style == 'critStar' || sw.style == 'skillUltimate') {
+        // 8방향 예리한 황금·진홍 회심 십자 스타버스트 섬광!
+        final spikes = sw.style == 'skillUltimate' ? 12 : 8;
+        for (int k = 0; k < spikes; k++) {
+          final a = k * (2 * pi / spikes) + prog * 0.35;
+          final innerD = curR * 0.16;
+          final outerD = curR * (k.isEven ? 1.24 : 0.84);
+          canvas.drawLine(
+            c + Offset(cos(a) * innerD, sin(a) * innerD),
+            c + Offset(cos(a) * outerD, sin(a) * outerD),
+            Paint()
+              ..color = k.isEven ? mainCol : Colors.white.withValues(alpha: alpha)
+              ..strokeWidth = k.isEven ? 2.8 : 1.7
+              ..strokeCap = StrokeCap.round,
+          );
+        }
+      } else if (sw.style == 'heavyCrater') {
+        // 중포·화구 용암 방사형 균열!
+        for (int k = 0; k < 6; k++) {
+          final a = k * (pi / 3) + 0.25;
+          canvas.drawLine(
+            c + Offset(cos(a) * (curR * 0.25), sin(a) * (curR * 0.25)),
+            c + Offset(cos(a) * (curR * 1.05), sin(a) * (curR * 1.05)),
+            Paint()
+              ..color = subCol
+              ..strokeWidth = 2.6
+              ..strokeCap = StrokeCap.round,
+          );
+        }
+      } else if (sw.style == 'frostNova') {
+        // 육각 얼음꽃 결정 파열!
+        for (int k = 0; k < 6; k++) {
+          final a = k * (pi / 3);
+          final tip = c + Offset(cos(a) * curR, sin(a) * curR);
+          canvas.drawCircle(tip, 3.0 * alpha, Paint()..color = Colors.white.withValues(alpha: alpha));
+        }
       }
     }
   }
@@ -2524,15 +3008,19 @@ class NightBattlePainter extends CustomPainter {
     for (final dp in sim.damagePopups) {
       final prog = dp.progress;
       final alpha = prog < 0.70 ? 1.0 : ((1.0 - prog) / 0.30).clamp(0.0, 1.0);
-      final popScale = prog < 0.16 ? (0.85 + (prog / 0.16) * 0.35) : 1.0;
-      final fontSize = (dp.isCrit ? 13.4 : (dp.isKill ? 11.8 : 10.2)) * popScale;
-      final label = dp.isCrit ? '💥${dp.damage}!' : '${dp.damage}';
+      final popScale = prog < 0.18 ? (0.88 + (prog / 0.18) * 0.45) : 1.0;
+      final fontSize = (dp.isCrit ? 15.2 : (dp.isKill ? 12.6 : 10.6)) * popScale;
+      final label = dp.isCrit ? '⚡치명 ${dp.damage}!!' : '${dp.damage}';
       _paintMiniText(
         canvas,
         label,
-        Offset(dp.pos.x.clamp(24.0, 376.0), dp.pos.y.clamp(24.0, 640.0)),
+        Offset(
+          dp.pos.x.clamp(28.0, CampaignCatalog.arenaWidth - 28.0),
+          dp.pos.y.clamp(28.0, CampaignCatalog.arenaHeight - 28.0),
+        ),
         Color(dp.colorHex).withValues(alpha: alpha),
         fontSize,
+        withBg: dp.isCrit,
       );
     }
   }
@@ -2546,10 +3034,7 @@ class NightBattlePainter extends CustomPainter {
       _drawSpriteCentered(
         canvas,
         feverImg,
-        Offset(
-          CampaignCatalog.centralTowerPos.x,
-          CampaignCatalog.centralTowerPos.y - 4,
-        ),
+        Offset(sim.towerPos.x, sim.towerPos.y - 4),
         width: 98,
         height: 98,
         rotationRad: sim.elapsedSec * 0.8,
@@ -2565,13 +3050,57 @@ class NightBattlePainter extends CustomPainter {
     );
   }
 
+  void _drawCrisisTargetBeacon(Canvas canvas) {
+    final crisis = sim.activeCrisis;
+    if (crisis == null) return;
+    final target = Offset(crisis.rawTargetPos.x, crisis.rawTargetPos.y);
+    final pulse = 0.5 + 0.5 * sin(sim.elapsedSec * 9.5);
+    final outerR = 30.0 + pulse * 14.0;
+    final innerR = 20.0 + (1.0 - pulse) * 6.0;
+
+    canvas.drawCircle(
+      target,
+      outerR,
+      Paint()
+        ..color = const Color(0xFFFF1E56).withValues(alpha: 0.28 + pulse * 0.34)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _isPipZoom ? 2.8 : 2.2,
+    );
+    canvas.drawCircle(
+      target,
+      innerR,
+      Paint()
+        ..color = const Color(0xFFFFD166).withValues(alpha: 0.72)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8,
+    );
+    for (int k = 0; k < 4; k++) {
+      final a = sim.elapsedSec * 1.4 + k * (pi / 2);
+      canvas.drawLine(
+        target + Offset(cos(a) * (innerR - 5), sin(a) * (innerR - 5)),
+        target + Offset(cos(a) * (outerR + 4), sin(a) * (outerR + 4)),
+        Paint()
+          ..color = const Color(0xFFFF4D6D)
+          ..strokeWidth = 2.0
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+    if (!_isPipZoom) {
+      _paintMiniText(
+        canvas,
+        '🚨위험구역 [${crisis.zoneName}]',
+        target + Offset(0, outerR + 12),
+        const Color(0xFFFF4D6D),
+        9.4,
+        withBg: true,
+      );
+    }
+  }
+
   void _drawDawnPurifyWave(Canvas canvas) {
     if (sim.dawnPurifyAnimTimer <= 0) return;
     final prog = (1.0 - sim.dawnPurifyAnimTimer / 1.5).clamp(0.0, 1.0);
-    final center = Offset(
-      CampaignCatalog.villageCenter.x,
-      CampaignCatalog.villageCenter.y,
-    );
+    final center = Offset(sim.shieldCenter.x, sim.shieldCenter.y);
     canvas.drawCircle(
       center,
       prog * 680.0,
@@ -2586,8 +3115,8 @@ class NightBattlePainter extends CustomPainter {
   void _drawFloatingCallouts(Canvas canvas) {
     for (final fc in sim.callouts) {
       final anchor = Offset(
-        fc.pos.x.clamp(70.0, 330.0),
-        fc.pos.y.clamp(35.0, 625.0),
+        fc.pos.x.clamp(86.0, CampaignCatalog.arenaWidth - 86.0),
+        fc.pos.y.clamp(42.0, CampaignCatalog.arenaHeight - 48.0),
       );
 
       ui.Image? badgeSprite;

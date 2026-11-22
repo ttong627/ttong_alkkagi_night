@@ -72,6 +72,8 @@ void main() {
         'assets/images/mutants/mut_shieldYacha.webp',
         'assets/images/mutants/mut_plagueToad.webp',
         'assets/images/mutants/mut_bloodCocoon.webp',
+        'assets/images/mutants/mut_bloodWingBat.webp',
+        'assets/images/mutants/mut_abyssalGargoyle.webp',
         'assets/images/mutants/mut_swiftShadowBoss.webp',
         'assets/images/mutants/mut_ironColossusBoss.webp',
         'assets/images/mutants/mut_crimsonBreakerBoss.webp',
@@ -90,6 +92,8 @@ void main() {
         'assets/images/mutants/mut_shieldYacha_atk.webp',
         'assets/images/mutants/mut_plagueToad_atk.webp',
         'assets/images/mutants/mut_bloodCocoon_atk.webp',
+        'assets/images/mutants/mut_bloodWingBat_atk.webp',
+        'assets/images/mutants/mut_abyssalGargoyle_atk.webp',
         'assets/images/mutants/mut_swiftShadowBoss_atk.webp',
         'assets/images/mutants/mut_ironColossusBoss_atk.webp',
         'assets/images/mutants/mut_crimsonBreakerBoss_atk.webp',
@@ -460,7 +464,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 650));
     expect(find.text('수호 도감 · 세트 도감력'), findsOneWidget);
 
-    for (final tabTitle in ['발사대(5)', '영수(5)', '동료(14)', '변이체(12)', '수호석(13)']) {
+    for (final tabTitle in ['발사대(5)', '영수(5)', '동료(14)', '변이체(14)', '수호석(13)']) {
       await tester.ensureVisible(find.text(tabTitle));
       await tester.pump();
       await tester.tap(find.text(tabTitle));
@@ -974,5 +978,275 @@ void main() {
     await tester.pump();
     expect(find.textContaining('${st11.introDialogue[1].speaker}:'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('v1.0.0+22 전면 리디자인: 하단 5탭 고정 내비게이션 전환 · 원터치 최적 편성 · 추천 일괄 강화 · 일괄 보상 수령 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    expect(
+      NightArtRegistry.mutantShowcaseAsset(MutantKind.chapterOverlord),
+      'assets/images/scenes/showcase_boss_chapter.webp',
+    );
+    expect(
+      NightArtRegistry.mutantShowcaseAsset(MutantKind.crimsonBreakerBoss),
+      'assets/images/scenes/showcase_boss_crimson.webp',
+    );
+    expect(
+      NightArtRegistry.mutantShowcaseAsset(MutantKind.ironColossusBoss),
+      'assets/images/scenes/showcase_boss_iron.webp',
+    );
+
+    final p = PlayerProgress(
+      tokens: 950,
+      elixirs: 45,
+      naegongPoints: 260,
+      moonOmenGauge: 100,
+      highestClearedGlobalStage: 35,
+      convoyActive: true,
+      convoyBattlesRemaining: 0,
+      tutorialSeen: true,
+      bgmVolume: 0.0,
+      sfxVolume: 0.0,
+    );
+    p.unlockedStones.addAll([StoneMaterial.hyeoncheol, StoneMaterial.obsidian]);
+    p.companionLevels[CompanionHero.geomhwang] = 3;
+    p.companionLevels[CompanionHero.yeonbi] = 2;
+    p.beastLevels[SpiritBeast.geumryong] = 2;
+
+    final controller = GameController(initialProgress: p);
+    await tester.pumpWidget(
+      SuhoAlkkagiNightApp(controller: controller, skipSplash: true),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+
+    // 1) 본영 상단 원터치 일괄 보상 수령·재파견 작동 확인
+    final batchClaimBtn = find.byKey(const Key('home_batch_claim_btn'));
+    expect(batchClaimBtn, findsOneWidget);
+    final beforeSupport = controller.progress.supportTokens;
+    await tester.ensureVisible(batchClaimBtn);
+    await tester.tap(batchClaimBtn);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(controller.progress.supportTokens, greaterThan(beforeSupport));
+    expect(controller.progress.moonOmenGauge, 0);
+    ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first)).clearSnackBars();
+    await tester.pump();
+
+    // 2) 하단 2탭(영웅·진법) 즉시 전환 및 원터치 최적 진법 자동 편성 검증
+    await tester.tap(find.byKey(const Key('nav_tab_loadout')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('자동 수호 진법 편성실'), findsOneWidget);
+    final autoRecBtn = find.byKey(const Key('loadout_auto_recommend_btn'));
+    expect(autoRecBtn, findsOneWidget);
+    await tester.tap(autoRecBtn);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(controller.progress.activePreset.primaryStone, StoneMaterial.obsidian);
+    expect(controller.progress.activePreset.equippedBeast, SpiritBeast.geumryong);
+    ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first)).clearSnackBars();
+    await tester.pump();
+
+    // 3) 하단 3탭(대장간·영약) 즉시 전환 및 추천 일괄 강화 검증
+    await tester.tap(find.byKey(const Key('nav_tab_forge')));
+    await tester.pump(const Duration(milliseconds: 200));
+    final batchUpgBtn = find.byKey(const Key('forge_batch_upgrade_btn'));
+    expect(batchUpgBtn, findsOneWidget);
+    await tester.tap(batchUpgBtn);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(controller.progress.openedMeridianStep, greaterThan(0));
+    ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first)).clearSnackBars();
+    await tester.pump();
+
+    // 4) 하단 4탭(수련·보급 통합관) 및 5탭(변이 도감) 무오류 전환 검증
+    await tester.tap(find.byKey(const Key('nav_tab_supply')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('단전·경맥 수련'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav_tab_codex')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.textContaining('3D 모션록'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav_tab_home')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byKey(const Key('home_quick_battle_btn')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('v1.0.0+23 코덱스 대륙 월드맵 핀 이동 및 캐릭터·돌연변이 4프레임 시트 모달 검증', (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final p = PlayerProgress(highestClearedGlobalStage: 45);
+    p.companionLevels[CompanionHero.geomhwang] = 3;
+    final controller = GameController(initialProgress: p);
+
+    await tester.pumpWidget(
+      MaterialApp(home: CampaignScreen(controller: controller)),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.textContaining('탄지무림 10대 거점 심야 수호 대륙도'), findsOneWidget);
+
+    // 대륙 지도 위의 2장 거점 핀 터치 시 즉시 2장 선택 전환 확인
+    await tester.tap(find.text('✓2장').first);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(controller.selectedChapter, 2);
+
+    // 변이 도감에서 첫 번째 돌연변이 카드 터치 시 4프레임 시트 & 3D 모션 쇼케이스 다이얼로그 오픈 확인
+    await tester.pumpWidget(
+      MaterialApp(home: CodexScreen(controller: controller, initialTab: 4)),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(find.text('심야 독쥐').first);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.textContaining('4단계 모션 · 변이 시트 구성'), findsOneWidget);
+    await tester.tap(find.text('감상 완료 · 닫기'));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'v1.0.0+24 10장 고유 지형 정합 · 비행 변이(14종) · 100/1000타 계급 보스 · 위험구역 2.8배 확대 영상 모니터(PIP) 검증',
+      (tester) async {
+    tester.view.physicalSize = const Size(1200, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final p = PlayerProgress(
+      tokens: 900,
+      elixirs: 50,
+      centralGuardianLevel: 18,
+      highestClearedGlobalStage: 110,
+      tutorialSeen: true,
+      bgmVolume: 0.0,
+      sfxVolume: 0.0,
+    );
+    p.companionLevels[CompanionHero.geomhwang] = 5;
+    p.companionLevels[CompanionHero.yonga] = 5;
+    p.beastLevels[SpiritBeast.geumryong] = 5;
+    final controller = GameController(initialProgress: p)
+      ..autoChooseBattlePerks = true;
+
+    // 1) 변이 도감 14종(비행 변이 2종 포함) 및 마갑 타수 배지 표시 확인
+    await tester.pumpWidget(
+      MaterialApp(home: CodexScreen(controller: controller, initialTab: 4)),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('혈익 흡혈박쥐'), findsOneWidget);
+    expect(find.text('🪽공중 비행'), findsWidgets);
+
+    // 2) 제10장 보스 결전(10-10) 진입 → 초소 1곳 축조 후 100/1,000타+ 계급 보스 HUD 및 비상 알림 & 2.8배 확대 영상 모니터 작동 검증
+    final st10 = CampaignCatalog.stageAt(10, 10);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BattleScreen(controller: controller, stage: st10),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+    final arenaBox = tester.getRect(find.byKey(const Key('battle_arena_gesture')));
+    final firstSlotPos = CampaignCatalog.chapterOf(10).mounts.first.pos;
+    await tester.tapAt(
+      Offset(
+        arenaBox.left + arenaBox.width * (firstSlotPos.x / CampaignCatalog.arenaWidth),
+        arenaBox.top + arenaBox.height * (firstSlotPos.y / CampaignCatalog.arenaHeight),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.ensureVisible(find.byKey(const Key('place_launcher_rapid')));
+    await tester.tap(find.byKey(const Key('place_launcher_rapid')));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('4배'));
+    await tester.pump();
+
+    bool sawBossHitHud = false;
+    bool sawCrisisPip = false;
+    for (int f = 0; f < 760; f++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byKey(const Key('battle_boss_hit_hud')).evaluate().isNotEmpty) {
+        sawBossHitHud = true;
+      }
+      if (find.byKey(const Key('battle_crisis_zoom_pip')).evaluate().isNotEmpty) {
+        if (!sawCrisisPip) {
+          sawCrisisPip = true;
+          // PIP 화면 원터치 정밀타격 무오류 확인
+          await tester.tap(
+            find.byKey(const Key('battle_crisis_zoom_pip')),
+            warnIfMissed: false,
+          );
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        if (sawBossHitHud) break;
+      }
+      if (sawCrisisPip && sawBossHitHud) break;
+      if (find.byKey(const Key('call_early_wave_btn')).evaluate().isNotEmpty) {
+        await tester.tap(
+          find.byKey(const Key('call_early_wave_btn')),
+          warnIfMissed: false,
+        );
+        await tester.pump();
+      }
+    }
+    expect(sawBossHitHud, isTrue);
+    expect(sawCrisisPip, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('v1.0.0+25 10장 차별화 루트 배지 · 제5장 직각미궁/제7장 남북역진격/제10장 부유섬 및 5종 타워 투사체 무오류 검증',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2280);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final p = PlayerProgress(
+      tokens: 1500,
+      elixirs: 80,
+      centralGuardianLevel: 20,
+      highestClearedGlobalStage: 110,
+      tutorialSeen: true,
+      bgmVolume: 0.0,
+      sfxVolume: 0.0,
+    );
+    final controller = GameController(initialProgress: p)
+      ..autoChooseBattlePerks = true;
+
+    for (final code in const [(5, 2), (7, 2), (10, 2)]) {
+      final st = CampaignCatalog.stageAt(code.$1, code.$2);
+      final ch = CampaignCatalog.chapterOf(code.$1);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BattleScreen(
+            key: ValueKey(st.code),
+            controller: controller,
+            stage: st,
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(find.textContaining(ch.routeTopologyTag), findsWidgets);
+
+      final arenaBox = tester.getRect(find.byKey(const Key('battle_arena_gesture')));
+      final slotPos = ch.mounts.first.pos;
+      await tester.tapAt(
+        Offset(
+          arenaBox.left + arenaBox.width * (slotPos.x / CampaignCatalog.arenaWidth),
+          arenaBox.top + arenaBox.height * (slotPos.y / CampaignCatalog.arenaHeight),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 80));
+      final buildKey = Key('place_launcher_${LauncherType.values[code.$1 % 5].id}');
+      await tester.ensureVisible(find.byKey(buildKey));
+      await tester.tap(find.byKey(buildKey));
+      for (int i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(tester.takeException(), isNull);
+    }
   });
 }
