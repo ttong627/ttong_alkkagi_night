@@ -153,10 +153,14 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                   label: '영웅·진법',
                 ),
-                const NavigationDestination(
-                  key: Key('nav_tab_forge'),
-                  icon: Icon(Icons.precision_manufacturing_outlined),
-                  selectedIcon: Icon(
+                NavigationDestination(
+                  key: const Key('nav_tab_forge'),
+                  icon: Badge(
+                    isLabelVisible: p.tokens >= (30 + p.centralGuardianLevel * 18),
+                    backgroundColor: NightPalette.accentGold,
+                    child: const Icon(Icons.precision_manufacturing_outlined),
+                  ),
+                  selectedIcon: const Icon(
                     Icons.precision_manufacturing_rounded,
                     color: NightPalette.accentGold,
                   ),
@@ -290,136 +294,164 @@ class _HomeScreenState extends State<HomeScreen>
                 ? 1.24
                 : (viewport.maxWidth >= 900 ? 1.62 : 1.48);
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 22),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1020),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // 1) 상단 게임 타이틀 & 재화 요약 & 도감·설정 빠른 아이콘 바
-                      Row(
+            return Column(
+              children: [
+                // 1) 모바일 상단 고정 재화·경지 HUD 헤더 (스크롤 시에도 증표·영약·지원패·설정이 항상 상단 고정!)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xEB0E182B),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: NightPalette.borderGold.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1020),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const NightSpriteIcon(
-                            assetPath: NightArtRegistry.appLogo,
-                            fallbackAssetPath: NightArtRegistry.towerGuardian,
-                            fallbackIcon: Icons.shield_moon_rounded,
-                            size: 42,
-                            borderRadius: 10,
-                            showFrame: true,
-                            frameColor: NightPalette.accentGold,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  '수호알까기 · 탄지무림 심야기습',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontFamily: 'BlackHanSans',
-                                    fontSize: 19.5,
-                                    color: NightPalette.accentGold,
-                                  ),
+                          Row(
+                            children: [
+                              const NightSpriteIcon(
+                                assetPath: NightArtRegistry.appLogo,
+                                fallbackAssetPath:
+                                    NightArtRegistry.towerGuardian,
+                                fallbackIcon: Icons.shield_moon_rounded,
+                                size: 38,
+                                borderRadius: 9,
+                                showFrame: true,
+                                frameColor: NightPalette.accentGold,
+                              ),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      '수호알까기 · 탄지무림 심야기습',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontFamily: 'BlackHanSans',
+                                        fontSize: 17.8,
+                                        color: NightPalette.accentGold,
+                                      ),
+                                    ),
+                                    Text(
+                                      '경지 [${p.realm.name}] · ${p.highestClearedGlobalStage}/${CampaignCatalog.allStages.length}판(10현) · 영웅 ${p.unlockedCompanionCount}/14 · 신수 ${p.unlockedBeastCount}/5',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11.2,
+                                        color: NightPalette.textMuted,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  '경지 [${p.realm.name}] · 수호 ${p.highestClearedGlobalStage}/${CampaignCatalog.allStages.length}판(10현) · 영웅 ${p.unlockedCompanionCount}/14 · 신수 ${p.unlockedBeastCount}/5',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 11.8,
-                                    color: NightPalette.textMuted,
-                                  ),
+                              ),
+                              IconButton(
+                                key: const Key('home_codex_btn'),
+                                visualDensity: VisualDensity.compact,
+                                tooltip: '수호 도감 및 확률 공개',
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => CodexScreen(
+                                        controller: widget.controller,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const NightSpriteIcon(
+                                  assetPath: NightArtRegistry.iconCodex,
+                                  fallbackIcon: Icons.auto_stories_rounded,
+                                  size: 26,
+                                  showFrame: true,
+                                  frameColor: NightPalette.jadeShield,
+                                ),
+                              ),
+                              IconButton(
+                                key: const Key('home_settings_btn'),
+                                visualDensity: VisualDensity.compact,
+                                tooltip: '환경 설정 · 백업 · 만든 이 · 제작노트',
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => SettingsScreen(
+                                        controller: widget.controller,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const NightSpriteIcon(
+                                  assetPath: NightArtRegistry.iconSettings,
+                                  fallbackIcon: Icons.settings_rounded,
+                                  size: 26,
+                                  showFrame: true,
+                                  frameColor: NightPalette.accentGold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                ResourcePill(
+                                  iconAsset: NightArtRegistry.nightToken,
+                                  icon: Icons.toll_rounded,
+                                  label: '증표',
+                                  value: '${p.tokens}',
+                                  color: NightPalette.accentGold,
+                                ),
+                                const SizedBox(width: 6),
+                                ResourcePill(
+                                  iconAsset: NightArtRegistry.nightElixir,
+                                  icon: Icons.science_rounded,
+                                  label: '영약',
+                                  value: '${p.elixirs}',
+                                  color: NightPalette.jadeShield,
+                                ),
+                                const SizedBox(width: 6),
+                                ResourcePill(
+                                  iconAsset: NightArtRegistry.nightSupportSeal,
+                                  icon: Icons.campaign_rounded,
+                                  label: '지원패',
+                                  value: '${p.supportTokens}개',
+                                  color: NightPalette.jadeGreen,
+                                ),
+                                const SizedBox(width: 6),
+                                ResourcePill(
+                                  iconAsset: NightArtRegistry.nightSerendipity,
+                                  icon: Icons.brightness_2_rounded,
+                                  label: '보름달',
+                                  value: '${p.moonOmenGauge}%',
+                                  color: NightPalette.accentGold,
                                 ),
                               ],
                             ),
                           ),
-                          IconButton(
-                            key: const Key('home_codex_btn'),
-                            visualDensity: VisualDensity.compact,
-                            tooltip: '수호 도감 및 확률 공개',
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CodexScreen(
-                                    controller: widget.controller,
-                                  ),
-                                ),
-                              );
-                            },
-                            icon: const NightSpriteIcon(
-                              assetPath: NightArtRegistry.iconCodex,
-                              fallbackIcon: Icons.auto_stories_rounded,
-                              size: 28,
-                              showFrame: true,
-                              frameColor: NightPalette.jadeShield,
-                            ),
-                          ),
-                          IconButton(
-                            key: const Key('home_settings_btn'),
-                            visualDensity: VisualDensity.compact,
-                            tooltip: '환경 설정 · 백업 · 만든 이 · 제작노트',
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => SettingsScreen(
-                                    controller: widget.controller,
-                                  ),
-                                ),
-                              );
-                            },
-                            icon: const NightSpriteIcon(
-                              assetPath: NightArtRegistry.iconSettings,
-                              fallbackIcon: Icons.settings_rounded,
-                              size: 28,
-                              showFrame: true,
-                              frameColor: NightPalette.accentGold,
-                            ),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                    ),
+                  ),
+                ),
 
-                      // 보유 재화 HUD 바
-                      Wrap(
-                        spacing: 7,
-                        runSpacing: 6,
-                        children: [
-                          ResourcePill(
-                            iconAsset: NightArtRegistry.nightToken,
-                            icon: Icons.toll_rounded,
-                            label: '증표',
-                            value: '${p.tokens}',
-                            color: NightPalette.accentGold,
-                          ),
-                          ResourcePill(
-                            iconAsset: NightArtRegistry.nightElixir,
-                            icon: Icons.science_rounded,
-                            label: '영약',
-                            value: '${p.elixirs}',
-                            color: NightPalette.jadeShield,
-                          ),
-                          ResourcePill(
-                            iconAsset: NightArtRegistry.nightSupportSeal,
-                            icon: Icons.campaign_rounded,
-                            label: '지원패',
-                            value: '${p.supportTokens}개',
-                            color: NightPalette.jadeGreen,
-                          ),
-                          ResourcePill(
-                            iconAsset: NightArtRegistry.nightSerendipity,
-                            icon: Icons.brightness_2_rounded,
-                            label: '보름달',
-                            value: '${p.moonOmenGauge}%',
-                            color: NightPalette.accentGold,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // 입문 교범 미열람 시 1회 안내 배너
-                      if (!p.tutorialSeen) ...[
+                // 2) 본영 스크롤 컨텐츠 (모바일 한 손 엄지 출정 지령대 + 성채 디오라마 + 6대 전각 격자)
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1020),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 입문 교범 미열람 시 1회 안내 배너
+                            if (!p.tutorialSeen) ...[
                         MurimCard(
                           borderColor: NightPalette.borderGold,
                           padding: const EdgeInsets.symmetric(
@@ -632,15 +664,18 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ],
                   ),
-                ),
-              ),
-            );
-          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
-}
 
 /// 본영 상단 제1주인공: 영웅 대 3페이즈 대수괴 결전 일러스트 + 한지 출정 지령판 + 원터치 일괄 수령.
 class _HeroVsBossCommandBanner extends StatelessWidget {
@@ -717,34 +752,33 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                     ),
                   ),
                 ),
-                // 좌하단 출전 선봉 영웅 3D 모션 배지
+                // 좌하단 출전 선봉 영웅 알파 투명 3D 모션 스탠디 (배경 사각 박스 제거!)
                 Align(
-                  alignment: const Alignment(-0.88, 0.92),
+                  alignment: const Alignment(-0.88, 0.96),
                   child: NightSpriteIcon(
                     assetPath: NightArtRegistry.heroMotionAsset(leadHero),
-                    fallbackAssetPath: NightArtRegistry.heroAttackAsset(leadHero),
+                    fallbackAssetPath:
+                        NightArtRegistry.heroAttackAsset(leadHero),
                     fallbackIcon: Icons.person_rounded,
-                    size: (artHeight * 0.58).clamp(72.0, 110.0),
-                    borderRadius: 14,
-                    fit: BoxFit.cover,
-                    showFrame: true,
-                    frameColor: NightPalette.accentGold,
+                    size: (artHeight * 0.68).clamp(80.0, 124.0),
+                    borderRadius: 0,
+                    fit: BoxFit.contain,
+                    showFrame: false,
                   ),
                 ),
-                // 우하단 침공 3페이즈 보스 3D 모션 배지
+                // 우하단 침공 3페이즈 보스 알파 투명 3D 모션 스탠디 (배경 사각 박스 제거!)
                 Align(
-                  alignment: const Alignment(0.88, 0.92),
+                  alignment: const Alignment(0.88, 0.96),
                   child: NightSpriteIcon(
                     assetPath: NightArtRegistry.mutantMotionAsset(
                       MutantKind.chapterOverlord,
                     ),
                     fallbackAssetPath: NightArtRegistry.showcaseBossChapter,
                     fallbackIcon: Icons.whatshot_rounded,
-                    size: (artHeight * 0.58).clamp(72.0, 110.0),
-                    borderRadius: 14,
-                    fit: BoxFit.cover,
-                    showFrame: true,
-                    frameColor: NightPalette.crimsonMoon,
+                    size: (artHeight * 0.68).clamp(80.0, 124.0),
+                    borderRadius: 0,
+                    fit: BoxFit.contain,
+                    showFrame: false,
                   ),
                 ),
                 // 상단 진행 단계 & 초소/구출 정보 배지
@@ -766,7 +800,8 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                           color: const Color(0xE8162238),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: NightPalette.accentGold.withValues(alpha: 0.8),
+                            color:
+                                NightPalette.accentGold.withValues(alpha: 0.8),
                           ),
                         ),
                         child: Text(
@@ -805,25 +840,26 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
             ),
           ),
 
-          // 2) 하단: 고대비 한지 출정 명패 + 대형 출정 단추 & 원터치 일괄 수령
+          // 2) 하단: 모바일 한 손 엄지 출정 도크 (난이도 즉시 선택 + 전폭 출정 버튼 + 지도/일괄수령 2열 + 원터치 진법/강화 정비 바!)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     NightSpriteIcon(
                       assetPath:
                           NightArtRegistry.charFace(chSpec.bossPortraitPrefix),
                       fallbackIcon: Icons.shield_rounded,
-                      size: 48,
-                      borderRadius: 24,
+                      size: 44,
+                      borderRadius: 22,
                       fit: BoxFit.cover,
                       showFrame: true,
                       frameColor: NightPalette.hanjiInk,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -832,103 +868,312 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                             '${chSpec.countyName} · ${nextStage.stageNumber}/10번째 마을 [${nextStage.villageNodeName}]',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 13.0,
+                              fontSize: 12.4,
                               color: NightPalette.hanjiSubInk,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(
                             nextStage.title,
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontFamily: 'BlackHanSans',
-                              fontSize: 22.0,
+                              fontSize: 20.0,
                               color: NightPalette.hanjiInk,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 6),
+                    SegmentedButton<DefenseDifficulty>(
+                      key: const Key('home_difficulty_selector'),
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: DefenseDifficulty.easy,
+                          label: Text('쉬움'),
+                        ),
+                        ButtonSegment(
+                          value: DefenseDifficulty.normal,
+                          label: Text('보통'),
+                        ),
+                        ButtonSegment(
+                          value: DefenseDifficulty.nightmare,
+                          label: Text('악몽'),
+                        ),
+                      ],
+                      selected: {controller.selectedDifficulty},
+                      onSelectionChanged: (s) =>
+                          controller.setDifficulty(s.first),
+                      style: ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        backgroundColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.selected)
+                              ? NightPalette.hanjiInk
+                              : const Color(0xFFE5D5B5),
+                        ),
+                        foregroundColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.selected)
+                              ? NightPalette.accentGold
+                              : NightPalette.hanjiInk,
+                        ),
+                        side: const WidgetStatePropertyAll(
+                          BorderSide(color: Color(0xFF2F3F5C)),
+                        ),
+                        padding: const WidgetStatePropertyAll(
+                          EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        ),
+                        minimumSize:
+                            const WidgetStatePropertyAll(Size(30, 30)),
+                        textStyle: const WidgetStatePropertyAll(
+                          TextStyle(
+                            fontSize: 11.2,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    FilledButton.icon(
-                      key: const Key('home_quick_battle_btn'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(200, 52),
-                        backgroundColor: NightPalette.hanjiInk,
-                        foregroundColor: NightPalette.accentGold,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          buildSmoothBattleRoute(
-                            controller: controller,
-                            stage: nextStage,
-                          ),
-                        );
-                      },
-                      icon: const NightSpriteIcon(
-                        assetPath: NightArtRegistry.towerGuardian,
-                        fallbackIcon: Icons.play_arrow_rounded,
-                        size: 22,
-                      ),
-                      label: const Text(
-                        '즉시 야간 수호 출정',
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.bold,
-                        ),
+                const SizedBox(height: 10),
+
+                // ① 엄지 스윗스팟 전폭 주력 CTA: [즉시 야간 수호 출정]
+                SizedBox(
+                  height: 50,
+                  child: FilledButton.icon(
+                    key: const Key('home_quick_battle_btn'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NightPalette.hanjiInk,
+                      foregroundColor: NightPalette.accentGold,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    OutlinedButton.icon(
-                      key: const Key('home_campaign_map_btn'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(156, 48),
-                        backgroundColor: const Color(0xFFE6D4B0),
-                        foregroundColor: NightPalette.hanjiInk,
-                        side: const BorderSide(color: Color(0xFF2F3F5C)),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        buildSmoothBattleRoute(
+                          controller: controller,
+                          stage: nextStage,
+                        ),
+                      );
+                    },
+                    icon: const NightSpriteIcon(
+                      assetPath: NightArtRegistry.towerGuardian,
+                      fallbackIcon: Icons.play_arrow_rounded,
+                      size: 22,
+                    ),
+                    label: const Text(
+                      '즉시 야간 수호 출정',
+                      style: TextStyle(
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.bold,
                       ),
-                      onPressed: () {
-                        controller.setSelectedChapter(nextStage.chapterNumber);
-                        Navigator.of(context).push(
-                          buildSmoothScreenRoute(
-                            CampaignScreen(
-                              controller: controller,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // ② 2열 균등 보조 버튼: [10현·100판 행군 지도] + [도착 보상 일괄 수령·파견]
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          key: const Key('home_campaign_map_btn'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            backgroundColor: const Color(0xFFE6D4B0),
+                            foregroundColor: NightPalette.hanjiInk,
+                            side: const BorderSide(color: Color(0xFF2F3F5C)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                        );
-                      },
-                      icon: const NightSpriteIcon(
-                        assetPath: NightArtRegistry.iconCampaign,
-                        fallbackIcon: Icons.map_rounded,
-                        size: 18,
-                      ),
-                      label: const Text('10현·100판 행군 지도'),
-                    ),
-                    if (hasReadyAction)
-                      OutlinedButton.icon(
-                        key: const Key('home_batch_claim_btn'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(164, 48),
-                          backgroundColor: const Color(0xFF24344F),
-                          foregroundColor: NightPalette.jadeGreen,
-                          side: const BorderSide(color: NightPalette.jadeGreen),
+                          onPressed: () {
+                            controller.setSelectedChapter(
+                              nextStage.chapterNumber,
+                            );
+                            Navigator.of(context).push(
+                              buildSmoothScreenRoute(
+                                CampaignScreen(
+                                  controller: controller,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const NightSpriteIcon(
+                            assetPath: NightArtRegistry.iconCampaign,
+                            fallbackIcon: Icons.map_rounded,
+                            size: 17,
+                          ),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '10현·100판 행군 지도',
+                              style: TextStyle(
+                                fontSize: 13.0,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
-                        onPressed: onBatchClaimAll,
-                        icon: const Icon(Icons.redeem_rounded, size: 18),
-                        label: const Text('도착 보상 일괄 수령·파견'),
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          key: const Key('home_batch_claim_btn'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            backgroundColor: hasReadyAction
+                                ? const Color(0xFF1E3738)
+                                : const Color(0xFF233047),
+                            foregroundColor: hasReadyAction
+                                ? NightPalette.jadeGreen
+                                : NightPalette.accentGold,
+                            side: BorderSide(
+                              color: hasReadyAction
+                                  ? NightPalette.jadeGreen
+                                  : const Color(0xFF3E506E),
+                              width: hasReadyAction ? 1.5 : 1.0,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: onBatchClaimAll,
+                          icon: Icon(
+                            hasReadyAction
+                                ? Icons.redeem_rounded
+                                : Icons.done_all_rounded,
+                            size: 17,
+                          ),
+                          label: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              hasReadyAction
+                                  ? '도착 보상 일괄 수령·파견'
+                                  : '일괄 수령·자동파견',
+                              style: const TextStyle(
+                                fontSize: 13.0,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+
+                // ③ 탭 이동 없이 본영에서 한 손으로 끝내는 [출정 전 1초 원터치 정비 바]
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: OutlinedButton.icon(
+                          key: const Key('home_quick_auto_loadout_btn'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            backgroundColor: const Color(0xFF1A2740),
+                            foregroundColor: NightPalette.accentGold,
+                            side: BorderSide(
+                              color: NightPalette.accentGold
+                                  .withValues(alpha: 0.65),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () {
+                            final target =
+                                controller.applyRecommendedForNextStage();
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                SnackBar(
+                                  backgroundColor: NightPalette.bgCard,
+                                  content: Text(
+                                    '[${target.code}] 맞춤 진법(수호석·초소·영수·동료) 원터치 편성 완료!',
+                                    style: const TextStyle(
+                                      color: NightPalette.accentGold,
+                                    ),
+                                  ),
+                                ),
+                              );
+                          },
+                          icon:
+                              const Icon(Icons.auto_fix_high_rounded, size: 15),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '최적 진법 원터치 편성',
+                              style: TextStyle(
+                                fontSize: 12.2,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: OutlinedButton.icon(
+                          key: const Key('home_quick_auto_upgrade_btn'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            backgroundColor: const Color(0xFF16312E),
+                            foregroundColor: const Color(0xFF80ED99),
+                            side: const BorderSide(color: Color(0x9980ED99)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () {
+                            final logs = controller.upgradeRecommendedBatch(
+                              maxSteps: 6,
+                            );
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                SnackBar(
+                                  backgroundColor: NightPalette.bgCard,
+                                  content: Text(
+                                    logs.isNotEmpty
+                                        ? '추천 일괄 강화 완료: ${logs.join(" · ")}'
+                                        : '현재 보유 증표·영약·내공으로 즉시 올릴 수 있는 추천 항목이 없습니다.',
+                                    style: const TextStyle(
+                                      color: NightPalette.jadeGreen,
+                                    ),
+                                  ),
+                                ),
+                              );
+                          },
+                          icon: const Icon(Icons.bolt_rounded, size: 16),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '추천 일괄 강화',
+                              style: TextStyle(
+                                fontSize: 12.2,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],

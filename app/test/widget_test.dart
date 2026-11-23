@@ -1623,4 +1623,117 @@ void main() {
     expect(find.byType(BattleScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+      'v1.0.0+32 모바일 한 손 엄지 UI/UX 개편 검증: 360x780 폰 무스크롤 4등분 강화 격자 · 우측 스윗스팟 추천축조 · 하단 비급 시트 · 본영 원터치 난이도/정비 도크',
+      (WidgetTester tester) async {
+    // 표준 소형 스마트폰 세로 뷰포트 (360 x 780 logical px)
+    tester.view.physicalSize = const Size(720, 1560);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final mobileProg = PlayerProgress(
+      tokens: 900,
+      elixirs: 40,
+      naegongPoints: 300,
+      supportTokens: 3,
+      highestClearedGlobalStage: 4,
+      tutorialSeen: true,
+      bgmVolume: 0.0,
+      sfxVolume: 0.0,
+    );
+    mobileProg.unlockedStones.add(StoneMaterial.hyeoncheol);
+    final ctrl = GameController(initialProgress: mobileProg);
+
+    // 1) 본영: 360dp 폰에서 오버플로 0건 + 난이도 즉시 선택 + 원터치 최적 진법/추천 강화 작동 확인
+    await tester.pumpWidget(
+      SuhoAlkkagiNightApp(controller: ctrl, skipSplash: true),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('home_difficulty_selector')), findsOneWidget);
+    await tester.tap(find.text('악몽'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(ctrl.selectedDifficulty, DefenseDifficulty.nightmare);
+    await tester.tap(find.text('보통'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(ctrl.selectedDifficulty, DefenseDifficulty.normal);
+
+    await tester.tap(find.byKey(const Key('home_quick_auto_loadout_btn')));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(ctrl.progress.activePreset.primaryStone, StoneMaterial.hyeoncheol);
+    ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first))
+        .clearSnackBars();
+    await tester.pump();
+
+    final beforeCentralLv = ctrl.progress.centralGuardianLevel;
+    await tester.tap(find.byKey(const Key('home_quick_auto_upgrade_btn')));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(
+      ctrl.progress.centralGuardianLevel > beforeCentralLv ||
+          ctrl.progress.openedMeridianStep > 0,
+      isTrue,
+    );
+    ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first))
+        .clearSnackBars();
+    await tester.pump();
+
+    // 2) 전장(360x780 소형 스마트폰): 가로 스크롤 전혀 없이 4종 강화 버튼 + 도박소환 + 우측 스윗스팟 추천축조 모두 0..360dp 내 노출 확인!
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BattleScreen(
+          key: const ValueKey('v32_mobile_battle'),
+          controller: ctrl,
+          stage: CampaignCatalog.stageAt(1, 2),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('battle_mobile_thumb_deck')), findsOneWidget);
+
+    for (final k in const [
+      Key('quick_lucky_summon_btn'),
+      Key('quick_direct_build_btn'),
+      Key('live_upg_firepower_btn'),
+      Key('live_upg_reload_btn'),
+      Key('live_upg_range_btn'),
+      Key('live_upg_barrier_btn'),
+      Key('battle_chuldu_btn'),
+    ]) {
+      final rect = tester.getRect(find.byKey(k));
+      expect(rect.left, greaterThanOrEqualTo(0.0), reason: '$k 좌측 잘림 없어야 함');
+      expect(rect.right, lessThanOrEqualTo(360.0), reason: '$k 가로 스크롤 없이 360dp 내 완전 노출');
+    }
+
+    // 오른손 엄지 스윗스팟 원칙: [추천축조]가 [도박소환] 우측에 위치하고 화면 하단 황금 엄지 권역(y > 540)에 배치되어야 함!
+    final luckyRect = tester.getRect(find.byKey(const Key('quick_lucky_summon_btn')));
+    final directRect = tester.getRect(find.byKey(const Key('quick_direct_build_btn')));
+    expect(directRect.center.dx, greaterThan(luckyRect.center.dx));
+    expect(directRect.center.dy, greaterThan(540.0));
+
+    // 추천축조 원터치 실행 후 3배속 조기 호출 시 돌파 비급 3택 1 시트도 화면 하단 엄지 권역(y > 390)에 표시되는지 확인!
+    await tester.tap(find.byKey(const Key('quick_direct_build_btn')));
+    await tester.pump(const Duration(milliseconds: 80));
+    await tester.tap(find.text('3배'));
+    await tester.pump();
+    for (int f = 0; f < 180; f++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byKey(const Key('call_early_wave_btn')).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    expect(find.byKey(const Key('call_early_wave_btn')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('call_early_wave_btn')));
+    await tester.pump(const Duration(milliseconds: 120));
+    final perkSheetRect =
+        tester.getRect(find.byKey(const Key('battle_thumb_perk_sheet')));
+    expect(
+      perkSheetRect.center.dy,
+      greaterThan(390.0),
+      reason: '돌파 비급 선택창이 상단 끝이 아닌 하단 엄지 권역에 떠야 함',
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

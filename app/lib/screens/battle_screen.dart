@@ -962,7 +962,7 @@ class _BattleScreenState extends State<BattleScreen>
           body: SafeArea(
         child: Column(
           children: [
-            // 상단 전장 상태 막대 + 실시간 초소 건설 기력(⚡) 충전 게이지 바
+            // 상단 슬림 정보창(Glance Zone): 한 손 플레이 시 시선만 주는 상태 정보만 2줄로 압축해 모바일 전장 시야 극대화!
             ValueListenableBuilder<int>(
               valueListenable: _frameNotifier,
               builder: (_, _, _) {
@@ -972,87 +972,67 @@ class _BattleScreenState extends State<BattleScreen>
                 final towerPct = _sim.centralSpec.coreMaxHp > 0
                     ? (_sim.towerHp / _sim.centralSpec.coreMaxHp * 100).round()
                     : 0;
-                final nextSlot = _sim.nextRecommendedSlotIndex();
-                final nextMount =
-                    nextSlot != null ? _sim.mountSlotByIndex(nextSlot) : null;
-                final needExcavateFirst =
-                    nextSlot != null && !_sim.isSlotExcavated(nextSlot);
-                final nextTargetCost = nextMount == null
-                    ? _sim.buildCostForType(LauncherType.rapid)
-                    : (needExcavateFirst
-                        ? _sim.excavationCostForSlot(nextMount)
-                        : _sim.buildCostForType(
-                            _sim.preferredBuildTypeForSlot(nextMount),
-                          ));
-                final qiFill =
-                    (_sim.fieldTokens / max(1, nextTargetCost)).clamp(0.0, 1.0);
-                final canBuildAny =
-                    nextSlot != null && _sim.fieldTokens >= nextTargetCost;
+                final q = _sim.currentBountyQuest;
 
                 return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+                  padding: const EdgeInsets.fromLTRB(6, 3, 8, 4),
+                  decoration: BoxDecoration(
+                    color: NightPalette.bgPanel,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: NightPalette.borderGold.withValues(alpha: 0.28),
+                      ),
+                    ),
                   ),
-                  color: NightPalette.bgPanel,
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      // 1줄: 복귀·재개시 · 현재 마을/물결 · 1~4배속 슬림 선택기
                       Row(
                         children: [
-                          IconButton(
-                            key: const Key('battle_pause_btn'),
-                            visualDensity: VisualDensity.compact,
-                            tooltip: '본영으로 즉시 복귀',
-                            onPressed: () =>
-                                _confirmExitOrRestart(isRestart: false),
-                            icon: const Icon(Icons.arrow_back_rounded),
-                          ),
-                          IconButton(
-                            key: const Key('battle_quick_restart_btn'),
-                            visualDensity: VisualDensity.compact,
-                            tooltip: '멈춤 없이 즉시 처음부터 재개시',
-                            onPressed: () =>
-                                _confirmExitOrRestart(isRestart: true),
-                            icon: const Icon(Icons.refresh_rounded, size: 20),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${widget.stage.title} · 물결 ${_sim.currentWaveIndex + 1}/${widget.stage.waves.length}',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 13.5,
-                                    color: NightPalette.accentGold,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (widget.stage.hasRescueReward)
-                                  Text(
-                                    '🆘 구출 목표: ${widget.stage.rescueBadgeText}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 11.0,
-                                      color: NightPalette.jadeGreen,
-                                    ),
-                                  )
-                                else if (widget.stage.globalIndex >= 1 &&
-                                    widget.stage.globalIndex <
-                                        CampaignCatalog.allStages.length)
-                                  Text(
-                                    widget.stage.stageNumber < 10
-                                        ? '🏘️ 현재 [${widget.stage.villageNodeName}] ➔ 다음 인근 마을: [${CampaignCatalog.allStages[widget.stage.globalIndex].villageNodeName}]'
-                                        : '🏯 현 결전 [${widget.stage.villageNodeName}] ➔ 완수 시 제${widget.stage.chapterNumber + 1}현 대행군!',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 10.8,
-                                      color: NightPalette.jadeGreen,
-                                    ),
-                                  ),
-                              ],
+                          SizedBox(
+                            width: 34,
+                            height: 32,
+                            child: IconButton(
+                              key: const Key('battle_pause_btn'),
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              tooltip: '본영으로 즉시 복귀',
+                              onPressed: () =>
+                                  _confirmExitOrRestart(isRestart: false),
+                              icon: const Icon(
+                                Icons.arrow_back_rounded,
+                                size: 20,
+                              ),
                             ),
                           ),
+                          SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: IconButton(
+                              key: const Key('battle_quick_restart_btn'),
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              tooltip: '멈춤 없이 즉시 처음부터 재개시',
+                              onPressed: () =>
+                                  _confirmExitOrRestart(isRestart: true),
+                              icon: const Icon(Icons.refresh_rounded, size: 19),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Expanded(
+                            child: Text(
+                              '${widget.stage.title} · 🌊${_sim.currentWaveIndex + 1}/${widget.stage.waves.length}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12.8,
+                                color: NightPalette.accentGold,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
                           SegmentedButton<int>(
                             showSelectedIcon: false,
                             segments: const [
@@ -1084,145 +1064,162 @@ class _BattleScreenState extends State<BattleScreen>
                                 BorderSide(color: Color(0x5572EFDD)),
                               ),
                               padding: const WidgetStatePropertyAll(
-                                EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                               ),
-                              minimumSize: const WidgetStatePropertyAll(Size(28, 30)),
+                              minimumSize:
+                                  const WidgetStatePropertyAll(Size(25, 27)),
                               textStyle: const WidgetStatePropertyAll(
-                                TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                TextStyle(
+                                  fontSize: 10.8,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
 
-                      // ★ 한눈에 보이는 「초소 건설 기력(⚡) 충전 바 & 조건 표시」
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: NightPalette.bgDeep,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: canBuildAny
-                                ? const Color(0xFF80ED99)
-                                : NightPalette.jadeShield.withValues(alpha: 0.45),
-                          ),
-                        ),
+                      // 2줄: 전장 핵심 지표 1줄 슬림 바 (연속수호 토글을 맨 앞에 두어 전 해상도 즉시 클릭 보장!)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            const NightSpriteIcon(
-                              assetPath: NightArtRegistry.iconLuckyDice,
-                              fallbackIcon: Icons.bolt_rounded,
-                              size: 18,
-                              borderRadius: 4,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '군수기력 ⚡${_sim.fieldTokens}',
-                              style: TextStyle(
-                                fontSize: 11.8,
-                                fontWeight: FontWeight.bold,
-                                color: canBuildAny
-                                    ? const Color(0xFF80ED99)
-                                    : NightPalette.accentGold,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(5),
-                                child: LinearProgressIndicator(
-                                  value: qiFill,
-                                  minHeight: 7,
-                                  backgroundColor: Colors.white12,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    canBuildAny
-                                        ? const Color(0xFF80ED99)
-                                        : NightPalette.accentGold,
+                            if (widget.stage.globalIndex >= 1 &&
+                                widget.stage.globalIndex <=
+                                    CampaignCatalog.allStages.length) ...[
+                              GestureDetector(
+                                key: const Key('battle_continuous_march_chip'),
+                                onTap: () {
+                                  widget.controller.setContinuousVillageMarch(
+                                    !widget.controller.continuousVillageMarch,
+                                  );
+                                  setState(() {});
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
                                   ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              nextSlot == null
-                                  ? '전 거점 가동/대기'
-                                  : (needExcavateFirst
-                                      ? (canBuildAny
-                                          ? '⛏️거점 개척 가능($nextTargetCost⚡)!'
-                                          : '🪨개척 필요 $nextTargetCost⚡')
-                                      : (canBuildAny
-                                          ? '🔨포대 축조 가능($nextTargetCost⚡)!'
-                                          : '체증건설 $nextTargetCost⚡')),
-                              style: TextStyle(
-                                fontSize: 11.0,
-                                fontWeight: FontWeight.bold,
-                                color: canBuildAny
-                                    ? const Color(0xFF80ED99)
-                                    : NightPalette.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-
-                      // ★ 실시간 긴급 현상수배 미션 바 (달성 즉시 자동으로 대박 기력 지급!)
-                      Builder(
-                        builder: (_) {
-                          final q = _sim.currentBountyQuest;
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10192D),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: NightPalette.accentGold.withValues(alpha: 0.35),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
+                                  decoration: BoxDecoration(
+                                    color:
+                                        widget.controller.continuousVillageMarch
+                                            ? const Color(0xFF143C34)
+                                            : NightPalette.bgDeep,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: widget
+                                              .controller.continuousVillageMarch
+                                          ? NightPalette.jadeGreen
+                                          : Colors.white24,
+                                    ),
+                                  ),
                                   child: Text(
-                                    q.allCleared
-                                        ? '🏆 현상수배 전 단계 완수! (전군 대박 보급 완료)'
-                                        : '🏆 현상수배(${q.stepIndex}/4): ${q.title} [${q.current}/${q.goal}]',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 10.8,
+                                    widget.controller.continuousVillageMarch
+                                        ? '🏃연속수호 ON'
+                                        : '⏸️연속수호 OFF',
+                                    style: TextStyle(
+                                      fontSize: 10.4,
                                       fontWeight: FontWeight.bold,
-                                      color: NightPalette.jadeGreen,
+                                      color: widget
+                                              .controller.continuousVillageMarch
+                                          ? NightPalette.jadeGreen
+                                          : NightPalette.textMuted,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '보상 ${q.bonusLabel}',
-                                  style: const TextStyle(
-                                    fontSize: 10.6,
-                                    fontWeight: FontWeight.bold,
-                                    color: NightPalette.accentGold,
-                                  ),
-                                ),
-                              ],
+                              ),
+                              const SizedBox(width: 7),
+                            ],
+                            _HudStatBadge(
+                              assetPath: NightArtRegistry.launcherAsset(
+                                LauncherType.rapid,
+                              ),
+                              fallbackIcon: Icons.add_location_alt_rounded,
+                              text:
+                                  '초소 ${_sim.launchers.length}/${_sim.activeMounts.length}곳',
+                              color: _sim.launchers.isEmpty
+                                  ? NightPalette.accentGold
+                                  : NightPalette.jadeGreen,
                             ),
-                          );
-                        },
+                            const SizedBox(width: 7),
+                            _HudStatBadge(
+                              assetPath: NightArtRegistry.fxBarrier,
+                              fallbackIcon: Icons.shield_rounded,
+                              text: '방어막 $shieldPct%',
+                              color: NightPalette.jadeShield,
+                            ),
+                            const SizedBox(width: 7),
+                            _HudStatBadge(
+                              assetPath: NightArtRegistry.towerGuardian,
+                              fallbackIcon: Icons.fort_rounded,
+                              text: '수호탑 $towerPct%',
+                              color: NightPalette.accentGold,
+                            ),
+                            const SizedBox(width: 7),
+                            _HudStatBadge(
+                              assetPath: NightArtRegistry.fxQi,
+                              fallbackIcon: Icons.bolt_rounded,
+                              text:
+                                  '내공 ${_sim.qiBars.toStringAsFixed(1)}/${_sim.maxQiBars.round()}칸',
+                              color: NightPalette.jadeGreen,
+                            ),
+                            const SizedBox(width: 7),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10192D),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: NightPalette.accentGold
+                                      .withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: Text(
+                                q.allCleared
+                                    ? '🏆현상수배 완수!'
+                                    : '🏆${q.title} [${q.current}/${q.goal}] (${q.bonusLabel})',
+                                style: const TextStyle(
+                                  fontSize: 10.4,
+                                  fontWeight: FontWeight.bold,
+                                  color: NightPalette.jadeGreen,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 7),
+                            _HudStatBadge(
+                              assetPath: chapter.floorAsset,
+                              fallbackIcon: Icons.route_rounded,
+                              text:
+                                  '${chapter.routeTopologyTag} · ${chapter.chapterTraitTitle}',
+                              color: const Color(0xFF90E0EF),
+                            ),
+                            if (widget.stage.hasRescueReward) ...[
+                              const SizedBox(width: 7),
+                              Text(
+                                '🆘구출: ${widget.stage.rescueBadgeText}',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: NightPalette.jadeGreen,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 3),
 
-                      // ★ 행동대장(100+타) · 중간보스(300+타) · 장 보스(1,000+타) 실시간 계급·다단페이즈·누적타수 안내 바!
+                      // ★ 보스 출현 시에만 슬림하게 펼쳐지는 다단 페이즈 · 타수 마갑 게이지 바
                       Builder(
                         builder: (_) {
                           final boss = _sim.activeMultiPhaseBoss ??
                               _sim.mutants
-                                  .where((m) => m.kind.isBoss || m.maxHitShield > 0)
+                                  .where(
+                                    (m) => m.kind.isBoss || m.maxHitShield > 0,
+                                  )
                                   .firstOrNull;
                           if (boss == null) return const SizedBox.shrink();
                           final pRatio = boss.currentMaxHp > 0
@@ -1233,27 +1230,28 @@ class _BattleScreenState extends State<BattleScreen>
                                   .clamp(0.0, 1.0)
                               : 0.0;
                           final remPhases =
-                              (boss.totalPhases - boss.currentPhase + 1).clamp(1, 3);
+                              (boss.totalPhases - boss.currentPhase + 1)
+                                  .clamp(1, 3);
                           final gems = boss.totalPhases > 1
                               ? '${'◆' * remPhases}${'◇' * (boss.totalPhases - remPhases)} '
                               : '';
                           final hitSummary = boss.maxHitShield > 0
-                              ? '🔥${boss.totalHitsTaken}HIT · 🛡️남은 ${boss.hitShieldLeft}/${boss.maxHitShield}타'
-                              : '🔥누적 ${boss.totalHitsTaken}HIT';
+                              ? '🔥${boss.totalHitsTaken}HIT · 🛡️${boss.hitShieldLeft}/${boss.maxHitShield}타'
+                              : '🔥${boss.totalHitsTaken}HIT';
                           final statusLabel = boss.phaseTransitionTimer > 0
-                              ? '⚡재변이 각성 중! · $hitSummary'
+                              ? '⚡재변이! · $hitSummary'
                               : (boss.carapacePlatesLeft > 0
                                   ? '🛡️장갑${boss.carapacePlatesLeft}겹 🎯약점터치! · $hitSummary'
                                   : (boss.groggyExposeTimer > 0
                                       ? '💥무방비(×1.85) · $hitSummary'
                                       : hitSummary));
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 3),
+                            padding: const EdgeInsets.only(top: 3),
                             child: Container(
                               key: const Key('battle_boss_hit_hud'),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
-                                vertical: 4,
+                                vertical: 3,
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF280B18),
@@ -1275,7 +1273,7 @@ class _BattleScreenState extends State<BattleScreen>
                                           '👹 [${boss.hierarchyRank}] ${boss.displayName} [$gems${boss.phaseTitleBadge}]',
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
-                                            fontSize: 11.0,
+                                            fontSize: 10.6,
                                             fontWeight: FontWeight.bold,
                                             color: NightPalette.accentGold,
                                           ),
@@ -1287,7 +1285,7 @@ class _BattleScreenState extends State<BattleScreen>
                                           statusLabel,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                            fontSize: 10.4,
+                                            fontSize: 10.2,
                                             fontWeight: FontWeight.bold,
                                             color: boss.groggyExposeTimer > 0
                                                 ? const Color(0xFF80ED99)
@@ -1297,12 +1295,12 @@ class _BattleScreenState extends State<BattleScreen>
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 3),
+                                  const SizedBox(height: 2),
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(4),
                                     child: LinearProgressIndicator(
                                       value: pRatio,
-                                      minHeight: 5,
+                                      minHeight: 4.5,
                                       backgroundColor: Colors.white12,
                                       valueColor: AlwaysStoppedAnimation<Color>(
                                         boss.currentPhase >= 3
@@ -1319,7 +1317,7 @@ class _BattleScreenState extends State<BattleScreen>
                                       borderRadius: BorderRadius.circular(3),
                                       child: LinearProgressIndicator(
                                         value: hitRatio,
-                                        minHeight: 3.5,
+                                        minHeight: 3,
                                         backgroundColor: Colors.white10,
                                         valueColor:
                                             const AlwaysStoppedAnimation<Color>(
@@ -1333,111 +1331,6 @@ class _BattleScreenState extends State<BattleScreen>
                             ),
                           );
                         },
-                      ),
-
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.center,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          _HudStatBadge(
-                            assetPath: NightArtRegistry.launcherAsset(
-                              LauncherType.rapid,
-                            ),
-                            fallbackIcon: Icons.add_location_alt_rounded,
-                            text:
-                                '초소 ${_sim.launchers.length}/${_sim.activeMounts.length}곳',
-                            color: _sim.launchers.isEmpty
-                                ? NightPalette.accentGold
-                                : NightPalette.jadeGreen,
-                          ),
-                          _HudStatBadge(
-                            assetPath: NightArtRegistry.fxBarrier,
-                            fallbackIcon: Icons.shield_rounded,
-                            text: '방어막 $shieldPct%',
-                            color: NightPalette.jadeShield,
-                          ),
-                          _HudStatBadge(
-                            assetPath: NightArtRegistry.towerGuardian,
-                            fallbackIcon: Icons.fort_rounded,
-                            text: '수호탑 $towerPct%',
-                            color: NightPalette.accentGold,
-                          ),
-                          _HudStatBadge(
-                            assetPath: NightArtRegistry.fxQi,
-                            fallbackIcon: Icons.bolt_rounded,
-                            text:
-                                '내공 ${_sim.qiBars.toStringAsFixed(1)}/${_sim.maxQiBars.round()}칸',
-                            color: NightPalette.jadeGreen,
-                          ),
-                          _HudStatBadge(
-                            assetPath: chapter.floorAsset,
-                            fallbackIcon: Icons.route_rounded,
-                            text:
-                                '${chapter.routeTopologyTag} · ${chapter.chapterTraitTitle}',
-                            color: const Color(0xFF90E0EF),
-                          ),
-                          if (_sim.activePerks.isNotEmpty)
-                            _HudStatBadge(
-                              assetPath: NightArtRegistry.iconRogueScroll,
-                              fallbackIcon: Icons.menu_book_rounded,
-                              text:
-                                  '비급 ${_sim.activePerks.values.fold<int>(0, (a, b) => a + b)}권',
-                              color: NightPalette.accentGold,
-                            ),
-                          if (_sim.auroraCritTimer > 0)
-                            _HudStatBadge(
-                              assetPath: NightArtRegistry.fxCritical,
-                              fallbackIcon: Icons.auto_awesome_rounded,
-                              text:
-                                  '극광회심 ${_sim.auroraCritTimer.toStringAsFixed(1)}초',
-                              color: Colors.orangeAccent,
-                            ),
-                          if (widget.stage.globalIndex >= 1 &&
-                              widget.stage.globalIndex <=
-                                  CampaignCatalog.allStages.length)
-                            GestureDetector(
-                              key: const Key('battle_continuous_march_chip'),
-                              onTap: () {
-                                widget.controller.setContinuousVillageMarch(
-                                  !widget.controller.continuousVillageMarch,
-                                );
-                                setState(() {});
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2.5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: widget.controller.continuousVillageMarch
-                                      ? const Color(0xFF143C34)
-                                      : NightPalette.bgDeep,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color:
-                                        widget.controller.continuousVillageMarch
-                                            ? NightPalette.jadeGreen
-                                            : Colors.white24,
-                                  ),
-                                ),
-                                child: Text(
-                                  widget.controller.continuousVillageMarch
-                                      ? '🏃연속수호 ON'
-                                      : '⏸️연속수호 OFF',
-                                  style: TextStyle(
-                                    fontSize: 10.6,
-                                    fontWeight: FontWeight.bold,
-                                    color:
-                                        widget.controller.continuousVillageMarch
-                                            ? NightPalette.jadeGreen
-                                            : NightPalette.textMuted,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
                       ),
                     ],
                   ),
@@ -2001,6 +1894,8 @@ class _BattleScreenState extends State<BattleScreen>
                         const Color(0xFFFFD166),
                         sirenPulse,
                       )!;
+                      final isMobileNarrow =
+                          MediaQuery.sizeOf(context).width < 520;
                       final dockRightForTopMounts = _sim.chapter.number == 7;
                       final hasRightTopHud = _sim.comboCount >= 3 ||
                           _sim.feverTimer > 0 ||
@@ -2010,10 +1905,12 @@ class _BattleScreenState extends State<BattleScreen>
                         top: dockRightForTopMounts
                             ? (hasRightTopHud ? 124 : 88)
                             : 44,
-                        left: dockRightForTopMounts ? null : 10,
-                        right: dockRightForTopMounts ? 10 : null,
+                        left: dockRightForTopMounts ? null : 8,
+                        right: dockRightForTopMounts ? 8 : null,
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 214),
+                          constraints: BoxConstraints(
+                            maxWidth: isMobileNarrow ? 152 : 214,
+                          ),
                           child: Column(
                             crossAxisAlignment: dockRightForTopMounts
                                 ? CrossAxisAlignment.end
@@ -2109,8 +2006,8 @@ class _BattleScreenState extends State<BattleScreen>
                                     }
                                   },
                                   child: Container(
-                                    width: 196,
-                                    height: 132,
+                                    width: isMobileNarrow ? 142 : 196,
+                                    height: isMobileNarrow ? 96 : 132,
                                     decoration: BoxDecoration(
                                       color: const Color(0xF2080E1A),
                                       borderRadius: BorderRadius.circular(12),
@@ -2346,22 +2243,33 @@ class _BattleScreenState extends State<BattleScreen>
                               DefenseBattleSim.perkWindowDurationSec)
                           .clamp(0.0, 1.0);
 
+                      final hasOpenPadBar =
+                          _selectedSlotIndex != null && _livePadMenuTimer > 0;
                       return Positioned(
-                        top: 6,
+                        top: hasOpenPadBar ? 8 : null,
+                        bottom: hasOpenPadBar ? null : 8,
                         left: 8,
                         right: 8,
                         child: Center(
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 580),
                             child: Container(
-                              padding: const EdgeInsets.fromLTRB(10, 7, 10, 8),
+                              key: const Key('battle_thumb_perk_sheet'),
+                              padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
                               decoration: BoxDecoration(
-                                color: const Color(0xDF091122),
-                                borderRadius: BorderRadius.circular(14),
+                                color: const Color(0xEC091122),
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: NightPalette.accentGold,
-                                  width: 1.5,
+                                  width: 1.6,
                                 ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x88000000),
+                                    blurRadius: 14,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
                               ),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -3099,7 +3007,11 @@ class _BattleScreenState extends State<BattleScreen>
               ),
             ),
 
-            // ★ 멈춤 없는 하단 전략 지휘 바: 마기 암석 개척 · 체증 도박소환 · 전군 실시간 업그레이드 4종 · 전술 비약!
+            // ★ 모바일 한 손 엄지 지휘 데크 (Golden Thumb Zone):
+            // 0열: 실시간 군수기력(⚡) 동기화 바 + 중앙탑 수동/자동 + 확대 전환 (시선 이동 0!)
+            // 1열: 우측 엄지 스윗스팟 주력 행동 덱 ([개척/합체] + [🎲도박소환] + [🔨추천축조] 대형 타격 버튼)
+            // 2열: 가로 스크롤 0% 4등분 균등 강화 격자 ([⚔️화력업] [⚡연사업] [🔭사거리업] [🛡️결계업])
+            // 3열: 전술 비약 3종 · 자동 토글 · 우하단 궁극기 [무림수호단 출두!]
             ValueListenableBuilder<int>(
               valueListenable: _frameNotifier,
               builder: (_, _, _) {
@@ -3138,631 +3050,620 @@ class _BattleScreenState extends State<BattleScreen>
                     _sim.fieldTokens >= unexcavatedCost;
                 final mergePair = _sim.findAnyMergePair();
 
+                final nextSlot = _sim.nextRecommendedSlotIndex();
+                final nextMount =
+                    nextSlot != null ? _sim.mountSlotByIndex(nextSlot) : null;
+                final needExcavateFirst =
+                    nextSlot != null && !_sim.isSlotExcavated(nextSlot);
+                final nextTargetCost = nextMount == null
+                    ? _sim.buildCostForType(LauncherType.rapid)
+                    : (needExcavateFirst
+                        ? _sim.excavationCostForSlot(nextMount)
+                        : _sim.buildCostForType(
+                            _sim.preferredBuildTypeForSlot(nextMount),
+                          ));
+                final qiFill =
+                    (_sim.fieldTokens / max(1, nextTargetCost)).clamp(0.0, 1.0);
+                final canBuildAny =
+                    nextSlot != null && _sim.fieldTokens >= nextTargetCost;
+
                 return Container(
+                  key: const Key('battle_mobile_thumb_deck'),
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 5,
+                  padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
+                  decoration: BoxDecoration(
+                    color: NightPalette.bgPanel,
+                    border: Border(
+                      top: BorderSide(
+                        color: NightPalette.borderGold.withValues(alpha: 0.42),
+                        width: 1.2,
+                      ),
+                    ),
                   ),
-                  color: NightPalette.bgPanel,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 1열: 거점 암석 개척 · 도박 소환 · 유료 연성 합체 · 전군 실시간 강화 4종!
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            if (unexcavatedSlot != null) ...[
-                              ActionChip(
-                                key: const Key('quick_excavate_next_btn'),
-                                visualDensity: VisualDensity.compact,
-                                labelPadding:
-                                    const EdgeInsets.symmetric(horizontal: 3),
-                                backgroundColor: canExcavateNext
-                                    ? const Color(0xFF3A2510)
-                                    : NightPalette.bgDeep,
-                                side: BorderSide(
-                                  color: canExcavateNext
-                                      ? NightPalette.accentGold
-                                      : Colors.white24,
-                                ),
-                                label: Text(
-                                  '⛏️${unexcavatedSlot.slotIndex + 1}번거점개척($unexcavatedCost⚡)',
-                                  style: TextStyle(
-                                    fontSize: 11.0,
-                                    fontWeight: FontWeight.bold,
-                                    color: canExcavateNext
-                                        ? NightPalette.accentGold
-                                        : NightPalette.textMuted,
-                                  ),
-                                ),
-                                onPressed: canExcavateNext
-                                    ? () {
-                                        final targetIdx =
-                                            unexcavatedSlot.slotIndex;
-                                        if (_sim.excavateSlotInBattle(
-                                          targetIdx,
-                                        )) {
-                                          NightHaptics.instance.heavyImpact();
-                                          setState(() {
-                                            _selectedSlotIndex = targetIdx;
-                                            _livePadMenuTimer =
-                                                _livePadMenuDuration;
-                                          });
-                                        }
-                                      }
-                                    : null,
-                              ),
-                              const SizedBox(width: 4),
-                            ],
-                            if (readyEmptySlot != null &&
-                                recDirectType != null) ...[
-                              ActionChip(
-                                key: const Key('quick_direct_build_btn'),
-                                visualDensity: VisualDensity.compact,
-                                labelPadding:
-                                    const EdgeInsets.symmetric(horizontal: 3),
-                                backgroundColor: canQuickDirect
-                                    ? const Color(0xFF14382E)
-                                    : NightPalette.bgDeep,
-                                side: BorderSide(
-                                  color: canQuickDirect
-                                      ? const Color(0xFF80ED99)
-                                      : Colors.white24,
-                                ),
-                                label: Text(
-                                  '🔨추천축조[${recDirectType.name.split(" ").first}]($recDirectCost⚡)',
-                                  style: TextStyle(
-                                    fontSize: 11.0,
-                                    fontWeight: FontWeight.bold,
-                                    color: canQuickDirect
-                                        ? const Color(0xFF80ED99)
-                                        : NightPalette.textMuted,
-                                  ),
-                                ),
-                                onPressed: canQuickDirect
-                                    ? () {
-                                        if (_sim.quickDirectBuildNextPad()) {
-                                          NightHaptics.instance.lightTap();
-                                          setState(() {});
-                                        }
-                                      }
-                                    : null,
-                              ),
-                              const SizedBox(width: 4),
-                            ],
-                            ActionChip(
-                              key: const Key('quick_lucky_summon_btn'),
-                              visualDensity: VisualDensity.compact,
-                              labelPadding:
-                                  const EdgeInsets.symmetric(horizontal: 3),
-                              backgroundColor: canQuickLucky
-                                  ? const Color(0xFF1E3252)
-                                  : NightPalette.bgDeep,
-                              side: BorderSide(
-                                color: canQuickLucky
-                                    ? NightPalette.accentGold
-                                    : Colors.white24,
-                              ),
-                              label: Text(
-                                readyEmptySlot != null
-                                    ? '🎲도박소환($luckyCost⚡)'
-                                    : (unexcavatedSlot != null
-                                        ? '🪨개척후소환'
-                                        : '🎲초소만석'),
-                                style: TextStyle(
-                                  fontSize: 11.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: canQuickLucky
-                                      ? NightPalette.accentGold
-                                      : NightPalette.textMuted,
-                                ),
-                              ),
-                              onPressed: canQuickLucky
-                                  ? () {
-                                      if (_sim.quickLuckySummonNextPad() !=
-                                          null) {
-                                        NightHaptics.instance.lightTap();
-                                        setState(() {});
-                                      }
-                                    }
-                                  : null,
-                            ),
-                            if (mergePair != null) ...[
-                              const SizedBox(width: 4),
-                              ActionChip(
-                                key: const Key('quick_merge_any_btn'),
-                                visualDensity: VisualDensity.compact,
-                                labelPadding:
-                                    const EdgeInsets.symmetric(horizontal: 3),
-                                backgroundColor: const Color(0xFF3A2810),
-                                side: const BorderSide(
-                                  color: NightPalette.accentGold,
-                                ),
-                                label: Text(
-                                  '☯️연성합체(${_sim.mergeCostForSlot(mergePair.$1)}⚡)',
-                                  style: const TextStyle(
-                                    fontSize: 11.0,
-                                    fontWeight: FontWeight.bold,
-                                    color: NightPalette.accentGold,
-                                  ),
-                                ),
-                                onPressed: () {
-                                  if (_sim.quickMergeAnyPair()) {
-                                    NightHaptics.instance.heavyImpact();
-                                    setState(() {});
-                                  }
-                                },
-                              ),
-                            ],
-                            const SizedBox(width: 4),
-                            ActionChip(
-                              key: const Key('live_upg_firepower_btn'),
-                              visualDensity: VisualDensity.compact,
-                              labelPadding:
-                                  const EdgeInsets.symmetric(horizontal: 3),
-                              backgroundColor: _sim.liveFirepowerLv < 5 &&
-                                      _sim.fieldTokens >= _sim.liveFirepowerCost
-                                  ? const Color(0xFF3A181C)
-                                  : NightPalette.bgDeep,
-                              side: BorderSide(
-                                color: _sim.liveFirepowerLv < 5 &&
-                                        _sim.fieldTokens >=
-                                            _sim.liveFirepowerCost
-                                    ? const Color(0xFFFF6B35)
-                                    : Colors.white24,
-                              ),
-                              label: Text(
-                                _sim.liveFirepowerLv >= 5
-                                    ? '⚔️화력만땅'
-                                    : '⚔️화력업+${_sim.liveFirepowerLv}(${_sim.liveFirepowerCost}⚡)',
-                                style: TextStyle(
-                                  fontSize: 10.8,
-                                  fontWeight: FontWeight.bold,
-                                  color: _sim.liveFirepowerLv < 5 &&
-                                          _sim.fieldTokens >=
-                                              _sim.liveFirepowerCost
-                                      ? const Color(0xFFFF6B35)
-                                      : NightPalette.textMuted,
-                                ),
-                              ),
-                              onPressed: _sim.liveFirepowerLv < 5 &&
-                                      _sim.fieldTokens >= _sim.liveFirepowerCost
-                                  ? () {
-                                      if (_sim.upgradeLiveFirepower()) {
-                                        NightHaptics.instance.lightTap();
-                                        setState(() {});
-                                      }
-                                    }
-                                  : null,
-                            ),
-                            const SizedBox(width: 4),
-                            ActionChip(
-                              key: const Key('live_upg_reload_btn'),
-                              visualDensity: VisualDensity.compact,
-                              labelPadding:
-                                  const EdgeInsets.symmetric(horizontal: 3),
-                              backgroundColor: _sim.liveReloadLv < 5 &&
-                                      _sim.fieldTokens >= _sim.liveReloadCost
-                                  ? const Color(0xFF122C44)
-                                  : NightPalette.bgDeep,
-                              side: BorderSide(
-                                color: _sim.liveReloadLv < 5 &&
-                                        _sim.fieldTokens >= _sim.liveReloadCost
-                                    ? const Color(0xFF4CC9F0)
-                                    : Colors.white24,
-                              ),
-                              label: Text(
-                                _sim.liveReloadLv >= 5
-                                    ? '⚡연사만땅'
-                                    : '⚡연사업+${_sim.liveReloadLv}(${_sim.liveReloadCost}⚡)',
-                                style: TextStyle(
-                                  fontSize: 10.8,
-                                  fontWeight: FontWeight.bold,
-                                  color: _sim.liveReloadLv < 5 &&
-                                          _sim.fieldTokens >=
-                                              _sim.liveReloadCost
-                                      ? const Color(0xFF4CC9F0)
-                                      : NightPalette.textMuted,
-                                ),
-                              ),
-                              onPressed: _sim.liveReloadLv < 5 &&
-                                      _sim.fieldTokens >= _sim.liveReloadCost
-                                  ? () {
-                                      if (_sim.upgradeLiveReload()) {
-                                        NightHaptics.instance.lightTap();
-                                        setState(() {});
-                                      }
-                                    }
-                                  : null,
-                            ),
-                            const SizedBox(width: 4),
-                            ActionChip(
-                              key: const Key('live_upg_range_btn'),
-                              visualDensity: VisualDensity.compact,
-                              labelPadding:
-                                  const EdgeInsets.symmetric(horizontal: 3),
-                              backgroundColor: _sim.liveRangeLv < 4 &&
-                                      _sim.fieldTokens >= _sim.liveRangeCost
-                                  ? const Color(0xFF10343A)
-                                  : NightPalette.bgDeep,
-                              side: BorderSide(
-                                color: _sim.liveRangeLv < 4 &&
-                                        _sim.fieldTokens >= _sim.liveRangeCost
-                                    ? NightPalette.jadeGreen
-                                    : Colors.white24,
-                              ),
-                              label: Text(
-                                _sim.liveRangeLv >= 4
-                                    ? '🔭사거리만땅'
-                                    : '🔭사거리업+${_sim.liveRangeLv}(${_sim.liveRangeCost}⚡)',
-                                style: TextStyle(
-                                  fontSize: 10.8,
-                                  fontWeight: FontWeight.bold,
-                                  color: _sim.liveRangeLv < 4 &&
-                                          _sim.fieldTokens >= _sim.liveRangeCost
-                                      ? NightPalette.jadeGreen
-                                      : NightPalette.textMuted,
-                                ),
-                              ),
-                              onPressed: _sim.liveRangeLv < 4 &&
-                                      _sim.fieldTokens >= _sim.liveRangeCost
-                                  ? () {
-                                      if (_sim.upgradeLiveRange()) {
-                                        NightHaptics.instance.lightTap();
-                                        setState(() {});
-                                      }
-                                    }
-                                  : null,
-                            ),
-                            const SizedBox(width: 4),
-                            ActionChip(
-                              key: const Key('live_upg_barrier_btn'),
-                              visualDensity: VisualDensity.compact,
-                              labelPadding:
-                                  const EdgeInsets.symmetric(horizontal: 3),
-                              backgroundColor: _sim.liveBarrierLv < 5 &&
-                                      _sim.fieldTokens >= _sim.liveBarrierCost
-                                  ? const Color(0xFF123328)
-                                  : NightPalette.bgDeep,
-                              side: BorderSide(
-                                color: _sim.liveBarrierLv < 5 &&
-                                        _sim.fieldTokens >= _sim.liveBarrierCost
-                                    ? const Color(0xFF80ED99)
-                                    : Colors.white24,
-                              ),
-                              label: Text(
-                                _sim.liveBarrierLv >= 5
-                                    ? '🛡️결계만땅'
-                                    : '🛡️결계업+${_sim.liveBarrierLv}(${_sim.liveBarrierCost}⚡)',
-                                style: TextStyle(
-                                  fontSize: 10.8,
-                                  fontWeight: FontWeight.bold,
-                                  color: _sim.liveBarrierLv < 5 &&
-                                          _sim.fieldTokens >=
-                                              _sim.liveBarrierCost
-                                      ? const Color(0xFF80ED99)
-                                      : NightPalette.textMuted,
-                                ),
-                              ),
-                              onPressed: _sim.liveBarrierLv < 5 &&
-                                      _sim.fieldTokens >= _sim.liveBarrierCost
-                                  ? () {
-                                      if (_sim.upgradeLiveBarrier()) {
-                                        NightHaptics.instance.lightTap();
-                                        setState(() {});
-                                      }
-                                    }
-                                  : null,
-                            ),
-                            if (_sim.rouletteSpinsAvailable > 0) ...[
-                              const SizedBox(width: 5),
-                              ActionChip(
-                                key: const Key('spin_roulette_btn'),
-                                visualDensity: VisualDensity.compact,
-                                backgroundColor: const Color(0xFF4A2511),
-                                side: const BorderSide(
-                                  color: NightPalette.accentGold,
-                                  width: 1.4,
-                                ),
-                                label: Text(
-                                  '🎰돌림판(${_sim.rouletteSpinsAvailable})',
-                                  style: const TextStyle(
-                                    fontSize: 11.2,
-                                    fontWeight: FontWeight.bold,
-                                    color: NightPalette.accentGold,
-                                  ),
-                                ),
-                                onPressed: () {
-                                  if (_sim.spinDestinyRoulette() != null) {
-                                    NightHaptics.instance.heavyImpact();
-                                    setState(() {});
-                                  }
-                                },
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-
-                      // 2열: 사격모드 · 1.4배확대 · 자동승급 · 자동비급 (360dp 화면에서도 가로 스크롤 없이 한눈에!)
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            ActionChip(
-                              key: const Key('battle_toggle_central_mode_btn'),
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: _sim.centralManualMode
-                                  ? NightPalette.accentGold
-                                      .withValues(alpha: 0.24)
-                                  : NightPalette.bgDeep,
-                              side: BorderSide(
-                                color: _sim.centralManualMode
-                                    ? NightPalette.accentGold
-                                    : NightPalette.jadeGreen,
-                              ),
-                              avatar: Icon(
-                                _sim.centralManualMode
-                                    ? Icons.gps_fixed_rounded
-                                    : Icons.autorenew_rounded,
-                                size: 15,
-                                color: _sim.centralManualMode
-                                    ? NightPalette.accentGold
-                                    : NightPalette.jadeGreen,
-                              ),
-                              label: Text(
-                                _sim.centralManualMode
-                                    ? '중앙탑: 수동탄지'
-                                    : '중앙탑: 자동발사',
-                                style: TextStyle(
-                                  fontSize: 11.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: _sim.centralManualMode
-                                      ? NightPalette.accentGold
-                                      : NightPalette.jadeGreen,
-                                ),
-                              ),
-                              onPressed: () {
-                                _sim.toggleCentralManualMode();
-                                NightHaptics.instance.lightTap();
-                                setState(() {});
-                              },
-                            ),
-                            const SizedBox(width: 5),
-                            ActionChip(
-                              key: const Key('battle_toggle_zoom_view_btn'),
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: _zoomedView
-                                  ? const Color(0xFF16324A)
-                                  : NightPalette.bgDeep,
-                              side: BorderSide(
-                                color: _zoomedView
-                                    ? NightPalette.jadeShield
-                                    : Colors.white24,
-                              ),
-                              avatar: Icon(
-                                _zoomedView
-                                    ? Icons.zoom_out_map_rounded
-                                    : Icons.zoom_in_map_rounded,
-                                size: 15,
-                                color: NightPalette.jadeShield,
-                              ),
-                              label: Text(
-                                _zoomedView ? '🔍광각전체' : '🔍1.4배확대',
-                                style: const TextStyle(
-                                  fontSize: 10.8,
-                                  fontWeight: FontWeight.bold,
-                                  color: NightPalette.jadeShield,
-                                ),
-                              ),
-                              onPressed: () {
-                                NightHaptics.instance.lightTap();
-                                final mq = MediaQuery.sizeOf(context);
-                                final txRatio = (_sim.towerPos.x /
-                                        CampaignCatalog.arenaWidth)
-                                    .clamp(0.15, 0.85);
-                                final tyRatio = (_sim.towerPos.y /
-                                        CampaignCatalog.arenaHeight)
-                                    .clamp(0.15, 0.85);
-                                final focusDx = -(mq.width * 0.40 * txRatio);
-                                final focusDy = -(mq.height * 0.34 * tyRatio);
-                                setState(() {
-                                  _zoomedView = !_zoomedView;
-                                  if (_zoomedView) {
-                                    _zoomController.value = Matrix4.identity()
-                                      ..translateByDouble(
-                                        focusDx,
-                                        focusDy,
-                                        0.0,
-                                        1.0,
-                                      )
-                                      ..scaleByDouble(1.4, 1.4, 1.0, 1.0);
-                                  } else {
-                                    _zoomController.value = Matrix4.identity();
-                                  }
-                                });
-                              },
-                            ),
-                            const SizedBox(width: 5),
-                            FilterChip(
-                              visualDensity: VisualDensity.compact,
-                              selected: _sim.preset.autoUpgradeInBattle,
-                              selectedColor: const Color(0xFF1A343B),
-                              backgroundColor: NightPalette.bgDeep,
-                              checkmarkColor: NightPalette.jadeGreen,
-                              side: BorderSide(
-                                color: _sim.preset.autoUpgradeInBattle
-                                    ? NightPalette.jadeGreen
-                                    : Colors.white24,
-                              ),
-                              label: Text(
-                                '자동승급',
-                                style: TextStyle(
-                                  fontSize: 10.8,
-                                  color: _sim.preset.autoUpgradeInBattle
-                                      ? NightPalette.jadeGreen
-                                      : NightPalette.textMuted,
-                                ),
-                              ),
-                              onSelected: (v) {
-                                widget.controller.updatePreset(
-                                  (pr) => pr.autoUpgradeInBattle = v,
-                                );
-                                setState(() {});
-                              },
-                            ),
-                            const SizedBox(width: 5),
-                            FilterChip(
-                              key: const Key('battle_auto_perk_chip'),
-                              visualDensity: VisualDensity.compact,
-                              selected: _sim.autoChoosePerks,
-                              selectedColor: const Color(0xFF332610),
-                              backgroundColor: NightPalette.bgDeep,
-                              checkmarkColor: NightPalette.accentGold,
-                              side: BorderSide(
-                                color: _sim.autoChoosePerks
-                                    ? NightPalette.accentGold
-                                    : Colors.white24,
-                              ),
-                              label: Text(
-                                '자동비급',
-                                style: TextStyle(
-                                  fontSize: 10.8,
-                                  color: _sim.autoChoosePerks
-                                      ? NightPalette.accentGold
-                                      : NightPalette.textMuted,
-                                ),
-                              ),
-                              onSelected: (v) {
-                                _sim.autoChoosePerks = v;
-                                widget.controller.setAutoChoosePerks(v);
-                                if (v && _sim.pendingPerkChoices.isNotEmpty) {
-                                  final rec = _sim.recommendedPerkChoice() ??
-                                      _sim.pendingPerkChoices.first;
-                                  _sim.chooseRoguePerk(rec);
-                                }
-                                setState(() {});
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-
-                      // 3열: 전술 비약 3종(기공단·수리패·극광부) + 우측 고정 [무림수호단 출두!] (전 기기 무스크롤 즉시 클릭 보장!)
-                      Row(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 780),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: TacticalConsumable.values.map((item) {
-                                  final cnt = p.consumables[item] ?? 0;
-                                  final shortLabel = switch (item) {
-                                    TacticalConsumable.qiSurgePill => '기공단',
-                                    TacticalConsumable.guardianRepairSeal => '수리패',
-                                    TacticalConsumable.auroraCritCharm => '극광부',
-                                  };
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 5),
-                                    child: ActionChip(
-                                      key: Key('use_consumable_${item.name}'),
-                                      visualDensity: VisualDensity.compact,
-                                      avatar: NightSpriteIcon(
-                                        assetPath:
-                                            NightArtRegistry.consumableAsset(item),
-                                        fallbackIcon: Icons.local_pharmacy_rounded,
-                                        size: 15,
-                                        color: cnt > 0
-                                            ? Color(item.colorHex)
-                                            : Colors.grey.shade600,
-                                        dimmed: cnt <= 0,
-                                        borderRadius: 4,
-                                      ),
-                                      label: Text(
-                                        '$shortLabel($cnt)',
-                                        style: TextStyle(
-                                          fontSize: 10.6,
-                                          color: cnt > 0
-                                              ? NightPalette.textPrimary
-                                              : NightPalette.textMuted,
+                          // 0열: 클래시로얄식 실시간 일체형 군수기력(⚡) 충전 게이지 + 사격모드/확대 빠른 토글 (360dp 오버플로 0%!)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: NightPalette.bgDeep,
+                                    borderRadius: BorderRadius.circular(9),
+                                    border: Border.all(
+                                      color: canBuildAny
+                                          ? const Color(0xFF80ED99)
+                                          : NightPalette.jadeShield
+                                              .withValues(alpha: 0.45),
+                                    ),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: FractionallySizedBox(
+                                          widthFactor: qiFill,
+                                          heightFactor: 1.0,
+                                          child: ColoredBox(
+                                            color: canBuildAny
+                                                ? const Color(0x3D80ED99)
+                                                : const Color(0x33FFD166),
+                                          ),
                                         ),
                                       ),
-                                      onPressed: cnt > 0
-                                          ? () {
-                                              if (_sim.activateConsumable(item)) {
-                                                _consumablesUsedThisBattle++;
-                                                widget.controller
-                                                    .notifyConsumableUsedInBattle();
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                        ),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const NightSpriteIcon(
+                                                assetPath: NightArtRegistry
+                                                    .iconLuckyDice,
+                                                fallbackIcon:
+                                                    Icons.bolt_rounded,
+                                                size: 14,
+                                                borderRadius: 3,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                nextSlot == null
+                                                    ? '군수기력 ⚡${_sim.fieldTokens} (만석)'
+                                                    : (canBuildAny
+                                                        ? '군수기력 ⚡${_sim.fieldTokens} · ${needExcavateFirst ? "개척" : "축조"}가능!'
+                                                        : '군수기력 ⚡${_sim.fieldTokens}/$nextTargetCost⚡'),
+                                                style: TextStyle(
+                                                  fontSize: 11.2,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: canBuildAny
+                                                      ? const Color(0xFF80ED99)
+                                                      : NightPalette.accentGold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              _CompactModePill(
+                                pillKey:
+                                    const Key('battle_toggle_central_mode_btn'),
+                                icon: _sim.centralManualMode
+                                    ? Icons.gps_fixed_rounded
+                                    : Icons.autorenew_rounded,
+                                label: _sim.centralManualMode
+                                    ? '중앙탑: 수동탄지'
+                                    : '중앙탑: 자동발사',
+                                active: _sim.centralManualMode,
+                                activeColor: NightPalette.accentGold,
+                                idleColor: NightPalette.jadeGreen,
+                                onTap: () {
+                                  _sim.toggleCentralManualMode();
+                                  NightHaptics.instance.lightTap();
+                                  setState(() {});
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              _CompactModePill(
+                                pillKey:
+                                    const Key('battle_toggle_zoom_view_btn'),
+                                icon: _zoomedView
+                                    ? Icons.zoom_out_map_rounded
+                                    : Icons.zoom_in_map_rounded,
+                                label: _zoomedView ? '🔍광각전체' : '🔍1.4배확대',
+                                active: _zoomedView,
+                                activeColor: NightPalette.jadeShield,
+                                idleColor: NightPalette.jadeShield,
+                                onTap: () {
+                                  NightHaptics.instance.lightTap();
+                                  final mq = MediaQuery.sizeOf(context);
+                                  final txRatio = (_sim.towerPos.x /
+                                          CampaignCatalog.arenaWidth)
+                                      .clamp(0.15, 0.85);
+                                  final tyRatio = (_sim.towerPos.y /
+                                          CampaignCatalog.arenaHeight)
+                                      .clamp(0.15, 0.85);
+                                  final focusDx = -(mq.width * 0.40 * txRatio);
+                                  final focusDy = -(mq.height * 0.34 * tyRatio);
+                                  setState(() {
+                                    _zoomedView = !_zoomedView;
+                                    if (_zoomedView) {
+                                      _zoomController.value = Matrix4.identity()
+                                        ..translateByDouble(
+                                          focusDx,
+                                          focusDy,
+                                          0.0,
+                                          1.0,
+                                        )
+                                        ..scaleByDouble(1.4, 1.4, 1.0, 1.0);
+                                    } else {
+                                      _zoomController.value =
+                                          Matrix4.identity();
+                                    }
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+
+                          // 1열: 주력 엄지 액션 데크 (가로 스크롤 0% · 가장 많이 누르는 [🎲도박소환] & [🔨추천축조]를 우측 엄지 스윗스팟에 배치!)
+                          Row(
+                            children: [
+                              if (unexcavatedSlot != null) ...[
+                                Expanded(
+                                  child: _ThumbPrimaryDeckButton(
+                                    buttonKey:
+                                        const Key('quick_excavate_next_btn'),
+                                    label:
+                                        '⛏️${unexcavatedSlot.slotIndex + 1}번거점개척($unexcavatedCost⚡)',
+                                    enabled: canExcavateNext,
+                                    bgColor: const Color(0xFF3E2710),
+                                    borderColor: NightPalette.accentGold,
+                                    textColor: NightPalette.accentGold,
+                                    onTap: () {
+                                      final targetIdx =
+                                          unexcavatedSlot.slotIndex;
+                                      if (_sim.excavateSlotInBattle(
+                                        targetIdx,
+                                      )) {
+                                        NightHaptics.instance.heavyImpact();
+                                        setState(() {
+                                          _selectedSlotIndex = targetIdx;
+                                          _livePadMenuTimer =
+                                              _livePadMenuDuration;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                              ],
+                              if (mergePair != null) ...[
+                                Expanded(
+                                  child: _ThumbPrimaryDeckButton(
+                                    buttonKey:
+                                        const Key('quick_merge_any_btn'),
+                                    label:
+                                        '☯️연성합체(${_sim.mergeCostForSlot(mergePair.$1)}⚡)',
+                                    enabled: true,
+                                    bgColor: const Color(0xFF3E290E),
+                                    borderColor: NightPalette.accentGold,
+                                    textColor: NightPalette.accentGold,
+                                    onTap: () {
+                                      if (_sim.quickMergeAnyPair()) {
+                                        NightHaptics.instance.heavyImpact();
+                                        setState(() {});
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                              ],
+                              Expanded(
+                                child: _ThumbPrimaryDeckButton(
+                                  buttonKey:
+                                      const Key('quick_lucky_summon_btn'),
+                                  label: readyEmptySlot != null
+                                      ? '🎲도박소환($luckyCost⚡)'
+                                      : (unexcavatedSlot != null
+                                          ? '🪨개척후소환'
+                                          : '🎲초소만석'),
+                                  enabled: canQuickLucky,
+                                  bgColor: const Color(0xFF1E3256),
+                                  borderColor: NightPalette.accentGold,
+                                  textColor: NightPalette.accentGold,
+                                  onTap: () {
+                                    if (_sim.quickLuckySummonNextPad() !=
+                                        null) {
+                                      NightHaptics.instance.lightTap();
+                                      setState(() {});
+                                    }
+                                  },
+                                ),
+                              ),
+                              if (readyEmptySlot != null &&
+                                  recDirectType != null) ...[
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  flex: 1,
+                                  child: _ThumbPrimaryDeckButton(
+                                    buttonKey:
+                                        const Key('quick_direct_build_btn'),
+                                    label:
+                                        '🔨추천축조[${recDirectType.name.split(" ").first}]($recDirectCost⚡)',
+                                    enabled: canQuickDirect,
+                                    bgColor: const Color(0xFF143C30),
+                                    borderColor: const Color(0xFF80ED99),
+                                    textColor: const Color(0xFF80ED99),
+                                    onTap: () {
+                                      if (_sim.quickDirectBuildNextPad()) {
+                                        NightHaptics.instance.lightTap();
+                                        setState(() {});
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+
+                          // 2열: 4등분 균등 전군 실시간 강화 격자 (360dp 소형 폰에서도 가로 스크롤 없이 4종 동시 노출!)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _ThumbUpgradeGridTile(
+                                  tileKey:
+                                      const Key('live_upg_firepower_btn'),
+                                  title: _sim.liveFirepowerLv >= 5
+                                      ? '⚔️화력만땅'
+                                      : '⚔️화력업+${_sim.liveFirepowerLv}',
+                                  costLabel: _sim.liveFirepowerLv >= 5
+                                      ? 'MAX'
+                                      : '${_sim.liveFirepowerCost}⚡',
+                                  enabled: _sim.liveFirepowerLv < 5 &&
+                                      _sim.fieldTokens >=
+                                          _sim.liveFirepowerCost,
+                                  activeBg: const Color(0xFF3A181C),
+                                  accentColor: const Color(0xFFFF6B35),
+                                  onTap: () {
+                                    if (_sim.upgradeLiveFirepower()) {
+                                      NightHaptics.instance.lightTap();
+                                      setState(() {});
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _ThumbUpgradeGridTile(
+                                  tileKey: const Key('live_upg_reload_btn'),
+                                  title: _sim.liveReloadLv >= 5
+                                      ? '⚡연사만땅'
+                                      : '⚡연사업+${_sim.liveReloadLv}',
+                                  costLabel: _sim.liveReloadLv >= 5
+                                      ? 'MAX'
+                                      : '${_sim.liveReloadCost}⚡',
+                                  enabled: _sim.liveReloadLv < 5 &&
+                                      _sim.fieldTokens >= _sim.liveReloadCost,
+                                  activeBg: const Color(0xFF122C44),
+                                  accentColor: const Color(0xFF4CC9F0),
+                                  onTap: () {
+                                    if (_sim.upgradeLiveReload()) {
+                                      NightHaptics.instance.lightTap();
+                                      setState(() {});
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _ThumbUpgradeGridTile(
+                                  tileKey: const Key('live_upg_range_btn'),
+                                  title: _sim.liveRangeLv >= 4
+                                      ? '🔭사거리만땅'
+                                      : '🔭사거리업+${_sim.liveRangeLv}',
+                                  costLabel: _sim.liveRangeLv >= 4
+                                      ? 'MAX'
+                                      : '${_sim.liveRangeCost}⚡',
+                                  enabled: _sim.liveRangeLv < 4 &&
+                                      _sim.fieldTokens >= _sim.liveRangeCost,
+                                  activeBg: const Color(0xFF10343A),
+                                  accentColor: NightPalette.jadeGreen,
+                                  onTap: () {
+                                    if (_sim.upgradeLiveRange()) {
+                                      NightHaptics.instance.lightTap();
+                                      setState(() {});
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: _ThumbUpgradeGridTile(
+                                  tileKey: const Key('live_upg_barrier_btn'),
+                                  title: _sim.liveBarrierLv >= 5
+                                      ? '🛡️결계만땅'
+                                      : '🛡️결계업+${_sim.liveBarrierLv}',
+                                  costLabel: _sim.liveBarrierLv >= 5
+                                      ? 'MAX'
+                                      : '${_sim.liveBarrierCost}⚡',
+                                  enabled: _sim.liveBarrierLv < 5 &&
+                                      _sim.fieldTokens >= _sim.liveBarrierCost,
+                                  activeBg: const Color(0xFF123328),
+                                  accentColor: const Color(0xFF80ED99),
+                                  onTap: () {
+                                    if (_sim.upgradeLiveBarrier()) {
+                                      NightHaptics.instance.lightTap();
+                                      setState(() {});
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+
+                          // 3열: 전술 비약 3종 · 돌림판 · 자동 토글 + 우측 하단 궁극기 [무림수호단 출두!]
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      if (_sim.rouletteSpinsAvailable > 0)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(right: 5),
+                                          child: ActionChip(
+                                            key: const Key('spin_roulette_btn'),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            labelPadding:
+                                                const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                            ),
+                                            backgroundColor:
+                                                const Color(0xFF4A2511),
+                                            side: const BorderSide(
+                                              color: NightPalette.accentGold,
+                                              width: 1.4,
+                                            ),
+                                            label: Text(
+                                              '🎰돌림판(${_sim.rouletteSpinsAvailable})',
+                                              style: const TextStyle(
+                                                fontSize: 10.8,
+                                                fontWeight: FontWeight.bold,
+                                                color: NightPalette.accentGold,
+                                              ),
+                                            ),
+                                            onPressed: () {
+                                              if (_sim.spinDestinyRoulette() !=
+                                                  null) {
+                                                NightHaptics.instance
+                                                    .heavyImpact();
                                                 setState(() {});
                                               }
-                                            }
-                                          : null,
+                                            },
+                                          ),
+                                        ),
+                                      ...TacticalConsumable.values.map((item) {
+                                        final cnt = p.consumables[item] ?? 0;
+                                        final shortLabel = switch (item) {
+                                          TacticalConsumable.qiSurgePill =>
+                                            '기공단',
+                                          TacticalConsumable
+                                                .guardianRepairSeal =>
+                                            '수리패',
+                                          TacticalConsumable.auroraCritCharm =>
+                                            '극광부',
+                                        };
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.only(right: 4),
+                                          child: ActionChip(
+                                            key: Key(
+                                              'use_consumable_${item.name}',
+                                            ),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            labelPadding:
+                                                const EdgeInsets.symmetric(
+                                              horizontal: 3,
+                                            ),
+                                            avatar: NightSpriteIcon(
+                                              assetPath: NightArtRegistry
+                                                  .consumableAsset(item),
+                                              fallbackIcon:
+                                                  Icons.local_pharmacy_rounded,
+                                              size: 14,
+                                              color: cnt > 0
+                                                  ? Color(item.colorHex)
+                                                  : Colors.grey.shade600,
+                                              dimmed: cnt <= 0,
+                                              borderRadius: 4,
+                                            ),
+                                            label: Text(
+                                              '$shortLabel($cnt)',
+                                              style: TextStyle(
+                                                fontSize: 10.4,
+                                                color: cnt > 0
+                                                    ? NightPalette.textPrimary
+                                                    : NightPalette.textMuted,
+                                              ),
+                                            ),
+                                            onPressed: cnt > 0
+                                                ? () {
+                                                    if (_sim.activateConsumable(
+                                                      item,
+                                                    )) {
+                                                      _consumablesUsedThisBattle++;
+                                                      widget.controller
+                                                          .notifyConsumableUsedInBattle();
+                                                      setState(() {});
+                                                    }
+                                                  }
+                                                : null,
+                                          ),
+                                        );
+                                      }),
+                                      FilterChip(
+                                        visualDensity: VisualDensity.compact,
+                                        labelPadding:
+                                            const EdgeInsets.symmetric(
+                                          horizontal: 3,
+                                        ),
+                                        selected:
+                                            _sim.preset.autoUpgradeInBattle,
+                                        selectedColor: const Color(0xFF1A343B),
+                                        backgroundColor: NightPalette.bgDeep,
+                                        checkmarkColor: NightPalette.jadeGreen,
+                                        side: BorderSide(
+                                          color: _sim.preset.autoUpgradeInBattle
+                                              ? NightPalette.jadeGreen
+                                              : Colors.white24,
+                                        ),
+                                        label: Text(
+                                          '자동승급',
+                                          style: TextStyle(
+                                            fontSize: 10.2,
+                                            color:
+                                                _sim.preset.autoUpgradeInBattle
+                                                    ? NightPalette.jadeGreen
+                                                    : NightPalette.textMuted,
+                                          ),
+                                        ),
+                                        onSelected: (v) {
+                                          widget.controller.updatePreset(
+                                            (pr) => pr.autoUpgradeInBattle = v,
+                                          );
+                                          setState(() {});
+                                        },
+                                      ),
+                                      const SizedBox(width: 4),
+                                      FilterChip(
+                                        key: const Key('battle_auto_perk_chip'),
+                                        visualDensity: VisualDensity.compact,
+                                        labelPadding:
+                                            const EdgeInsets.symmetric(
+                                          horizontal: 3,
+                                        ),
+                                        selected: _sim.autoChoosePerks,
+                                        selectedColor: const Color(0xFF332610),
+                                        backgroundColor: NightPalette.bgDeep,
+                                        checkmarkColor: NightPalette.accentGold,
+                                        side: BorderSide(
+                                          color: _sim.autoChoosePerks
+                                              ? NightPalette.accentGold
+                                              : Colors.white24,
+                                        ),
+                                        label: Text(
+                                          '자동비급',
+                                          style: TextStyle(
+                                            fontSize: 10.2,
+                                            color: _sim.autoChoosePerks
+                                                ? NightPalette.accentGold
+                                                : NightPalette.textMuted,
+                                          ),
+                                        ),
+                                        onSelected: (v) {
+                                          _sim.autoChoosePerks = v;
+                                          widget.controller
+                                              .setAutoChoosePerks(v);
+                                          if (v &&
+                                              _sim.pendingPerkChoices
+                                                  .isNotEmpty) {
+                                            final rec =
+                                                _sim.recommendedPerkChoice() ??
+                                                    _sim.pendingPerkChoices
+                                                        .first;
+                                            _sim.chooseRoguePerk(rec);
+                                          }
+                                          setState(() {});
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              SizedBox(
+                                height: 36,
+                                child: OutlinedButton.icon(
+                                  key: const Key('battle_chuldu_btn'),
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
                                     ),
-                                  );
-                                }).toList(),
+                                    backgroundColor: _sim.supportChargesLeft > 0
+                                        ? const Color(0xFF3B280E)
+                                        : NightPalette.bgDeep,
+                                    foregroundColor: _sim.supportChargesLeft > 0
+                                        ? NightPalette.accentGold
+                                        : NightPalette.textMuted,
+                                    side: BorderSide(
+                                      color: _sim.supportChargesLeft > 0
+                                          ? NightPalette.accentGold
+                                          : Colors.white24,
+                                      width: 1.4,
+                                    ),
+                                  ),
+                                  onPressed: _sim.supportChargesLeft > 0
+                                      ? () {
+                                          if (_sim.triggerSupportChuldu()) {
+                                            _lastPersistedSupportUsed =
+                                                _sim.usedSupportCount;
+                                            widget.controller
+                                                .notifySupportUsedInBattle();
+                                          }
+                                          setState(() {});
+                                        }
+                                      : null,
+                                  icon: NightSpriteIcon(
+                                    assetPath: NightArtRegistry.fxChuldu,
+                                    fallbackAssetPath:
+                                        NightArtRegistry.nightSupportSeal,
+                                    fallbackIcon: Icons.campaign_rounded,
+                                    size: 16,
+                                    color: _sim.supportChargesLeft > 0
+                                        ? NightPalette.accentGold
+                                        : Colors.white54,
+                                    dimmed: _sim.supportChargesLeft <= 0,
+                                    borderRadius: 4,
+                                  ),
+                                  label: Text(
+                                    '무림수호단 출두!(${_sim.supportChargesLeft})',
+                                    style: const TextStyle(
+                                      fontSize: 10.6,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          OutlinedButton.icon(
-                            key: const Key('battle_chuldu_btn'),
-                            style: OutlinedButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 5,
-                              ),
-                              backgroundColor: _sim.supportChargesLeft > 0
-                                  ? const Color(0xFF332410)
-                                  : NightPalette.bgDeep,
-                              foregroundColor: _sim.supportChargesLeft > 0
-                                  ? NightPalette.accentGold
-                                  : NightPalette.textMuted,
-                              side: BorderSide(
-                                color: _sim.supportChargesLeft > 0
-                                    ? NightPalette.accentGold
-                                    : Colors.white24,
-                                width: 1.3,
-                              ),
-                            ),
-                            onPressed: _sim.supportChargesLeft > 0
-                                ? () {
-                                    if (_sim.triggerSupportChuldu()) {
-                                      _lastPersistedSupportUsed =
-                                          _sim.usedSupportCount;
-                                      widget.controller
-                                          .notifySupportUsedInBattle();
-                                    }
-                                    setState(() {});
-                                  }
-                                : null,
-                            icon: NightSpriteIcon(
-                              assetPath: NightArtRegistry.fxChuldu,
-                              fallbackAssetPath:
-                                  NightArtRegistry.nightSupportSeal,
-                              fallbackIcon: Icons.campaign_rounded,
-                              size: 16,
-                              color: _sim.supportChargesLeft > 0
-                                  ? NightPalette.accentGold
-                                  : Colors.white54,
-                              dimmed: _sim.supportChargesLeft <= 0,
-                              borderRadius: 4,
-                            ),
-                            label: Text(
-                              '무림수호단 출두!(${_sim.supportChargesLeft})',
-                              style: const TextStyle(
-                                fontSize: 10.2,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 );
               },
@@ -3856,6 +3757,214 @@ class _MiniVillageStatBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CompactModePill extends StatelessWidget {
+  const _CompactModePill({
+    required this.pillKey,
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.activeColor,
+    required this.idleColor,
+    required this.onTap,
+  });
+
+  final Key pillKey;
+  final IconData icon;
+  final String label;
+  final bool active;
+  final Color activeColor;
+  final Color idleColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = active ? activeColor : idleColor;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: pillKey,
+        borderRadius: BorderRadius.circular(9),
+        onTap: onTap,
+        child: Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 7),
+          decoration: BoxDecoration(
+            color: active
+                ? activeColor.withValues(alpha: 0.20)
+                : NightPalette.bgDeep,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(
+              color: active ? activeColor : fg.withValues(alpha: 0.55),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 13.5, color: fg),
+              const SizedBox(width: 3),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10.2,
+                  fontWeight: FontWeight.bold,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThumbPrimaryDeckButton extends StatelessWidget {
+  const _ThumbPrimaryDeckButton({
+    required this.buttonKey,
+    required this.label,
+    required this.enabled,
+    required this.bgColor,
+    required this.borderColor,
+    required this.textColor,
+    required this.onTap,
+  });
+
+  final Key buttonKey;
+  final String label;
+  final bool enabled;
+  final Color bgColor;
+  final Color borderColor;
+  final Color textColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: buttonKey,
+        borderRadius: BorderRadius.circular(11),
+        onTap: enabled ? onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          height: 42,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: enabled ? bgColor : NightPalette.bgDeep,
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(
+              color: enabled ? borderColor : Colors.white24,
+              width: enabled ? 1.5 : 1.0,
+            ),
+            boxShadow: enabled
+                ? [
+                    BoxShadow(
+                      color: borderColor.withValues(alpha: 0.22),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                fontSize: 11.8,
+                fontWeight: FontWeight.bold,
+                color: enabled ? textColor : NightPalette.textMuted,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThumbUpgradeGridTile extends StatelessWidget {
+  const _ThumbUpgradeGridTile({
+    required this.tileKey,
+    required this.title,
+    required this.costLabel,
+    required this.enabled,
+    required this.activeBg,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final Key tileKey;
+  final String title;
+  final String costLabel;
+  final bool enabled;
+  final Color activeBg;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: tileKey,
+        borderRadius: BorderRadius.circular(10),
+        onTap: enabled ? onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          height: 44,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+          decoration: BoxDecoration(
+            color: enabled ? activeBg : NightPalette.bgDeep,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: enabled ? accentColor : Colors.white24,
+              width: enabled ? 1.4 : 1.0,
+            ),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                    fontSize: 11.0,
+                    height: 1.1,
+                    fontWeight: FontWeight.bold,
+                    color: enabled ? accentColor : NightPalette.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  costLabel,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                    fontSize: 10.0,
+                    height: 1.1,
+                    fontWeight: FontWeight.w700,
+                    color: enabled
+                        ? NightPalette.textPrimary
+                        : NightPalette.textMuted.withValues(alpha: 0.72),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -882,9 +882,9 @@ class QuickPlayAndMenuBar extends StatelessWidget {
                   key: Key('quick_bar_battle_$currentSection'),
                   style: FilledButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    minimumSize: const Size(124, 34),
+                    minimumSize: const Size(118, 34),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
+                      horizontal: 10,
                       vertical: 4,
                     ),
                     backgroundColor: NightPalette.accentGold,
@@ -899,13 +899,13 @@ class QuickPlayAndMenuBar extends StatelessWidget {
                       ),
                     );
                   },
-                  icon: const Icon(Icons.flash_on_rounded, size: 16),
+                  icon: const Icon(Icons.flash_on_rounded, size: 15),
                   label: Text(
                     allDone
                         ? '바로 재출정 (${nextStage.code})'
-                        : '바로 출정 (${nextStage.code} ${nextStage.villageNodeName})',
+                        : '바로 출정 (${nextStage.code})',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11.8,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -915,9 +915,9 @@ class QuickPlayAndMenuBar extends StatelessWidget {
                   key: Key('quick_bar_map_$currentSection'),
                   style: OutlinedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    minimumSize: const Size(106, 34),
+                    minimumSize: const Size(102, 34),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
+                      horizontal: 9,
                       vertical: 4,
                     ),
                     side: BorderSide(
@@ -935,10 +935,10 @@ class QuickPlayAndMenuBar extends StatelessWidget {
                       Navigator.of(context).pushReplacement(route);
                     }
                   },
-                  icon: const Icon(Icons.map_rounded, size: 15),
+                  icon: const Icon(Icons.map_rounded, size: 14),
                   label: Text(
                     '10현·100판 (${p.highestClearedGlobalStage}/$totalStages)',
-                    style: const TextStyle(fontSize: 11.6),
+                    style: const TextStyle(fontSize: 11.4),
                   ),
                 ),
                 if (currentSection != 'endless') ...[
@@ -947,9 +947,9 @@ class QuickPlayAndMenuBar extends StatelessWidget {
                     key: Key('quick_bar_endless_$currentSection'),
                     style: OutlinedButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      minimumSize: const Size(86, 34),
+                      minimumSize: const Size(82, 34),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
+                        horizontal: 8,
                         vertical: 4,
                       ),
                       side: BorderSide(
@@ -969,62 +969,85 @@ class QuickPlayAndMenuBar extends StatelessWidget {
                     },
                     icon: const Icon(
                       Icons.all_inclusive_rounded,
-                      size: 15,
+                      size: 14,
                       color: NightPalette.jadeGreen,
                     ),
                     label: const Text(
                       '무한혈전',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 11.2,
                         color: NightPalette.jadeGreen,
                       ),
                     ),
                   ),
                 ],
-                if (currentSection != 'loadout') ...[
-                  const SizedBox(width: 6),
-                  ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    label: const Text(
-                      '🛡️진법',
-                      style: TextStyle(fontSize: 11.4),
+                if (embeddedInShell) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: NightPalette.bgDeep,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: NightPalette.borderGold.withValues(alpha: 0.4),
+                      ),
                     ),
-                    onPressed: () => _jumpOrSwitch(
-                      context,
-                      shellTabIndex: 1,
-                      builder: () => LoadoutScreen(controller: controller),
-                    ),
-                  ),
-                ],
-                if (currentSection != 'forge') ...[
-                  const SizedBox(width: 6),
-                  ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    label: const Text(
-                      '⚒️대장간',
-                      style: TextStyle(fontSize: 11.4),
-                    ),
-                    onPressed: () => _jumpOrSwitch(
-                      context,
-                      shellTabIndex: 2,
-                      builder: () => UpgradeScreen(controller: controller),
+                    child: Text(
+                      '🪙${p.tokens} · 🧪${p.elixirs} · 🎺${p.supportTokens}',
+                      style: const TextStyle(
+                        fontSize: 11.2,
+                        fontWeight: FontWeight.bold,
+                        color: NightPalette.accentGold,
+                      ),
                     ),
                   ),
-                ],
-                if (currentSection != 'supply') ...[
-                  const SizedBox(width: 6),
-                  ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    label: const Text(
-                      '🧘수련',
-                      style: TextStyle(fontSize: 11.4),
+                ] else ...[
+                  if (currentSection != 'loadout') ...[
+                    const SizedBox(width: 6),
+                    ActionChip(
+                      visualDensity: VisualDensity.compact,
+                      label: const Text(
+                        '🛡️진법',
+                        style: TextStyle(fontSize: 11.4),
+                      ),
+                      onPressed: () => _jumpOrSwitch(
+                        context,
+                        shellTabIndex: 1,
+                        builder: () => LoadoutScreen(controller: controller),
+                      ),
                     ),
-                    onPressed: () => _jumpOrSwitch(
-                      context,
-                      shellTabIndex: 3,
-                      builder: () => TrainingScreen(controller: controller),
+                  ],
+                  if (currentSection != 'forge') ...[
+                    const SizedBox(width: 6),
+                    ActionChip(
+                      visualDensity: VisualDensity.compact,
+                      label: const Text(
+                        '⚒️대장간',
+                        style: TextStyle(fontSize: 11.4),
+                      ),
+                      onPressed: () => _jumpOrSwitch(
+                        context,
+                        shellTabIndex: 2,
+                        builder: () => UpgradeScreen(controller: controller),
+                      ),
                     ),
-                  ),
+                  ],
+                  if (currentSection != 'supply') ...[
+                    const SizedBox(width: 6),
+                    ActionChip(
+                      visualDensity: VisualDensity.compact,
+                      label: const Text(
+                        '🧘수련',
+                        style: TextStyle(fontSize: 11.4),
+                      ),
+                      onPressed: () => _jumpOrSwitch(
+                        context,
+                        shellTabIndex: 3,
+                        builder: () => TrainingScreen(controller: controller),
+                      ),
+                    ),
+                  ],
                 ],
               ],
             ),
