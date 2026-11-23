@@ -1736,4 +1736,94 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+      'v1.0.0+33 10대 현 대륙도 실측 도로 실시간 영웅 행군 · 다중 현 터치 도로 이동 · 현간 승전/전이 대륙도 연동 검증',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final ctrl = GameController(
+      initialProgress: PlayerProgress(
+        highestClearedGlobalStage: 100,
+        tutorialSeen: true,
+      ),
+    );
+    ctrl.setSelectedChapter(2);
+
+    await tester.pumpWidget(
+      MaterialApp(home: CampaignScreen(controller: ctrl)),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+
+    await tester.tap(find.byKey(const Key('campaign_toggle_world_map')));
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(
+      find.byKey(const Key('campaign_continental_real_road_map')),
+      findsOneWidget,
+    );
+    final heroFinder = find.byKey(const Key('world_map_hero_marker'));
+    expect(heroFinder, findsOneWidget);
+
+    // 1) 평상시에도 대륙 실도로 위에서 영웅 마커가 실시간 행군하는지 확인
+    final pos0 = tester.getCenter(heroFinder);
+    await tester.pump(const Duration(milliseconds: 700));
+    final pos1 = tester.getCenter(heroFinder);
+    expect((pos1 - pos0).distance, greaterThan(2.0));
+
+    // 2) 2현(하단 객잔)에서 8현(상단 해전나루) 터치 시 순간이동하지 않고 실제 도로 곡선(중간 다리/황성 높이)을 경유해 이동하는지 검증!
+    final pin2Center = tester.getCenter(find.byKey(const Key('world_map_pin_2')));
+    final pin8Center = tester.getCenter(find.byKey(const Key('world_map_pin_8')));
+    await tester.tap(find.byKey(const Key('world_map_pin_8')));
+    await tester.pump();
+    expect(ctrl.selectedChapter, 8);
+    expect(find.textContaining('제2현➔제8현 실도로 행군 중!'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 650));
+    final midPos = tester.getCenter(heroFinder);
+    expect(midPos.dy, lessThan(pin2Center.dy - 20.0));
+    expect(midPos.dy, greaterThan(pin8Center.dy + 20.0));
+
+    await tester.pump(const Duration(milliseconds: 1400));
+    expect(tester.takeException(), isNull);
+
+    // 3) 현 이동 영상 화면(CountyTransitionScreen)에도 실시간 대륙 실도로 행군 지도가 함께 표시되는지 확인
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CountyTransitionScreen(
+          controller: ctrl,
+          fromChapter: 2,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(
+      find.byKey(const Key('county_transition_continental_map')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    // 4) 현 최종 관문(1-10) 승리 연속 행군 카드에서도 1현➔2현 대륙 실도로 행군 지도가 렌더링되는지 확인
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: VictoryContinuousMarchCard(
+            controller: ctrl,
+            clearedStage: CampaignCatalog.stageAt(1, 10),
+            nextStage: CampaignCatalog.stageAt(2, 1),
+            onAdvanceNow: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(
+      find.byKey(const Key('victory_live_continental_map')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -1004,6 +1004,220 @@ class CampaignCatalog {
   static const double outerShieldRadius = 60.0;
   static const double centralTowerRadius = 28.0;
 
+  /// 10대 현 대륙도(`world_map_murim_night.webp` 1440×960 / `world_map_live.webp` 768×512)에
+  /// 그려진 실제 황금 등불 가도·목교·석교·횃불 고갯길·백옥교·해상장교·운해계단의 9개 현간 연속 실측 도로 좌표!
+  static const List<List<Vec2>> continentalRoadSegments = [
+    // 1현(청산 흙먼지현) ➔ 물레방아 목교 ➔ 2현(통통 객잔현)
+    [
+      Vec2(0.118, 0.778),
+      Vec2(0.175, 0.806),
+      Vec2(0.235, 0.836),
+      Vec2(0.285, 0.852),
+      Vec2(0.335, 0.880),
+      Vec2(0.388, 0.902),
+      Vec2(0.442, 0.896),
+      Vec2(0.495, 0.872),
+    ],
+    // 2현(통통 객잔현) ➔ 등불 아치 석교 ➔ 3현(청옥 거북장터현)
+    [
+      Vec2(0.495, 0.872),
+      Vec2(0.555, 0.848),
+      Vec2(0.608, 0.812),
+      Vec2(0.665, 0.772),
+      Vec2(0.725, 0.742),
+      Vec2(0.778, 0.716),
+      Vec2(0.825, 0.700),
+    ],
+    // 3현(청옥 거북장터현) ➔ 횃불 지그재그 산길 4굽이 ➔ 4현(쿠비 봉화산현)
+    [
+      Vec2(0.825, 0.700),
+      Vec2(0.888, 0.680),
+      Vec2(0.946, 0.654),
+      Vec2(0.896, 0.626),
+      Vec2(0.854, 0.606),
+      Vec2(0.892, 0.578),
+      Vec2(0.922, 0.556),
+      Vec2(0.870, 0.542),
+      Vec2(0.820, 0.515),
+      Vec2(0.862, 0.492),
+    ],
+    // 4현(쿠비 봉화산현) ➔ 등불 고가 석교 ➔ 5현(황동 기관학당현)
+    [
+      Vec2(0.862, 0.492),
+      Vec2(0.818, 0.514),
+      Vec2(0.750, 0.516),
+      Vec2(0.675, 0.516),
+      Vec2(0.605, 0.518),
+      Vec2(0.562, 0.552),
+      Vec2(0.506, 0.572),
+    ],
+    // 5현(황동 기관학당현) ➔ 폭포 위 백옥 아치교 ➔ 6현(만년설 백옥무림현)
+    [
+      Vec2(0.506, 0.572),
+      Vec2(0.445, 0.554),
+      Vec2(0.404, 0.524),
+      Vec2(0.332, 0.500),
+      Vec2(0.262, 0.524),
+      Vec2(0.212, 0.524),
+      Vec2(0.156, 0.512),
+    ],
+    // 6현(만년설 백옥무림현) ➔ 적암 협곡 횃불 S자 고개 ➔ 7현(적월 열사사막현)
+    [
+      Vec2(0.156, 0.512),
+      Vec2(0.142, 0.448),
+      Vec2(0.104, 0.382),
+      Vec2(0.126, 0.340),
+      Vec2(0.186, 0.320),
+      Vec2(0.258, 0.288),
+      Vec2(0.246, 0.256),
+    ],
+    // 7현(적월 열사사막현) ➔ 절벽 아치교 & 해상 등불 장교 ➔ 8현(창파 등대함대현)
+    [
+      Vec2(0.246, 0.256),
+      Vec2(0.294, 0.268),
+      Vec2(0.348, 0.282),
+      Vec2(0.395, 0.308),
+      Vec2(0.478, 0.308),
+      Vec2(0.562, 0.308),
+      Vec2(0.610, 0.309),
+      Vec2(0.658, 0.312),
+    ],
+    // 8현(창파 등대함대현) ➔ 해상 등불 현수교 ➔ 9현(흑요 적염화산현)
+    [
+      Vec2(0.658, 0.312),
+      Vec2(0.704, 0.323),
+      Vec2(0.745, 0.317),
+      Vec2(0.782, 0.300),
+      Vec2(0.812, 0.276),
+      Vec2(0.836, 0.254),
+    ],
+    // 9현(흑요 적염화산현) ➔ 황금 운해 천상 계단교 ➔ 10현(천상 태극신전현)
+    [
+      Vec2(0.836, 0.254),
+      Vec2(0.804, 0.232),
+      Vec2(0.760, 0.176),
+      Vec2(0.706, 0.138),
+      Vec2(0.642, 0.128),
+      Vec2(0.598, 0.114),
+      Vec2(0.555, 0.106),
+    ],
+  ];
+
+  static final Map<int, List<Vec2>> _smoothedContinentalSegmentCache =
+      <int, List<Vec2>>{};
+
+  /// 대륙도 위 제1현~제10현 각 거점 핀의 정규화 좌표 (`0.0 ~ 1.0`).
+  static Vec2 continentalCountyCoordAt(int chapterNumber) {
+    final ch = chapterNumber.clamp(1, 10);
+    if (ch == 1) return continentalRoadSegments.first.first;
+    return continentalRoadSegments[(ch - 2).clamp(0, continentalRoadSegments.length - 1)].last;
+  }
+
+  /// 인접 두 현(`segmentIndex` 0..8 ➔ `1현→2현` .. `9현→10현`) 사이의 실제 대륙 도로 곡선을 카트멀-롬 스플라인으로 보간한다.
+  static List<Vec2> smoothedContinentalRoadSegment(int segmentIndex) {
+    final normIdx = segmentIndex.clamp(0, continentalRoadSegments.length - 1);
+    return _smoothedContinentalSegmentCache.putIfAbsent(normIdx, () {
+      final raw = continentalRoadSegments[normIdx];
+      if (raw.length < 3) return List<Vec2>.unmodifiable(raw);
+
+      Vec2 catmull(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, double t) {
+        final t2 = t * t;
+        final t3 = t2 * t;
+        final x = 0.5 *
+            ((2.0 * p1.x) +
+                (-p0.x + p2.x) * t +
+                (2.0 * p0.x - 5.0 * p1.x + 4.0 * p2.x - p3.x) * t2 +
+                (-p0.x + 3.0 * p1.x - 3.0 * p2.x + p3.x) * t3);
+        final y = 0.5 *
+            ((2.0 * p1.y) +
+                (-p0.y + p2.y) * t +
+                (2.0 * p0.y - 5.0 * p1.y + 4.0 * p2.y - p3.y) * t2 +
+                (-p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y) * t3);
+        return Vec2(x.clamp(0.03, 0.97), y.clamp(0.05, 0.95));
+      }
+
+      final out = <Vec2>[];
+      for (int i = 0; i < raw.length - 1; i++) {
+        final p0 = i == 0 ? raw[0] : raw[i - 1];
+        final p1 = raw[i];
+        final p2 = raw[i + 1];
+        final p3 = (i + 2 < raw.length) ? raw[i + 2] : raw.last;
+        const steps = 12;
+        for (int s = 0; s < steps; s++) {
+          out.add(catmull(p0, p1, p2, p3, s / steps));
+        }
+      }
+      out.add(raw.last);
+      return List<Vec2>.unmodifiable(out);
+    });
+  }
+
+  static Vec2 _samplePolylineByArcLength(List<Vec2> pts, double t) {
+    if (pts.isEmpty) return const Vec2(0.5, 0.5);
+    if (pts.length == 1 || t <= 0.0) return pts.first;
+    if (t >= 1.0) return pts.last;
+
+    double totalLen = 0.0;
+    for (int i = 1; i < pts.length; i++) {
+      totalLen += pts[i].distanceTo(pts[i - 1]);
+    }
+    if (totalLen <= 1e-6) return pts.first;
+    final target = totalLen * t.clamp(0.0, 1.0);
+    double acc = 0.0;
+    for (int i = 1; i < pts.length; i++) {
+      final seg = pts[i].distanceTo(pts[i - 1]);
+      if (acc + seg >= target) {
+        final localT = seg > 1e-6 ? ((target - acc) / seg).clamp(0.0, 1.0) : 0.0;
+        return Vec2(
+          pts[i - 1].x + (pts[i].x - pts[i - 1].x) * localT,
+          pts[i - 1].y + (pts[i].y - pts[i - 1].y) * localT,
+        );
+      }
+      acc += seg;
+    }
+    return pts.last;
+  }
+
+  /// 인접 두 현(`fromChapter` ➔ `fromChapter + 1`) 실제 대륙 도로 위의 진행률 `t` (`0.0 ~ 1.0`) 좌표를 반환한다.
+  static Vec2 sampleContinentalRoadMarch(int fromChapter, double t) {
+    final pts = smoothedContinentalRoadSegment((fromChapter - 1).clamp(0, 8));
+    return _samplePolylineByArcLength(pts, t);
+  }
+
+  /// 임의의 출발 현(`startChapter`)에서 도착 현(`endChapter`)까지 이어지는 실제 대륙 도로 전체 곡선 폴리라인(순방향·역방향 모두 지원).
+  static List<Vec2> continentalJourneyPolyline(int startChapter, int endChapter) {
+    final s = startChapter.clamp(1, 10);
+    final e = endChapter.clamp(1, 10);
+    if (s == e) return <Vec2>[continentalCountyCoordAt(s)];
+    final combined = <Vec2>[];
+    if (s < e) {
+      for (int segIdx = s - 1; segIdx < e - 1; segIdx++) {
+        final pts = smoothedContinentalRoadSegment(segIdx);
+        for (int i = (combined.isEmpty ? 0 : 1); i < pts.length; i++) {
+          combined.add(pts[i]);
+        }
+      }
+    } else {
+      for (int segIdx = s - 2; segIdx >= e - 1; segIdx--) {
+        final pts = smoothedContinentalRoadSegment(segIdx);
+        for (int i = pts.length - (combined.isEmpty ? 1 : 2); i >= 0; i--) {
+          combined.add(pts[i]);
+        }
+      }
+    }
+    return combined;
+  }
+
+  /// 임의의 출발 현(`startChapter`)에서 도착 현(`endChapter`)까지 실제 대륙 도로·다리를 따라 이동할 때 진행률 `t` (`0.0 ~ 1.0`)의 좌표를 반환한다.
+  static Vec2 sampleContinentalJourney(
+    int startChapter,
+    int endChapter,
+    double t,
+  ) {
+    final pts = continentalJourneyPolyline(startChapter, endChapter);
+    return _samplePolylineByArcLength(pts, t);
+  }
+
   static List<Vec2> _orbitAltarRing(
     Vec2 center,
     double radius,

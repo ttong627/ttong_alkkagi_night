@@ -2949,5 +2949,57 @@ void main() {
         expect(missingProg.companionLevels[mukStage.rescueCompanion!], 1);
       }
     });
+
+    test('10대 현 대륙도 실측 도로(continentalRoadSegments) 9구간이 끊김 없이 연결되고 양방향 다중 현 이동 샘플링이 실제 도로 곡선을 따른다', () {
+      expect(CampaignCatalog.continentalRoadSegments.length, 9);
+      for (int i = 0; i < 9; i++) {
+        final raw = CampaignCatalog.continentalRoadSegments[i];
+        expect(raw.length, greaterThanOrEqualTo(6));
+        final smoothed = CampaignCatalog.smoothedContinentalRoadSegment(i);
+        expect(smoothed.length, greaterThan(40));
+        expect(
+          smoothed.first.distanceTo(CampaignCatalog.continentalCountyCoordAt(i + 1)),
+          lessThan(1e-6),
+        );
+        expect(
+          smoothed.last.distanceTo(CampaignCatalog.continentalCountyCoordAt(i + 2)),
+          lessThan(1e-6),
+        );
+        for (final p in smoothed) {
+          expect(p.x >= 0.03 && p.x <= 0.97, isTrue);
+          expect(p.y >= 0.05 && p.y <= 0.95, isTrue);
+        }
+        // 직선 연결이 아니라 실제 다리·고갯길 곡률을 가지는지 확인
+        final chordMid = Vec2(
+          (smoothed.first.x + smoothed.last.x) * 0.5,
+          (smoothed.first.y + smoothed.last.y) * 0.5,
+        );
+        final marchMid = CampaignCatalog.sampleContinentalRoadMarch(i + 1, 0.5);
+        expect(marchMid.distanceTo(chordMid), greaterThan(0.004));
+      }
+
+      // 순방향 다중 구간(1현 -> 10현) 및 역방향 다중 구간(10현 -> 2현) 이동이 중간 현 거점을 실제로 경유하는지 검증
+      final forwardPts = CampaignCatalog.continentalJourneyPolyline(1, 10);
+      expect(forwardPts.length, greaterThan(500));
+      expect(
+        CampaignCatalog.sampleContinentalJourney(1, 10, 0.0)
+            .distanceTo(CampaignCatalog.continentalCountyCoordAt(1)),
+        lessThan(1e-6),
+      );
+      expect(
+        CampaignCatalog.sampleContinentalJourney(1, 10, 1.0)
+            .distanceTo(CampaignCatalog.continentalCountyCoordAt(10)),
+        lessThan(1e-6),
+      );
+
+      final reversePts = CampaignCatalog.continentalJourneyPolyline(10, 2);
+      expect(reversePts.first.distanceTo(CampaignCatalog.continentalCountyCoordAt(10)), lessThan(1e-6));
+      expect(reversePts.last.distanceTo(CampaignCatalog.continentalCountyCoordAt(2)), lessThan(1e-6));
+      final ch5Coord = CampaignCatalog.continentalCountyCoordAt(5);
+      final minDistToCh5 = reversePts
+          .map((p) => p.distanceTo(ch5Coord))
+          .reduce((a, b) => a < b ? a : b);
+      expect(minDistToCh5, lessThan(1e-6));
+    });
   });
 }
