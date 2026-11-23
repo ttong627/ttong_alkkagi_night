@@ -3001,5 +3001,118 @@ void main() {
           .reduce((a, b) => a < b ? a : b);
       expect(minDistToCh5, lessThan(1e-6));
     });
+
+    test('v1.0.0+34 만렙 계정이라도 소수 설치(2~3기) 방치 시 진법 결속률 저하로 함락되며 전 초소 결속 시 100% 공명 및 10만+ 고화력이 정상 적용된다', () {
+      final vet = PlayerProgress(
+        tokens: 5000,
+        elixirs: 200,
+        realmIndex: 7,
+        openedMeridianStep: 10,
+        centralGuardianLevel: 26,
+        forgeMasteryLevel: 18,
+        elixirResonanceLevel: 16,
+        highestClearedGlobalStage: 100,
+        unlockedStones: StoneMaterial.values.toSet(),
+      );
+      for (final lt in LauncherType.values) {
+        vet.launcherPermanentLevels[lt] = 24;
+      }
+      for (final b in SpiritBeast.values) {
+        vet.beastLevels[b] = 10;
+      }
+      for (final h in CompanionHero.values) {
+        vet.companionLevels[h] = 10;
+      }
+      vet.activePreset
+        ..primaryStone = StoneMaterial.taegeuk
+        ..primaryShape = StoneShape.sphere
+        ..equippedBeast = SpiritBeast.geumryong
+        ..companions = [
+          CompanionHero.mukhyeon,
+          CompanionHero.sinseung,
+          CompanionHero.geomhwang,
+        ]
+        ..autoUpgradeInBattle = true;
+
+      // 1) 4-5 악몽 관문에서 포대 3기만 딸깍 설치하고 방치하면 만렙 계정이라도 자동승급이 잠기고 진법 결속률이 급락해 패배해야 함!
+      final st45 = CampaignCatalog.stageAt(4, 5);
+      final lazySim = DefenseBattleSim(
+        stage: st45,
+        difficulty: DefenseDifficulty.nightmare,
+        progress: vet,
+        seed: 34045,
+        allowSupportTokens: false,
+      );
+      int built = 0;
+      bool sawLowCoverage = false;
+      for (int step = 0; step < 480 * 30 && !lazySim.isFinished; step++) {
+        if (step % 15 == 0 && built < 3) {
+          final ns = lazySim.nextRecommendedSlotIndex();
+          if (ns != null) {
+            final sl = lazySim.mountSlotByIndex(ns)!;
+            if (!lazySim.isSlotExcavated(ns)) {
+              if (lazySim.fieldTokens >= lazySim.excavationCostForSlot(sl)) {
+                lazySim.excavateSlotInBattle(ns);
+              }
+            } else if (lazySim.quickDirectBuildNextPad()) {
+              built++;
+            }
+          }
+        }
+        lazySim.step(1 / 30);
+        if (lazySim.currentWaveIndex >= 2 && lazySim.formationCoverageRatio < 0.70) {
+          sawLowCoverage = true;
+        }
+      }
+      expect(sawLowCoverage, isTrue);
+      // 빈 초소를 남겨둔 상태에서는 포대 3기가 4형으로 공짜 자동승급되지 않아야 함!
+      expect(lazySim.launchers.every((l) => l.tier == 1), isTrue);
+      expect(lazySim.buildSummary().victory, isFalse);
+
+      // 2) 99,999 데미지 하드캡 제거 검증: 25만 단일 피해 투사체가 적 체력을 정상 차감해야 함!
+      final highHpSim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(10, 10),
+        difficulty: DefenseDifficulty.nightmare,
+        progress: vet,
+        seed: 34100,
+      );
+      highHpSim.fieldTokens = 9000;
+      for (final m in highHpSim.activeMounts) {
+        if (highHpSim.isSlotWaveUnlocked(m.slotIndex)) {
+          if (!highHpSim.isSlotExcavated(m.slotIndex)) {
+            highHpSim.excavateSlotInBattle(m.slotIndex);
+          }
+          highHpSim.placeLauncherInBattle(m.slotIndex, m.recommendedType);
+        }
+      }
+      highHpSim.mutants.clear();
+      highHpSim.projectiles.clear();
+      final dummy = ActiveMutant(
+        uid: 99001,
+        kind: MutantKind.ironBoar,
+        laneIndex: 0,
+        waypoints: const [Vec2(360, 500)],
+        pos: const Vec2(360, 500),
+        maxHp: 500000.0,
+        speed: 0.0,
+      );
+      highHpSim.mutants.add(dummy);
+      highHpSim.projectiles.add(
+        ActiveStoneProjectile(
+          sourceKey: 'test_uncapped_dmg',
+          sourceLabel: '고화력검증',
+          pos: const Vec2(360, 508),
+          vel: const Vec2(0, -1200),
+          material: StoneMaterial.taegeuk,
+          shape: StoneShape.sphere,
+          damage: 250000.0,
+          knockback: 0,
+          critChance: 0.0,
+          colorHex: 0xFFFFFFFF,
+        ),
+      );
+      highHpSim.step(1 / 60);
+      expect(dummy.hp, lessThan(360000.0), reason: '10만 이상 단일 화력이 99,999에서 잘리지 않아야 함');
+    });
   });
 }

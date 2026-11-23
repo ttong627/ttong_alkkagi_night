@@ -205,26 +205,26 @@ enum DefenseDifficulty {
   easy(
     id: 'easy',
     name: '쉬움 · 마을 지킴이',
-    hpMult: 0.92,
-    speedMult: 0.93,
+    hpMult: 0.95,
+    speedMult: 0.94,
     rewardMult: 1.0,
-    summary: '거점 개척과 지형 포진의 기본기를 익히며 막아내는 입문 난이도',
+    summary: '초소 개척과 진법 포진의 기본기를 익히며 막아내는 입문 난이도',
   ),
   normal(
     id: 'normal',
     name: '보통 · 강호 수호자',
-    hpMult: 1.26,
-    speedMult: 1.05,
+    hpMult: 1.45,
+    speedMult: 1.07,
     rewardMult: 1.25,
-    summary: '기력 운용·거점 개척·5병종 상성·보스 약점 저격이 필수인 표준 진검 난이도 (영구 보상 +25%)',
+    summary: '전방 개척·5병종 상성·실시간 4종 강화·보스 약점 저격이 필수인 표준 진검 난이도 (영구 보상 +25%)',
   ),
   nightmare(
     id: 'nightmare',
     name: '악몽 · 심야 혈전',
-    hpMult: 1.88,
-    speedMult: 1.18,
-    rewardMult: 1.55,
-    summary: '극한의 진법 설계와 내공·영수 성장이 요구되는 고수용 사투 (영구 보상 +55%)',
+    hpMult: 4.95,
+    speedMult: 1.22,
+    rewardMult: 1.65,
+    summary: '전 초소 진법 결속·연성 합체·침식 정화·내공/영수/비약 총동원 없이는 뚫을 수 없는 극한 사투 (영구 보상 +65%)',
   );
 
   const DefenseDifficulty({

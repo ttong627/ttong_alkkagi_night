@@ -1826,4 +1826,38 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+      'v1.0.0+34 악몽 난이도 전장 진입 및 실시간 진법 결속률(battle_formation_coverage_badge) HUD 검증',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final ctrl = GameController(
+      initialProgress: PlayerProgress(
+        highestClearedGlobalStage: 100,
+        tutorialSeen: true,
+      ),
+    );
+    ctrl.setDifficulty(DefenseDifficulty.nightmare);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BattleScreen(
+          controller: ctrl,
+          stage: CampaignCatalog.stageAt(10, 10),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 180));
+
+    expect(
+      find.byKey(const Key('battle_formation_coverage_badge')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('진법결속'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

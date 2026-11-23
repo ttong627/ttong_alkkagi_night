@@ -499,6 +499,133 @@ class DefenseBattleSim {
   /// 길목 초소가 최소 1곳 설치되었거나 수동 탄지 공명이 살아 있을 때만 진법(영수·동료·회복)이 활성화됨!
   bool get isFormationActive => launchers.isNotEmpty || manualResonanceTimer > 0;
 
+  final Set<int> _gapWarningWaves = <int>{};
+
+  /// 현재 물결에서 요구되는 진법 결속률(0.10 ~ 1.0):
+  /// 초반에 포대 2~4개만 설치하고 방치하면 중후반 물결에서 진법 기맥이 끊겨 본진·동료 공명이 급감하고 빈 길목 마기 폭주가 발생한다!
+  double get formationCoverageRatio {
+    if (!isFormationActive) return 0.0;
+    if (currentWaveIndex == 0 || elapsedSec < 26.0) return 1.0;
+
+    int unlockedPads = 0;
+    for (final m in activeMounts) {
+      if (isSlotWaveUnlocked(m.slotIndex)) unlockedPads++;
+    }
+    if (unlockedPads <= 2) return 1.0;
+
+    final double targetFrac = switch (currentWaveIndex) {
+      1 => difficulty == DefenseDifficulty.nightmare ? 0.58 : 0.50,
+      2 => difficulty == DefenseDifficulty.nightmare ? 0.76 : 0.68,
+      _ => switch (difficulty) {
+          DefenseDifficulty.easy => 0.65,
+          DefenseDifficulty.normal => 0.78,
+          DefenseDifficulty.nightmare => 0.88,
+        },
+    };
+
+    // 연성 합체(merge)로 슬롯을 압축한 경우 물리 요구 대수에서 정당하게 차감 인정!
+    // 단, 4~5초소 소규모 관문(1-1 포함)에서도 '포대 2개만 딸깍 짓고 방치'하면 결속이 깨지도록 최소 3.4기(합체 시 차감) 기준 적용!
+    final double baseMinPads = currentWaveIndex >= 2
+        ? max(unlockedPads * targetFrac, unlockedPads - 0.65)
+        : unlockedPads * targetFrac;
+    final double reqPads = max(
+      currentWaveIndex >= 2 ? 3.4 : 2.0,
+      baseMinPads - mergeEvolutionCount * 0.95,
+    );
+    final double padCountRatio = (launchers.length / reqPads).clamp(0.10, 1.0);
+
+    double effectiveUnits =
+        (liveFirepowerLv + liveReloadLv + liveRangeLv + liveBarrierLv) * 0.36 +
+            mergeEvolutionCount * 0.85;
+    for (final l in launchers) {
+      effectiveUnits += switch (l.tier) {
+        1 => 1.0,
+        2 => 1.60,
+        3 => 2.45,
+        4 => 3.65,
+        _ => 5.25,
+      };
+    }
+    final double waveProg =
+        (currentWaveIndex / max(1, stage.waves.length - 1)).clamp(0.0, 1.0);
+    final double qualMult = 1.0 +
+        max(0.0, waveProg - 0.34) *
+            switch (difficulty) {
+              DefenseDifficulty.easy => 0.22,
+              DefenseDifficulty.normal => 0.52,
+              DefenseDifficulty.nightmare => 0.85,
+            };
+    final double reqUnits = reqPads * qualMult;
+    final double unitRatio = (effectiveUnits / max(1.0, reqUnits)).clamp(0.10, 1.0);
+    return min(padCountRatio, unitRatio);
+  }
+
+  /// 본진 중앙탑·영수·동료·결계 자연회복에 곱해지는 진법 기맥 공명 배율 (결속률 95% 이상이면 1.0 유지, 소수 설치 방치 시 급감!).
+  double get formationResonanceScale {
+    final cov = formationCoverageRatio;
+    if (cov >= 0.95) return 1.0;
+    return pow(cov, 1.90).toDouble().clamp(0.06, 1.0);
+  }
+
+  static const List<double> _chapterExpectedDpsCurve = <double>[
+    1.30,
+    2.20,
+    5.20,
+    9.20,
+    17.50,
+    32.50,
+    49.00,
+    74.00,
+    102.00,
+    142.00,
+  ];
+
+  static const List<double> _nightmareChapterDensityMult = <double>[
+    2.45,
+    3.85,
+    2.95,
+    2.05,
+    3.85,
+    5.20,
+    3.30,
+    5.65,
+    1.15,
+    1.50,
+  ];
+
+  /// 악몽(Nightmare) 난이도 전용 심야 공명 스케일링:
+  /// 만렙·고성장 계정이 하위 현(1~7현) 악몽에 진입해도 '설치 몇 번에 순삭'되지 않고 전 100판 모두 진검 승부가 되도록 보정한다.
+  double get _nightmareChallengeScale {
+    if (difficulty != DefenseDifficulty.nightmare || stage.globalIndex >= 900) {
+      return 1.0;
+    }
+    double permSum = 0.0;
+    int permCnt = 0;
+    for (final lt in LauncherType.values) {
+      if (isLauncherTypeUnlocked(lt)) {
+        permSum += (progress.launcherPermanentLevels[lt] ?? 1);
+        permCnt++;
+      }
+    }
+    final avgPerm = permCnt > 0 ? permSum / permCnt : 1.0;
+    final launcherDpsIdx = (1.0 + (avgPerm - 1.0) * 0.16) *
+        progress.realm.powerMult *
+        preset.primaryStone.damageMultiplier *
+        (1.0 +
+            progress.meridianLauncherDmgBonus +
+            progress.coreFirepowerBonus +
+            progress.codexPowerBonus +
+            progress.forgeMasteryPowerBonus);
+
+    final chIdx =
+        (stage.chapterNumber - 1).clamp(0, _chapterExpectedDpsCurve.length - 1);
+    final expectedDps = _chapterExpectedDpsCurve[chIdx];
+    final overRatio = launcherDpsIdx / expectedDps;
+    // 8~10장 종결 구간(overRatio <= 2.65)은 순수 성장 화력을 100% 반영하고, 하위 장 재도전 시에만 심야 공명 하한선을 가동한다.
+    if (overRatio <= 2.65) return 1.0;
+    return pow(overRatio / 2.65, 0.84).toDouble().clamp(1.0, 58.0);
+  }
+
   bool get isCentralReadyToFire => !isFinished && towerHp > 0 && centralFireTimer <= 0.04;
 
   bool get isPrecisionStrikeReady => !isFinished && towerHp > 0 && precisionStrikeCooldown <= 0.02;
@@ -2458,8 +2585,8 @@ class DefenseBattleSim {
       }
       engageIdx = bestI;
     }
-    final upstreamIdx = max(0, engageIdx - (3 + scoutOrder * 3));
-    return (upstreamIdx / max(1, lane.length - 1)).clamp(0.05, 0.84);
+    final upstreamIdx = max(0, engageIdx - (6 + scoutOrder * 4));
+    return (upstreamIdx / max(1, lane.length - 1)).clamp(0.05, 0.56);
   }
 
   void _enqueueWave(int waveIdx, {bool appendExisting = false}) {
@@ -2475,13 +2602,13 @@ class DefenseBattleSim {
         final scoutLaneIdx = s % chapter.lanes.length;
         _spawnQueue.add(
           _PendingSpawn(
-            delaySec: 2.85 + s * 0.45,
+            delaySec: 2.95 + s * 0.50,
             kind: MutantKind.swarmRat,
             laneIndex: scoutLaneIdx,
             waveIndex: waveIdx,
             customTitle: '선봉 척후 독쥐',
             startLaneProgress: _scoutSpawnProgressForLane(scoutLaneIdx, s),
-            hpScale: 0.68,
+            hpScale: 0.42,
           ),
         );
       }
@@ -2501,8 +2628,8 @@ class DefenseBattleSim {
           ? 1.0
           : switch (difficulty) {
               DefenseDifficulty.easy => 0.88,
-              DefenseDifficulty.normal => 1.00,
-              DefenseDifficulty.nightmare => 1.28,
+              DefenseDifficulty.normal => 1.04,
+              DefenseDifficulty.nightmare => 1.34,
             };
       final spawnTotal = g.kind.isBoss ? g.count : max(1, (g.count * diffCountMult).round());
       final adjInterval = g.kind.isBoss
@@ -2522,6 +2649,34 @@ class DefenseBattleSim {
           ),
         );
       }
+    }
+    // ★ 악몽(Nightmare) 전용 심야 정예 선봉 증원: 제3물결 이후 보스가 없는 물결에도 정예 중간보스가 추가 돌격!
+    if (difficulty == DefenseDifficulty.nightmare &&
+        stage.globalIndex < 900 &&
+        waveIdx >= 2 &&
+        !hasBossInWave &&
+        waveIdx.isEven) {
+      const nightmareElites = <MutantKind>[
+        MutantKind.swiftShadowBoss,
+        MutantKind.ironColossusBoss,
+        MutantKind.crimsonBreakerBoss,
+        MutantKind.raiderHeukpung,
+      ];
+      final eliteKind =
+          nightmareElites[(stage.globalIndex + waveIdx) % nightmareElites.length];
+      final eliteLane = (stage.globalIndex + waveIdx) % chapter.lanes.length;
+      _spawnQueue.add(
+        _PendingSpawn(
+          delaySec: startGrace + 4.2,
+          kind: eliteKind,
+          laneIndex: eliteLane,
+          waveIndex: waveIdx,
+          customTitle: '악몽 혈전 선봉 ${eliteKind.name}',
+          customHitShield: 90 + stage.chapterNumber * 18,
+          hierarchyRank: '악몽 선봉장',
+        ),
+      );
+      hasBossInWave = true;
     }
     if (hasBossInWave && !_bossRouletteGranted && waveIdx >= 1 && isFormationActive) {
       _bossRouletteGranted = true;
@@ -2911,14 +3066,16 @@ class DefenseBattleSim {
       }
     }
 
-    // 초소가 최소 1곳 설치된 상태에서만 호신 강기 방어막·수호탑 자연 회복 작동 (무배치 방치 클리어 차단!)
+    // 초소가 설치된 상태에서만 호신 강기 방어막·수호탑 자연 회복 작동 (소수 설치 방치 시 진법 결속률 비례 감쇠!)
     if (launchers.isNotEmpty) {
-      final fortScale = 1.0 +
-          progress.coreFortitudeBonus +
-          progress.elixirResonanceBonus * 0.45;
+      final resScale = formationResonanceScale;
+      final fortScale = (1.0 +
+              progress.coreFortitudeBonus +
+              progress.elixirResonanceBonus * 0.45) *
+          resScale;
       if (shieldHp > 0 && shieldHp < shieldMaxHpDynamic) {
         final shieldRegenPerSec =
-            max(1.25, shieldMaxHpDynamic * 0.0085) * fortScale;
+            max(1.25 * resScale, shieldMaxHpDynamic * 0.0085 * fortScale);
         shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldRegenPerSec * dt);
       }
       if (towerHp > 0 && towerHp < centralSpec.coreMaxHp) {
@@ -3000,14 +3157,16 @@ class DefenseBattleSim {
       }
     }
 
-    // 포탑 자동 승급: 실제 게임에서는 유저가 직접 `자동승급`을 켜고 전장에 최소 4기 이상 세워둔 뒤 잉여 기력(>= 95⚡)이 남을 때만 작동!
+    // 포탑 자동 승급: 현재 물결에 개방된 모든 초소에 이미 포대를 다 건설 완료(`nextRecommendedSlotIndex() == null`)한 뒤에만 잉여 기력으로 작동!
+    // (초반에 3~4기만 딸깍 짓고 손 놓았을 때 알아서 4형 풀강으로 키워주는 프리패스 원천 차단!)
     final allowAutoUpgNow = launchers.isNotEmpty &&
         (autoBuildForSimVerify
             ? (nextRecommendedSlotIndex() == null ||
                 (launchers.length >= min(3, activeMounts.length) && fieldTokens >= 78))
             : (preset.autoUpgradeInBattle &&
-                launchers.length >= min(4, activeMounts.length) &&
-                fieldTokens >= 95));
+                currentWaveIndex >= 3 &&
+                nextRecommendedSlotIndex() == null &&
+                fieldTokens >= 105));
     if (allowAutoUpgNow) {
       final hasPendingPad = nextRecommendedSlotIndex() != null;
       final reserveForBuild = autoBuildForSimVerify ? 0 : (hasPendingPad ? 55 : 0);
@@ -3384,6 +3543,20 @@ class DefenseBattleSim {
     182.00, // 10장 (7성좌 부유옥섬 무지개교 · 3페이즈 보스 10연전)
   ];
 
+  double _nightmareChallengeScaleForWave(int waveIdx) {
+    final fullScale = _nightmareChallengeScale;
+    if (fullScale <= 1.001) return 1.0;
+    // 제1물결은 초소가 2곳만 열려 있으므로(특히 4·9장 다중 진입로) 초반 25초 억까 즉사를 막고,
+    // 초소가 개방되는 제2~3물결부터 100% 심야 공명 전력으로 치솟는다!
+    if (waveIdx <= 0) {
+      return pow(fullScale, 0.28).toDouble().clamp(1.0, 3.2);
+    }
+    if (waveIdx == 1) {
+      return pow(fullScale, 0.65).toDouble().clamp(1.0, 24.0);
+    }
+    return fullScale;
+  }
+
   double _monsterHpScaleForWave(int waveIdx) {
     final chIdx = (stage.chapterNumber - 1).clamp(0, _chapterMonsterHpCurve.length - 1);
     final baseCh = _chapterMonsterHpCurve[chIdx];
@@ -3396,7 +3569,22 @@ class DefenseBattleSim {
       // 16~100물결: 막 10-10을 깬 계정은 중후반(40~85물결)에서 한계를 느끼고, 엔드게임 연마 계정이 100물결을 정복하는 곡선!
       return endlessBase * (1.0 + w * 0.135 + pow(w - 15, 1.33).toDouble() * 0.062);
     }
-    return baseCh * (1.0 + (stage.stageNumber - 1) * 0.058);
+    // 물결이 진행되며 초소·비급·실시간 강화가 중첩되는 속도에 맞춰 중후반 적 본대 체력도 탄탄하게 상승! (입구컷 프리패스 방지)
+    final waveEscalation = waveIdx <= 0
+        ? (difficulty == DefenseDifficulty.nightmare ? 0.78 : 0.88)
+        : switch (difficulty) {
+            DefenseDifficulty.easy => 1.0 + pow(waveIdx, 1.22).toDouble() * 0.06,
+            DefenseDifficulty.normal => 1.0 + pow(waveIdx, 1.38).toDouble() * 0.13,
+            DefenseDifficulty.nightmare => 1.0 + pow(waveIdx, 1.48).toDouble() * 0.20,
+          };
+    final nmChTight = difficulty == DefenseDifficulty.nightmare
+        ? _nightmareChapterDensityMult[chIdx]
+        : 1.0;
+    return baseCh *
+        (1.0 + (stage.stageNumber - 1) * 0.065) *
+        waveEscalation *
+        nmChTight *
+        _nightmareChallengeScaleForWave(waveIdx);
   }
 
   double _mutantAttackScaleForWave(int waveIdx) {
@@ -3404,17 +3592,21 @@ class DefenseBattleSim {
         ? 7.4
         : (1.0 +
             (stage.chapterNumber - 1) * 0.50 +
-            (stage.chapterNumber >= 6 ? (stage.chapterNumber - 5) * 0.44 : 0.0));
+            (stage.chapterNumber >= 6 ? (stage.chapterNumber - 5) * 0.42 : 0.0));
     if (stage.globalIndex >= 900 && waveIdx > 15) {
       chMult *= 1.0 + (waveIdx - 15) * 0.033;
     }
+    final isFirstIntro = stage.globalIndex == 1 && difficulty == DefenseDifficulty.normal;
+    final earlyWaveEase = (waveIdx == 0 && stage.globalIndex < 900) ? 0.65 : 1.0;
+    final nmWaveScale = _nightmareChallengeScaleForWave(waveIdx);
     final diffMult = switch (difficulty) {
-      DefenseDifficulty.easy => 0.80,
-      DefenseDifficulty.normal => 1.0,
-      DefenseDifficulty.nightmare => 1.56,
+      DefenseDifficulty.easy => 0.82,
+      DefenseDifficulty.normal => isFirstIntro ? 1.0 : 1.18,
+      DefenseDifficulty.nightmare =>
+        1.62 * pow(nmWaveScale, 0.22).toDouble(),
     };
-    final ch9LavaAtk = chapter.number == 9 ? 1.15 : 1.0;
-    return chMult * diffMult * ch9LavaAtk;
+    final ch9LavaAtk = chapter.number == 9 ? 1.10 : 1.0;
+    return chMult * diffMult * ch9LavaAtk * earlyWaveEase;
   }
 
   /// 장 진행 및 난이도에 따른 변이체 방어막·수호탑 공격력 배율 (1-1 보통은 1.00 정확 유지).
@@ -3479,21 +3671,25 @@ class DefenseBattleSim {
 
     // ★ 행동대장(100타+) · 중간보스(200~500타+) · 각 장 천련 대수괴(1,000타+) 다단 변이 및 타수 실드 가동!
     if (item.kind.isBoss) {
+      final isNightmare = difficulty == DefenseDifficulty.nightmare;
       if (item.kind.isMidBoss) {
         spawned.enableBossPhases(
           phases: 2,
-          initialPlates: 0,
+          initialPlates: (isNightmare && stage.chapterNumber >= 3) ? 1 : 0,
           phase1HpScale: 0.78,
         );
       } else {
         spawned.enableBossPhases(
           phases: 3,
-          initialPlates: 2,
+          initialPlates: isNightmare ? 3 : 2,
           phase1HpScale: 0.68,
         );
       }
       spawned.weakSpotAngleRad = rng.nextDouble() * pi * 2;
-      final shieldHits = item.customHitShield ?? item.kind.baseHitShield;
+      final baseShieldHits = item.customHitShield ?? item.kind.baseHitShield;
+      final shieldHits = isNightmare
+          ? (baseShieldHits * 1.32).round()
+          : baseShieldHits;
       final rankLabel = item.hierarchyRank ?? (item.kind.isMidBoss ? '행동대장' : '장 보스');
       if (shieldHits > 0) {
         spawned.enableHitShield(shieldHits, rank: rankLabel);
@@ -3644,23 +3840,26 @@ class DefenseBattleSim {
 
       // 전진 이동 및 스피드 특화 보행·질주·편대 물리 (빙결 중에는 animPhase 정지!)
       if (m.freezeTimer <= 0) {
-        // ★ 변이 두목 · 역병 두꺼비 · 대수괴의 주변 포탑 「🕸️마기 침식」 방해 기믹!
+        // ★ 변이 두목 · 역병 두꺼비 · 대수괴의 주변 포탑 「🕸️마기 침식」 방해 기믹! (악몽에서는 2기 동시 침식!)
         if ((m.kind.isBoss || m.kind == MutantKind.plagueToad) && launchers.isNotEmpty) {
           m.corruptionCastCooldown -= dt;
           if (m.corruptionCastCooldown <= 0) {
-            m.corruptionCastCooldown = m.kind.isBoss ? 5.2 : 7.5;
-            ActiveLauncher? nearL;
-            double bestD = 245.0;
-            for (final l in launchers) {
-              if (l.isConstructing || l.isCorrupted || l.purifiedBoostTimer > 0) continue;
-              final d = l.pos.distanceTo(m.pos);
-              if (d <= bestD) {
-                bestD = d;
-                nearL = l;
-              }
-            }
-            if (nearL != null) {
-              nearL.corruptionTimer = 6.5;
+            final isNightmare = difficulty == DefenseDifficulty.nightmare;
+            m.corruptionCastCooldown = isNightmare
+                ? (m.kind.isBoss ? 4.0 : 5.8)
+                : (m.kind.isBoss ? 5.2 : 7.5);
+            final maxTargets = (isNightmare && m.kind.isBoss) ? 2 : 1;
+            final candidates = launchers
+                .where((l) =>
+                    !l.isConstructing &&
+                    !l.isCorrupted &&
+                    l.purifiedBoostTimer <= 0 &&
+                    l.pos.distanceTo(m.pos) <= (isNightmare ? 285.0 : 245.0))
+                .toList()
+              ..sort((a, b) =>
+                  a.pos.distanceTo(m.pos).compareTo(b.pos.distanceTo(m.pos)));
+            for (final nearL in candidates.take(maxTargets)) {
+              nearL.corruptionTimer = isNightmare ? 7.5 : 6.5;
               lightningArcs.add(
                 LightningArcFx(
                   from: m.pos,
@@ -3673,7 +3872,7 @@ class DefenseBattleSim {
               callouts.add(
                 FloatingCallout(
                   pos: nearL.pos + const Vec2(0, -18),
-                  text: '🕸️ 마기 침식(연사 -42%)! 포탑 터치로 정화하세요!',
+                  text: '🕸️ 마기 침식(연사 -48%)! 포탑 터치로 정화하세요!',
                   colorHex: 0xFFC77DFF,
                 ),
               );
@@ -3724,7 +3923,24 @@ class DefenseBattleSim {
         }
 
         final slowFactor = m.slowTimer > 0 ? 0.58 : 1.0;
-        final effectiveSpeed = m.speed * slowFactor * gaitMult;
+        final covRatio = formationCoverageRatio;
+        final gapSpeedSurge = (currentWaveIndex >= 2 && covRatio < 0.84)
+            ? (1.0 + (0.84 - covRatio) * 0.68)
+            : 1.0;
+        if (currentWaveIndex >= 2 &&
+            covRatio < 0.76 &&
+            _gapWarningWaves.add(currentWaveIndex)) {
+          callouts.add(
+            FloatingCallout(
+              pos: const Vec2(360, 168),
+              text: '🚨 진법 기맥 공백! 빈 초소를 개척·증설하고 실시간 강화를 올리세요!',
+              colorHex: 0xFFFF595E,
+              ttlSec: 2.4,
+              isBigBanner: true,
+            ),
+          );
+        }
+        final effectiveSpeed = m.speed * slowFactor * gaitMult * gapSpeedSurge;
 
         // Catmull-Rom 곡선 경로 및 90° 직각 미궁 경로 정밀 주시(Look-Ahead Pure Pursuit)!
         if (m.waypoints.isNotEmpty) {
@@ -3876,7 +4092,11 @@ class DefenseBattleSim {
 
       final phaseAttackMult = 1.0 + (m.currentPhase - 1) * 0.22;
       final carapaceRamMult = m.carapacePlatesLeft > 0 ? 1.48 : 1.0;
-      final atkScale = m.attackScaleSnapshot > 0 ? m.attackScaleSnapshot : _mutantAttackScale;
+      final covForAtk = formationCoverageRatio;
+      final gapAtkSurge = (currentWaveIndex >= 2 && covForAtk < 0.84)
+          ? (1.0 + (0.84 - covForAtk) * 3.6)
+          : 1.0;
+      final atkScale = (m.attackScaleSnapshot > 0 ? m.attackScaleSnapshot : _mutantAttackScale) * gapAtkSurge;
       final frostShieldDr = seolhwaFrostShieldTimer > 0 ? 0.75 : 1.0;
       // 외곽 기공 방어막 충돌 처리 (외각 장갑이 깨지지 않은 다단 변이 보스는 결계를 1.48배로 부수며 밀침 저항!)
       if (shieldHp > 0 &&
@@ -4074,7 +4294,9 @@ class DefenseBattleSim {
     }
 
     final centralCultivationMult =
-        progress.realm.powerMult * (1.0 + progress.meridianLauncherDmgBonus);
+        progress.realm.powerMult *
+        (1.0 + progress.meridianLauncherDmgBonus) *
+        formationResonanceScale;
 
     if (!_encoreEogiReserved &&
         activeTowers.isNotEmpty &&
@@ -4130,7 +4352,8 @@ class DefenseBattleSim {
     if (target == null) return;
     final allyMult = (1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45) *
         (1.0 + progress.elixirResonanceBonus) *
-        (1.0 + progress.meridianLauncherDmgBonus);
+        (1.0 + progress.meridianLauncherDmgBonus) *
+        formationResonanceScale;
     final power =
         centralSpec.baseDamage * (1.15 + lv * 0.18) * progress.realm.powerMult * allyMult;
     _spawnStoneShot(
@@ -4151,7 +4374,9 @@ class DefenseBattleSim {
     final monoPenalty =
         (stage.chapterNumber >= 4 && activeTowers.length >= 3 && distinctTypes <= 1) ? 0.46 : 1.0;
     final centralCultivationMult =
-        progress.realm.powerMult * (1.0 + progress.meridianLauncherDmgBonus);
+        progress.realm.powerMult *
+        (1.0 + progress.meridianLauncherDmgBonus) *
+        formationResonanceScale;
     final count = progress.realm.eogieoseokCount + 1;
     final maxEogiRange = (285.0 * liveRangeMultiplier).clamp(275.0, 395.0);
     final candidates = mutants
@@ -4258,9 +4483,11 @@ class DefenseBattleSim {
         continue;
       }
 
-      final corruptionMult = l.isCorrupted ? 0.58 : (l.purifiedBoostTimer > 0 ? 1.25 : 1.0);
-      double ampReload = l.terrainType.reloadMult * corruptionMult;
-      double ampDamage = fiveElemBonus * l.terrainType.damageMult;
+      final corruptionMult = l.isCorrupted ? 0.52 : (l.purifiedBoostTimer > 0 ? 1.25 : 1.0);
+      final covNow = formationCoverageRatio;
+      final isolationFactor = covNow >= 0.90 ? 1.0 : (0.30 + 0.70 * covNow);
+      double ampReload = l.terrainType.reloadMult * corruptionMult * isolationFactor;
+      double ampDamage = fiveElemBonus * l.terrainType.damageMult * isolationFactor;
       double ampCrit = (distinctTypes >= 3 ? 0.08 : 0.0) + l.terrainType.critBonus;
       int synPierce = l.terrainType.pierceBonus;
       double synSpeedMult = 1.0;
@@ -4625,7 +4852,8 @@ class DefenseBattleSim {
     );
     final allyMult = (1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45) *
         (1.0 + progress.elixirResonanceBonus) *
-        (1.0 + progress.meridianLauncherDmgBonus);
+        (1.0 + progress.meridianLauncherDmgBonus) *
+        formationResonanceScale;
     final power =
         centralSpec.baseDamage * (1.55 + lv * 0.22) * progress.realm.powerMult * allyMult;
 
@@ -4684,17 +4912,18 @@ class DefenseBattleSim {
         );
         break;
       case SpiritBeast.baekho:
-        for (final offset in [-18.0, 18.0]) {
+        for (final offset in [-12.0, 12.0]) {
           _spawnStoneShot(
             sourceKey: 'beast_baekho',
             sourceLabel: '영수 백호',
             origin: shieldCenter + Vec2(offset, -16),
             target: target!,
             baseDamage: power * 1.35,
-            speed: 360,
+            speed: 395,
             knockbackScale: 1.85,
-            aoeRadius: 42,
-            maxTravelDist: allyMaxR * 1.15,
+            aoeRadius: 56,
+            homingTargetUid: offset < 0 ? target.uid : null,
+            maxTravelDist: allyMaxR * 1.30,
           );
         }
         break;
@@ -4756,7 +4985,8 @@ class DefenseBattleSim {
     if (target == null && !isBuffOnly) return;
     final allyMult = (1.0 + perkStacks(RoguePerk.allyAwakening) * 0.45) *
         (1.0 + progress.elixirResonanceBonus) *
-        (1.0 + progress.meridianLauncherDmgBonus);
+        (1.0 + progress.meridianLauncherDmgBonus) *
+        formationResonanceScale;
     final baseDmg =
         centralSpec.baseDamage * (1.50 + lv * 0.20) * progress.realm.powerMult * allyMult;
     final key = 'hero_${hero.id}';
@@ -4825,10 +5055,10 @@ class DefenseBattleSim {
           origin: shieldCenter + const Vec2(-32, -8),
           target: target!,
           baseDamage: baseDmg * 1.20,
-          speed: 330,
-          aoeRadius: 68,
+          speed: 365,
+          aoeRadius: 72,
           oilsOnHit: true,
-          maxTravelDist: allyMaxR * 1.15,
+          maxTravelDist: allyMaxR * 1.32,
         );
         break;
       case CompanionHero.gurumi:
@@ -5888,9 +6118,15 @@ class DefenseBattleSim {
       if (hitWeakBullseye) {
         crackedWeakPointNow = true;
         precisionHitCount++;
-        mult *= 1.25;
-        precisionBonusTrueDmg = m.currentMaxHp * (m.carapacePlatesLeft > 0 ? 0.08 : 0.05);
-        m.freezeTimer = max(m.freezeTimer, 0.38);
+        mult *= 1.32;
+        final hpCapRatio = difficulty == DefenseDifficulty.nightmare
+            ? (m.carapacePlatesLeft > 0 ? 0.032 : 0.018)
+            : (m.carapacePlatesLeft > 0 ? 0.065 : 0.042);
+        precisionBonusTrueDmg = min(p.damage * 2.4, m.currentMaxHp * hpCapRatio);
+        if (m.freezeImmuneTimer <= 0) {
+          m.freezeTimer = max(m.freezeTimer, 0.36);
+          m.freezeImmuneTimer = 2.1;
+        }
         fieldTokens += 5;
         _spawnFlyingQiOrb(m.weakSpotWorldPos, 5, colorHex: 0xFFFFD166);
         if (m.carapacePlatesLeft > 0) {
@@ -6454,12 +6690,21 @@ class DefenseBattleSim {
         carapaceMult = 0.26;
       }
     }
+    // ★ 빈 초소 마기 외피: 제3물결 이후 열린 초소를 절반 이상 비워두고 소수 포대(2~3기)만 방치하면,
+    // 빈 길목의 심야 독기가 적을 감싸 피해의 최대 90%를 흡수한다! (만렙 계정 소수 설치 프리패스 원천 봉쇄!)
+    double gapBypassMult = 1.0;
+    if (currentWaveIndex >= 2 && sourceKey != 'support_chuldu') {
+      final cov = formationCoverageRatio;
+      if (cov < 0.80) {
+        gapBypassMult = pow(cov / 0.80, 2.6).toDouble().clamp(0.08, 1.0);
+      }
+    }
     final rawEffective = (sourceKey == 'support_chuldu' && !m.kind.isBoss)
         ? dmg
-        : dmg * (1.0 - armor).clamp(0.1, 1.0) * carapaceMult;
+        : dmg * (1.0 - armor).clamp(0.1, 1.0) * carapaceMult * gapBypassMult;
     final effectiveDmg = (sourceKey == 'support_chuldu' && !m.kind.isBoss)
         ? rawEffective
-        : min(99999.0, rawEffective);
+        : min(1000000000.0, rawEffective);
 
     final dealt = min(m.hp, effectiveDmg);
     m.hp -= effectiveDmg;
@@ -6469,12 +6714,17 @@ class DefenseBattleSim {
       m.hp = max(1.0, m.currentMaxHp * 0.04);
     }
 
-    final impactScale = stage.chapterNumber <= 2
+    final impactScale = (stage.chapterNumber <= 2 && difficulty != DefenseDifficulty.nightmare)
         ? 1.0
-        : (0.22 + 0.78 * (effectiveDmg / max(1.0, m.currentMaxHp * 0.14)).clamp(0.0, 1.0));
+        : (0.18 + 0.82 * (effectiveDmg / max(1.0, m.currentMaxHp * 0.14)).clamp(0.0, 1.0));
+    final nightmareKnockResist = difficulty == DefenseDifficulty.nightmare
+        ? 0.56
+        : (difficulty == DefenseDifficulty.normal ? 0.88 : 1.0);
     final oilKnockBoost = (!m.kind.isFlying && m.oilSlipTimer > 0) ? 1.25 : 1.0;
     m.knockbackVel = m.knockbackVel +
-        knockDir * ((knockForce * impactScale * oilKnockBoost) / sqrt(m.kind.mass));
+        knockDir *
+            ((knockForce * impactScale * oilKnockBoost * nightmareKnockResist) /
+                sqrt(m.kind.mass));
     final isKillingBlow = m.hp <= 0;
 
     // 찰진 타격 숫자 팝업 (치명타·격살·중대형 타격 위주로 최대 38개 풀 유지!)

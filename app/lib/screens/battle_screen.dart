@@ -1165,6 +1165,48 @@ class _BattleScreenState extends State<BattleScreen>
                               color: NightPalette.jadeGreen,
                             ),
                             const SizedBox(width: 7),
+                            Builder(
+                              builder: (_) {
+                                final covPct =
+                                    (_sim.formationCoverageRatio * 100).round();
+                                final isGapAlert = _sim.currentWaveIndex >= 2 &&
+                                    covPct < 84;
+                                return Container(
+                                  key: const Key(
+                                    'battle_formation_coverage_badge',
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isGapAlert
+                                        ? const Color(0xCC5A1020)
+                                        : const Color(0xFF102235),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isGapAlert
+                                          ? const Color(0xFFFF4D6D)
+                                          : NightPalette.jadeShield
+                                              .withValues(alpha: 0.45),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    isGapAlert
+                                        ? '⚠️기맥공백 $covPct% (빈초소 개척!)'
+                                        : '⚖️진법결속 $covPct%',
+                                    style: TextStyle(
+                                      fontSize: 10.3,
+                                      fontWeight: FontWeight.bold,
+                                      color: isGapAlert
+                                          ? const Color(0xFFFFB3C1)
+                                          : NightPalette.jadeShield,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 7),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
