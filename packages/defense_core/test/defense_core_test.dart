@@ -2858,5 +2858,96 @@ void main() {
         }
       }
     });
+
+    test('v1.0.0+31 정밀 감사 회귀 검증: 마을 정화 ★3 복원 · 재도전 누락 구출 복구 · 도감 해금 정확도 · 석주/낭떠러지 분리', () {
+      // 1) 전 10장의 회전 석주(pillars)와 낭떠러지(cliffs) 중심점이 절대 겹치지 않아야 함 (거리 >= 50px)
+      for (final ch in CampaignCatalog.chapters) {
+        for (final p in ch.pillars) {
+          for (final cl in ch.cliffs) {
+            expect(
+              p.center.distanceTo(cl.center),
+              greaterThanOrEqualTo(50.0),
+              reason: '제${ch.number}장 석주(${p.center.x},${p.center.y})와 낭떠러지(${cl.center.x},${cl.center.y}) 겹침 금지',
+            );
+          }
+        }
+      }
+
+      // 2) unlockedLauncherCount 오프바이원(+1) 제거 및 도감 중앙 수호탑 반영 검증
+      final freshProg = PlayerProgress(highestClearedGlobalStage: 0);
+      expect(freshProg.highestUnlockedChapter, 1);
+      final expectedCh1Launchers = LauncherType.values
+          .where((t) => t.unlockChapter <= 1)
+          .length;
+      expect(freshProg.unlockedLauncherCount, expectedCh1Launchers);
+      expect(
+        freshProg.codexTotalCount,
+        1 +
+            LauncherType.values.length +
+            StoneMaterial.values.length +
+            CompanionHero.values.length +
+            SpiritBeast.values.length +
+            MutantKind.values.length,
+      );
+
+      // 3) 마을 독기 피격 후 정화로 생태계 3대 지표가 100% 복원되면 ★3 성급 달성 자격 복구 검증
+      final st11 = CampaignCatalog.stageAt(1, 1);
+      final simDamaged = DefenseBattleSim(
+        stage: st11,
+        difficulty: DefenseDifficulty.normal,
+        progress: PlayerProgress(),
+        seed: 777,
+      );
+      simDamaged.granaryHealth = 0.85;
+      simDamaged.villageTookDamage = true;
+      simDamaged.isFinished = true;
+      simDamaged.isVictory = true;
+      expect(simDamaged.buildSummary().stars, lessThan(3));
+
+      final simPurified = DefenseBattleSim(
+        stage: st11,
+        difficulty: DefenseDifficulty.normal,
+        progress: PlayerProgress(),
+        seed: 777,
+      );
+      simPurified.granaryHealth = 0.85;
+      simPurified.villageTookDamage = true;
+      // 제1장 신록 치유 기맥 / 청학 정화로 생태계 100% 회복 시뮬레이션
+      simPurified.granaryHealth = 0.9995;
+      simPurified.isFinished = true;
+      simPurified.isVictory = true;
+      expect(simPurified.buildSummary().stars, 3);
+      expect(simPurified.villageTookDamage, isFalse);
+
+      // 4) 이미 통과한 구출 관문(<= highestClearedGlobalStage)에서 동료·묵현이 누락(Lv.0)된 계정이 재클리어 시 정상 구출(Lv.1) 복구!
+      final rescueStage = CampaignCatalog.allStages.firstWhere(
+        (s) => s.rescueCompanion != null,
+      );
+      expect(rescueStage.hasRescueReward, isTrue);
+      final mukStage = CampaignCatalog.allStages.firstWhere(
+        (s) => s.alsoRescuesMukhyeon,
+      );
+      expect(mukStage.hasRescueReward, isTrue);
+
+      final missingProg = PlayerProgress(
+        highestClearedGlobalStage: 100,
+        companionLevels: {
+          for (final h in CompanionHero.values) h: 0,
+        },
+      );
+      missingProg.onBattleFinished(
+        stage: mukStage,
+        victory: true,
+        stars: 3,
+        earnedTokens: 20,
+        earnedElixirs: 2,
+        usedSupportCount: 0,
+        killCount: 30,
+      );
+      expect(missingProg.companionLevels[CompanionHero.mukhyeon], 1);
+      if (mukStage.rescueCompanion != null) {
+        expect(missingProg.companionLevels[mukStage.rescueCompanion!], 1);
+      }
+    });
   });
 }

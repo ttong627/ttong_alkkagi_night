@@ -529,6 +529,7 @@ class DefenseBattleSim {
   bool villageTookDamage = false;
   bool towerTookDamage = false;
   bool _convoyBuffConsumedRealtime = false;
+  bool get hasConsumedConvoyBuff => _convoyBuffConsumedRealtime;
 
   /// 현장 건설 기력(⚡ · 초소 건설/승급 전용) 및 정산 누적 보상.
   int fieldTokens = 0;
@@ -1322,8 +1323,17 @@ class DefenseBattleSim {
     launchers.remove(partner);
     final unlockedTypes = LauncherType.values.where(isLauncherTypeUnlocked).toList();
     var mergePool = unlockedTypes.isEmpty ? <LauncherType>[LauncherType.rapid] : unlockedTypes;
-    if (launchers.length <= 1) {
-      final directDps = mergePool.where((t) => t != LauncherType.qiAmplifier).toList();
+    final directAttackers =
+        launchers.where((l) => l.type != LauncherType.qiAmplifier).length;
+    final hasNearbyAttacker = launchers.any(
+      (l) =>
+          l.slotIndex != slotIndex &&
+          l.type != LauncherType.qiAmplifier &&
+          l.pos.distanceTo(target.pos) <= 195.0,
+    );
+    if (directAttackers < 3 || !hasNearbyAttacker) {
+      final directDps =
+          mergePool.where((t) => t != LauncherType.qiAmplifier).toList();
       if (directDps.isNotEmpty) mergePool = directDps;
     }
     final evolvedType = mergePool[rng.nextInt(mergePool.length)];
@@ -1560,7 +1570,11 @@ class DefenseBattleSim {
         bursts.add(FxBurst(pos: cloneGate.center, colorHex: 0xFFFF6B35, maxRadius: 72, isTriangleShatter: true));
         break;
       case DestinyRoulettePrize.freeChulduSweep:
-        triggerSupportChuldu(isFreeEncore: true);
+        if (mutants.isEmpty) {
+          pendingFreeEncoreChuldu = true;
+        } else {
+          triggerSupportChuldu(isFreeEncore: true);
+        }
         shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.50);
         break;
     }
@@ -1723,7 +1737,15 @@ class DefenseBattleSim {
     return true;
   }
 
-  /// 실시간 방어 결계 증축 & 즉시 수복 업그레이드 (최대 5단 · +20% 최대치 & 40% 즉시 수리, 멈춤 없음!).
+  void _syncVillagePurification() {
+    if (granaryHealth >= 0.999 &&
+        cropsHealth >= 0.999 &&
+        livestockHealth >= 0.999) {
+      villageTookDamage = false;
+    }
+  }
+
+  /// 실시간 방어 결계 증축 & 즉시 수복 업그레이드 (최대 5단 · +18% 최대치 & 28% 즉시 수리, 멈춤 없음!).
   bool upgradeLiveBarrier() {
     if (isFinished || liveBarrierLv >= 5 || fieldTokens < liveBarrierCost) return false;
     fieldTokens -= liveBarrierCost;
@@ -1735,6 +1757,7 @@ class DefenseBattleSim {
     granaryHealth = min(1.0, granaryHealth + 0.30);
     cropsHealth = min(1.0, cropsHealth + 0.30);
     livestockHealth = min(1.0, livestockHealth + 0.30);
+    _syncVillagePurification();
     pendingSounds.add(SoundCue.shieldWave);
     bursts.add(FxBurst(pos: shieldCenter, colorHex: 0xFF80ED99, maxRadius: 64));
     callouts.add(
@@ -1835,6 +1858,7 @@ class DefenseBattleSim {
         granaryHealth = min(1.0, granaryHealth + 0.45);
         cropsHealth = min(1.0, cropsHealth + 0.45);
         livestockHealth = min(1.0, livestockHealth + 0.45);
+        _syncVillagePurification();
         bursts.add(FxBurst(pos: shieldCenter, colorHex: 0xFF34D399, maxRadius: 76));
         break;
       default:
@@ -2281,9 +2305,7 @@ class DefenseBattleSim {
         preRolledSerendipity: rolledManualSeren,
       );
     }
-    if (preset.equippedBeast == SpiritBeast.nalssaendol) {
-      beastCooldown = 0.0;
-    }
+    _tryFireNalssaendolAcornWithCentral();
     return true;
   }
 
@@ -2570,6 +2592,7 @@ class DefenseBattleSim {
         granaryHealth = min(1.0, granaryHealth + 0.35);
         cropsHealth = min(1.0, cropsHealth + 0.35);
         livestockHealth = min(1.0, livestockHealth + 0.35);
+        _syncVillagePurification();
         pendingSounds.add(SoundCue.shieldWave);
         bursts.add(FxBurst(pos: shieldCenter, colorHex: 0xFF60A5FA, maxRadius: 74));
         callouts.add(
@@ -2710,6 +2733,7 @@ class DefenseBattleSim {
     } else {
       cropsHealth = (cropsHealth + 0.25).clamp(0.0, 1.0);
     }
+    _syncVillagePurification();
 
     if (isEncoreChuldu) {
       pendingFreeEncoreChuldu = true;
@@ -3076,8 +3100,8 @@ class DefenseBattleSim {
           final ally = preset.companions.isNotEmpty ? preset.companions.first : null;
           pendingStoryLines.add(
             StoryLine(
-              speaker: ally?.name ?? '기명',
-              portraitPrefix: ally?.portraitPrefix ?? 'player',
+              speaker: ally?.name ?? '사부',
+              portraitPrefix: ally?.portraitPrefix ?? 'sabu',
               text: '제3물결 전방 요충지가 열렸소! 마기 암석을 개척해 협곡 상류부터 화망으로 조이시오!',
             ),
           );
@@ -3089,10 +3113,10 @@ class DefenseBattleSim {
                 speaker: bossGroup.customBossTitle ?? bossGroup.kind.name,
                 portraitPrefix: bossGroup.customPortrait ??
                     (bossGroup.kind == MutantKind.raiderHeukpung
-                        ? 'heukpung'
+                        ? 'budumok'
                         : bossGroup.kind == MutantKind.rivalMukhyeon
                             ? 'mukhyeon'
-                            : 'boss'),
+                            : chapter.bossPortraitPrefix),
                 text: bossGroup.kind.isMidBoss
                     ? '크하하! 2단 재변이 마갑을 두른 내 돌격을 막을 수 있겠느냐!'
                     : '어리석은 수호자여! 3페이즈 불멸 마갑을 정밀 신궁탄으로 깨지 못하면 이 마을은 잿더미다!',
@@ -4987,6 +5011,7 @@ class DefenseBattleSim {
         granaryHealth = min(1.0, granaryHealth + ecoHeal);
         cropsHealth = min(1.0, cropsHealth + ecoHeal);
         livestockHealth = min(1.0, livestockHealth + ecoHeal);
+        _syncVillagePurification();
         final sinEntry = _contribMap.putIfAbsent(
           key,
           () => ContributionEntry(key: key, label: '$label (생기 정화)'),
@@ -7156,6 +7181,7 @@ class DefenseBattleSim {
     if (isFinished && _cachedSummary != null) {
       return _cachedSummary!;
     }
+    _syncVillagePurification();
     final ecoAvg = (granaryHealth + cropsHealth + livestockHealth) / 3.0;
     final ecoMin = min(granaryHealth, min(cropsHealth, livestockHealth));
     int stars = 0;

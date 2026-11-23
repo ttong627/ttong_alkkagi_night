@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:defense_core/defense_core.dart';
 import 'package:flutter/material.dart';
 
@@ -589,131 +591,180 @@ class _CampaignScreenState extends State<CampaignScreen> {
     required PlayerProgress progress,
     required int selectedChapterNumber,
   }) {
-    return SizedBox(
-      height: 204,
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(14.5)),
-        child: LayoutBuilder(
-          builder: (ctx, box) {
-            final w = box.maxWidth;
-            final h = box.maxHeight;
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  NightArtRegistry.worldMapLiveMotion,
+    final screenH = MediaQuery.sizeOf(context).height;
+    final adaptiveMaxH = (screenH * 0.275).clamp(172.0, 388.0);
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(maxHeight: adaptiveMaxH),
+      decoration: const BoxDecoration(color: Color(0xFF08101E)),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Opacity(
+                opacity: 0.40,
+                child: Image.asset(
+                  NightArtRegistry.worldMapMurimNight,
                   fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                  errorBuilder: (_, _, _) => Image.asset(
-                    NightArtRegistry.worldMapMurimNight,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Image.asset(
-                      NightArtRegistry.bgNightLobby,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
                 ),
-                CustomPaint(
-                  painter: _WorldMapRoutePainter(
-                    coords: _chapterMapCoords,
-                    unlockedChapter: progress.highestUnlockedChapter,
-                    selectedChapter: selectedChapterNumber,
-                  ),
-                ),
-                for (int i = 0; i < CampaignCatalog.chapters.length; i++)
-                  Builder(
-                    builder: (_) {
-                      final chNum = i + 1;
-                      final allDone = progress.highestClearedGlobalStage >=
-                          CampaignCatalog.allStages.length;
-                      final unlocked = chNum <= progress.highestUnlockedChapter;
-                      final selected = chNum == selectedChapterNumber;
-                      final cleared = chNum < progress.highestUnlockedChapter ||
-                          (chNum == 10 && allDone);
-                      final norm = _chapterMapCoords[i];
-                      final px = (norm.dx * w).clamp(28.0, w - 28.0);
-                      final py = (norm.dy * h).clamp(20.0, h - 22.0);
+              ),
+            ),
+          ),
+          const Positioned.fill(
+            child: ColoredBox(color: Color(0x66060C18)),
+          ),
+          Center(
+            child: AspectRatio(
+              aspectRatio: 1440.0 / 960.0,
+              child: LayoutBuilder(
+                builder: (ctx, box) {
+                  final w = box.maxWidth;
+                  final h = box.maxHeight;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        NightArtRegistry.worldMapLiveMotion,
+                        fit: BoxFit.fill,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, _, _) => Image.asset(
+                          NightArtRegistry.worldMapMurimNight,
+                          fit: BoxFit.fill,
+                          errorBuilder: (_, _, _) => Image.asset(
+                            NightArtRegistry.bgNightLobby,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      CustomPaint(
+                        painter: _WorldMapRoutePainter(
+                          coords: _chapterMapCoords,
+                          unlockedChapter: progress.highestUnlockedChapter,
+                          selectedChapter: selectedChapterNumber,
+                        ),
+                      ),
+                      for (int i = 0; i < CampaignCatalog.chapters.length; i++)
+                        Builder(
+                          builder: (_) {
+                            final chNum = i + 1;
+                            final allDone = progress.highestClearedGlobalStage >=
+                                CampaignCatalog.allStages.length;
+                            final unlocked =
+                                chNum <= progress.highestUnlockedChapter;
+                            final selected = chNum == selectedChapterNumber;
+                            final cleared =
+                                chNum < progress.highestUnlockedChapter ||
+                                    (chNum == 10 && allDone);
+                            final norm = _chapterMapCoords[i];
+                            final double pinW = chNum == 10 ? 58.0 : 50.0;
+                            const double pinH = 26.0;
+                            final px =
+                                (norm.dx * w).clamp(pinW * 0.52, w - pinW * 0.52);
+                            final py = (norm.dy * h).clamp(18.0, h - 24.0);
 
-                      final Color pinBg = selected
-                          ? NightPalette.accentGold
-                          : (cleared
-                              ? const Color(0xEE184E44)
-                              : (unlocked
-                                  ? const Color(0xEE8C2D2D)
-                                  : const Color(0xCC121B2C)));
-                      final Color pinFg = selected
-                          ? NightPalette.hanjiInk
-                          : (unlocked
-                              ? NightPalette.textPrimary
-                              : NightPalette.textMuted);
-
-                      return Positioned(
-                        left: px - 26,
-                        top: py - 14,
-                        width: 52,
-                        height: 28,
-                        child: GestureDetector(
-                          onTap: unlocked
-                              ? () => controller.setSelectedChapter(chNum)
-                              : null,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: pinBg,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: selected
-                                    ? Colors.white
+                            final Color pinBg = selected
+                                ? NightPalette.accentGold
+                                : (cleared
+                                    ? const Color(0xEE184E44)
                                     : (unlocked
-                                        ? NightPalette.accentGold
-                                        : NightPalette.borderGold
-                                            .withValues(alpha: 0.35)),
-                                width: selected ? 2.0 : 1.2,
+                                        ? const Color(0xEE8C2D2D)
+                                        : const Color(0xCC121B2C)));
+                            final Color pinFg = selected
+                                ? NightPalette.hanjiInk
+                                : (unlocked
+                                    ? NightPalette.textPrimary
+                                    : NightPalette.textMuted);
+
+                            return Positioned(
+                              left: px - pinW * 0.5,
+                              top: py - pinH * 0.5,
+                              width: pinW,
+                              height: pinH,
+                              child: GestureDetector(
+                                key: Key('world_map_pin_$chNum'),
+                                onTap: unlocked
+                                    ? () => controller.setSelectedChapter(chNum)
+                                    : null,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  alignment: Alignment.center,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: pinBg,
+                                    borderRadius: BorderRadius.circular(13),
+                                    border: Border.all(
+                                      color: selected
+                                          ? Colors.white
+                                          : (unlocked
+                                              ? NightPalette.accentGold
+                                              : NightPalette.borderGold
+                                                  .withValues(alpha: 0.35)),
+                                      width: selected ? 2.0 : 1.2,
+                                    ),
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      '${unlocked ? (cleared ? "✓" : "🔥") : "🔒"}$chNum현',
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style: TextStyle(
+                                        fontSize: 10.6,
+                                        fontWeight: FontWeight.bold,
+                                        color: pinFg,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      Positioned(
+                        right: 8,
+                        left: 8,
+                        bottom: 6,
+                        child: Align(
+                          alignment: Alignment.bottomRight,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xE60A1324),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: NightPalette.accentGold
+                                    .withValues(alpha: 0.72),
                               ),
                             ),
-                            child: Text(
-                              '${unlocked ? (cleared ? "✓" : "🔥") : "🔒"}$chNum장',
+                            child: const Text(
+                              '🗺️ 탄지무림 10대 거점 심야 수호 대륙도 (거점 터치 이동)',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 10.6,
                                 fontWeight: FontWeight.bold,
-                                color: pinFg,
+                                color: NightPalette.accentGold,
                               ),
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                Positioned(
-                  right: 10,
-                  bottom: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xE00E1728),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: NightPalette.accentGold.withValues(alpha: 0.7),
                       ),
-                    ),
-                    child: const Text(
-                      '🗺️ 탄지무림 10대 거점 심야 수호 대륙도 (거점 터치 이동)',
-                      style: TextStyle(
-                        fontSize: 10.8,
-                        fontWeight: FontWeight.bold,
-                        color: NightPalette.accentGold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -961,7 +1012,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
                             children: [
                               NightSpriteIcon(
                                 assetPath: chSpec.floorAsset,
-                                fallbackAssetPath: NightArtRegistry.charMotion(
+                                fallbackAssetPath: NightArtRegistry.charFace(
                                     chSpec.bossPortraitPrefix),
                                 fallbackIcon: Icons.map_rounded,
                                 size: 52,
@@ -987,7 +1038,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
                                     const SizedBox(height: 2),
                                     Text(
                                       '🗺️ ${chSpec.routeTopologyTag} · ✨ ${chSpec.chapterTraitTitle} (${chSpec.chapterTraitDesc})',
-                                      maxLines: 1,
+                                      maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 11.2,
@@ -1397,26 +1448,93 @@ class _WorldMapRoutePainter extends CustomPainter {
   final int unlockedChapter;
   final int selectedChapter;
 
+  List<Offset> _buildSmoothWorldPoints(Size size) {
+    final raw = [
+      for (final c in coords) Offset(c.dx * size.width, c.dy * size.height),
+    ];
+    if (raw.length < 2) return raw;
+    final pts = <Offset>[];
+    for (int i = 0; i < raw.length - 1; i++) {
+      final p0 = i == 0 ? raw[i] : raw[i - 1];
+      final p1 = raw[i];
+      final p2 = raw[i + 1];
+      final p3 = (i + 2 < raw.length) ? raw[i + 2] : raw[i + 1];
+      const steps = 14;
+      for (int s = 0; s < steps; s++) {
+        final t = s / steps;
+        final t2 = t * t;
+        final t3 = t2 * t;
+        final dx = 0.5 *
+            ((2 * p1.dx) +
+                (-p0.dx + p2.dx) * t +
+                (2 * p0.dx - 5 * p1.dx + 4 * p2.dx - p3.dx) * t2 +
+                (-p0.dx + 3 * p1.dx - 3 * p2.dx + p3.dx) * t3);
+        final dy = 0.5 *
+            ((2 * p1.dy) +
+                (-p0.dy + p2.dy) * t +
+                (2 * p0.dy - 5 * p1.dy + 4 * p2.dy - p3.dy) * t2 +
+                (-p0.dy + 3 * p1.dy - 3 * p2.dy + p3.dy) * t3);
+        pts.add(
+          Offset(
+            dx.clamp(12.0, size.width - 12.0),
+            dy.clamp(12.0, size.height - 12.0),
+          ),
+        );
+      }
+    }
+    pts.add(raw.last);
+    return pts;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (coords.length < 2) return;
-    final activePaint = Paint()
-      ..color = const Color(0xDDF4CC6A)
-      ..strokeWidth = 2.6
+    final smoothPts = _buildSmoothWorldPoints(size);
+    const stepsPerSeg = 14;
+
+    final casingPaint = Paint()
+      ..color = const Color(0xBB09111F)
+      ..strokeWidth = 5.4
       ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    final activeGlowPaint = Paint()
+      ..color = const Color(0x55FFD166)
+      ..strokeWidth = 6.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    final activePaint = Paint()
+      ..color = const Color(0xEEF4CC6A)
+      ..strokeWidth = 2.8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
     final lockedPaint = Paint()
-      ..color = const Color(0x558D99AE)
-      ..strokeWidth = 1.6
+      ..color = const Color(0x668D99AE)
+      ..strokeWidth = 1.9
       ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
 
-    for (int i = 0; i < coords.length - 1; i++) {
-      final p1 = Offset(coords[i].dx * size.width, coords[i].dy * size.height);
-      final p2 =
-          Offset(coords[i + 1].dx * size.width, coords[i + 1].dy * size.height);
-      final isOpen = (i + 2) <= unlockedChapter;
-      canvas.drawLine(p1, p2, isOpen ? activePaint : lockedPaint);
+    for (int seg = 0; seg < coords.length - 1; seg++) {
+      final startIdx = seg * stepsPerSeg;
+      final endIdx = ((seg + 1) * stepsPerSeg).clamp(0, smoothPts.length - 1);
+      if (endIdx <= startIdx) continue;
+      final segPath = Path()
+        ..moveTo(smoothPts[startIdx].dx, smoothPts[startIdx].dy);
+      for (int k = startIdx + 1; k <= endIdx; k++) {
+        segPath.lineTo(smoothPts[k].dx, smoothPts[k].dy);
+      }
+      final isOpen = (seg + 2) <= unlockedChapter;
+      canvas.drawPath(segPath, casingPaint);
+      if (isOpen) {
+        canvas.drawPath(segPath, activeGlowPaint);
+        canvas.drawPath(segPath, activePaint);
+      } else {
+        canvas.drawPath(segPath, lockedPaint);
+      }
     }
 
     if (selectedChapter >= 1 && selectedChapter <= coords.length) {
@@ -1426,7 +1544,7 @@ class _WorldMapRoutePainter extends CustomPainter {
         sc,
         22,
         Paint()
-          ..color = const Color(0x44FFD166)
+          ..color = const Color(0x52FFD166)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
       );
     }

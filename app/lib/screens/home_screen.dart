@@ -982,25 +982,17 @@ class _FortressDioramaStage extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 1) 코덱스 10대 거점 심야 대륙 월드맵 라이브 3D 모션 파노라마 (청람·황금 색조 조화로 색 가짓수 ≤ 5)
-            ColorFiltered(
-              colorFilter: const ColorFilter.matrix(<double>[
-                0.82, 0.10, 0.08, 0, 0,
-                0.08, 0.84, 0.08, 0, 0,
-                0.06, 0.10, 0.90, 0, 0,
-                0,    0,    0,    1, 0,
-              ]),
-              child: Image.asset(
+            // 1) 코덱스 성문 요새 방어 디오라마 원화 (`lobby_stage_fortress.webp`)
+            Image.asset(
+              NightArtRegistry.lobbyStageFortress,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => Image.asset(
                 NightArtRegistry.worldMapLiveMotion,
                 fit: BoxFit.cover,
-                gaplessPlayback: true,
                 errorBuilder: (_, _, _) => Image.asset(
                   NightArtRegistry.worldMapMurimNight,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Image.asset(
-                    NightArtRegistry.lobbyStageFortress,
-                    fit: BoxFit.cover,
-                  ),
                 ),
               ),
             ),
@@ -1037,37 +1029,37 @@ class _FortressDioramaStage extends StatelessWidget {
                     ),
                     if (heroes.isNotEmpty)
                       Align(
-                        alignment: const Alignment(-0.68, 0.34),
+                        alignment: const Alignment(-0.68, 0.06),
                         child: Transform.translate(
                           offset: Offset(0, hoverA * 0.6),
                           child: _DioramaHeroStandee(
                             hero: heroes[0],
                             level: progress.companionLevels[heroes[0]] ?? 1,
-                            height: 82,
+                            height: 76,
                           ),
                         ),
                       ),
                     if (heroes.length >= 2)
                       Align(
-                        alignment: const Alignment(-0.18, 0.38),
+                        alignment: const Alignment(-0.18, 0.10),
                         child: Transform.translate(
                           offset: Offset(0, hoverB * 0.6),
                           child: _DioramaHeroStandee(
                             hero: heroes[1],
                             level: progress.companionLevels[heroes[1]] ?? 1,
-                            height: 78,
+                            height: 74,
                           ),
                         ),
                       ),
                     if (heroes.length >= 3)
                       Align(
-                        alignment: const Alignment(0.32, 0.36),
+                        alignment: const Alignment(0.32, 0.08),
                         child: Transform.translate(
                           offset: Offset(0, -hoverA * 0.5),
                           child: _DioramaHeroStandee(
                             hero: heroes[2],
                             level: progress.companionLevels[heroes[2]] ?? 1,
-                            height: 76,
+                            height: 72,
                           ),
                         ),
                       ),

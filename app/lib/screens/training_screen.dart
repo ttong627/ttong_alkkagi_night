@@ -27,7 +27,7 @@ class TrainingScreen extends StatefulWidget {
 }
 
 class _TrainingScreenState extends State<TrainingScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _breathAnim;
   bool _autoMeditate = false;
   Timer? _autoTimer;
@@ -37,6 +37,7 @@ class _TrainingScreenState extends State<TrainingScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _breathAnim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -45,17 +46,37 @@ class _TrainingScreenState extends State<TrainingScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _autoTimer?.cancel();
     _breathAnim.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed && _autoMeditate) {
+      _toggleAutoMeditate(false);
+    }
+  }
+
   void _toggleAutoMeditate(bool value) {
-    setState(() => _autoMeditate = value);
+    if (mounted) {
+      setState(() => _autoMeditate = value);
+    } else {
+      _autoMeditate = value;
+    }
     _autoTimer?.cancel();
     if (value) {
       _autoTimer = Timer.periodic(const Duration(milliseconds: 1100), (_) {
-        if (!mounted) return;
+        if (!mounted) {
+          _autoTimer?.cancel();
+          return;
+        }
+        final route = ModalRoute.of(context);
+        if (route != null && !route.isCurrent) {
+          _toggleAutoMeditate(false);
+          return;
+        }
         _performMeditationTap();
       });
     }
@@ -584,6 +605,25 @@ class _TrainingScreenState extends State<TrainingScreen>
                     clipBehavior: Clip.antiAlias,
                     child: LayoutBuilder(
                       builder: (ctx, box) {
+                        final double orbSize =
+                            (box.maxHeight * 0.132).clamp(36.0, 44.0);
+                        final bool isDenseSpine =
+                            currentSpec.acupointCoords.length >= 5 &&
+                            currentSpec.acupointCoords
+                                .every((c) => (c.x - 0.50).abs() < 0.03);
+                        final adjustedCoords = <Vec2>[
+                          for (int i = 0;
+                              i < currentSpec.acupointCoords.length;
+                              i++)
+                            Vec2(
+                              (currentSpec.acupointCoords[i].x +
+                                      (isDenseSpine
+                                          ? (i.isEven ? -0.08 : 0.08)
+                                          : 0.0))
+                                  .clamp(0.12, 0.88),
+                              currentSpec.acupointCoords[i].y,
+                            ),
+                        ];
                         return Stack(
                           fit: StackFit.expand,
                           children: [
@@ -601,28 +641,24 @@ class _TrainingScreenState extends State<TrainingScreen>
                             CustomPaint(
                               size: Size(box.maxWidth, box.maxHeight),
                               painter: _MeridianLinePainter(
-                                coords: currentSpec.acupointCoords,
+                                coords: adjustedCoords,
                                 litSet: _litAcupoints,
                               ),
                             ),
                             // 혈자리 구슬 버튼들
-                            for (int i = 0;
-                                i < currentSpec.acupointCoords.length;
-                                i++)
+                            for (int i = 0; i < adjustedCoords.length; i++)
                               Positioned(
-                                left: currentSpec.acupointCoords[i].x *
-                                        box.maxWidth -
-                                    28,
-                                top: currentSpec.acupointCoords[i].y *
-                                        box.maxHeight -
-                                    28,
+                                left: adjustedCoords[i].x * box.maxWidth -
+                                    orbSize * 0.5,
+                                top: adjustedCoords[i].y * box.maxHeight -
+                                    orbSize * 0.5,
                                 child: GestureDetector(
                                   onTap: enoughNaegong
                                       ? () => _tapAcupoint(i, currentSpec)
                                       : null,
                                   child: Container(
-                                    width: 56,
-                                    height: 56,
+                                    width: orbSize,
+                                    height: orbSize,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: _litAcupoints.contains(i)
@@ -632,27 +668,32 @@ class _TrainingScreenState extends State<TrainingScreen>
                                               : Colors.grey.shade800),
                                       border: Border.all(
                                         color: Colors.white,
-                                        width: 2,
+                                        width: 1.8,
                                       ),
                                       boxShadow: [
                                         if (enoughNaegong)
                                           BoxShadow(
                                             color: NightPalette.accentGold
                                                 .withValues(alpha: 0.6),
-                                            blurRadius: 12,
+                                            blurRadius: 10,
                                           ),
                                       ],
                                     ),
                                     alignment: Alignment.center,
-                                    child: Text(
-                                      '${i + 1}\n${currentSpec.acupointNames[i]}',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        color: _litAcupoints.contains(i)
-                                            ? Colors.black
-                                            : Colors.white,
-                                        fontWeight: FontWeight.bold,
+                                    padding: const EdgeInsets.all(2),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        '${i + 1}\n${currentSpec.acupointNames[i]}',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 9.8,
+                                          height: 1.1,
+                                          color: _litAcupoints.contains(i)
+                                              ? Colors.black
+                                              : Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ),

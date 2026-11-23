@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:defense_core/defense_core.dart';
 import 'package:flutter/material.dart';
@@ -249,7 +250,9 @@ class _BattleScreenState extends State<BattleScreen>
 
   Future<void> _confirmExitOrRestart({required bool isRestart}) async {
     final hasSpentItems = !_sim.isFinished &&
-        (_sim.usedSupportCount > 0 || _consumablesUsedThisBattle > 0);
+        (_sim.usedSupportCount > 0 ||
+            _consumablesUsedThisBattle > 0 ||
+            _sim.hasConsumedConvoyBuff);
     if (hasSpentItems) {
       final proceed = await showDialog<bool>(
         context: context,
@@ -264,7 +267,7 @@ class _BattleScreenState extends State<BattleScreen>
             ),
           ),
           content: const Text(
-            '이번 전투에서 이미 사용한 지원패(무림수호단 출두) 및 전술 비약은 복구되지 않습니다. 계속하시겠습니까?',
+            '이번 전투에서 이미 사용한 지원패(무림수호단 출두)·전술 비약·호송 보급 버프는 복구되지 않습니다. 계속하시겠습니까?',
             style: TextStyle(color: NightPalette.textPrimary, fontSize: 13.5),
           ),
           actions: [
@@ -343,6 +346,7 @@ class _BattleScreenState extends State<BattleScreen>
     CompanionHero? rescuedHero,
     SpiritBeast? rescuedBeast,
   }) {
+    bool modalHandled = false;
     showModalBottomSheet<void>(
       context: context,
       isDismissible: false,
@@ -797,14 +801,13 @@ class _BattleScreenState extends State<BattleScreen>
                       nextStage:
                           CampaignCatalog.allStages[widget.stage.globalIndex],
                       onAdvanceNow: () {
-                        if (!ctx.mounted || !mounted) return;
+                        if (modalHandled || !ctx.mounted || !mounted) return;
+                        modalHandled = true;
                         Navigator.of(ctx).pop();
                         final nextStage =
                             CampaignCatalog.allStages[widget.stage.globalIndex];
                         if (nextStage.chapterNumber !=
                             widget.stage.chapterNumber) {
-                          widget.controller
-                              .applyRecommendedLoadoutForStage(nextStage);
                           widget.controller
                               .setSelectedChapter(nextStage.chapterNumber);
                           Navigator.of(context).pushReplacement(
@@ -833,6 +836,8 @@ class _BattleScreenState extends State<BattleScreen>
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {
+                            if (modalHandled) return;
+                            modalHandled = true;
                             Navigator.of(ctx).pop();
                             Navigator.of(context).pop();
                           },
@@ -848,8 +853,11 @@ class _BattleScreenState extends State<BattleScreen>
                             foregroundColor: Colors.black,
                           ),
                           onPressed: () {
+                            if (modalHandled) return;
+                            modalHandled = true;
                             Navigator.of(ctx).pop();
                             if (summary.victory &&
+                                widget.stage.globalIndex >= 1 &&
                                 widget.stage.globalIndex <
                                     CampaignCatalog.allStages.length) {
                               final nextStage = CampaignCatalog
@@ -857,8 +865,6 @@ class _BattleScreenState extends State<BattleScreen>
                               if (nextStage.chapterNumber !=
                                   widget.stage.chapterNumber) {
                                 // 현(縣) 10판 마무리 완료! 다음 현 고유 대행군 이동 영상 화면으로 진입!
-                                widget.controller
-                                    .applyRecommendedLoadoutForStage(nextStage);
                                 widget.controller
                                     .setSelectedChapter(nextStage.chapterNumber);
                                 Navigator.of(context).pushReplacement(
@@ -881,8 +887,9 @@ class _BattleScreenState extends State<BattleScreen>
                                 );
                               }
                             } else if (summary.victory &&
-                                widget.stage.chapterNumber == 10 &&
-                                widget.stage.stageNumber == 10) {
+                                ((widget.stage.chapterNumber == 10 &&
+                                        widget.stage.stageNumber == 10) ||
+                                    widget.stage.globalIndex >= 900)) {
                               Navigator.of(context).pop();
                             } else {
                               setState(_startNewSim);
@@ -890,8 +897,9 @@ class _BattleScreenState extends State<BattleScreen>
                           },
                           icon: Icon(
                             summary.victory
-                                ? (widget.stage.chapterNumber == 10 &&
-                                        widget.stage.stageNumber == 10
+                                ? ((widget.stage.chapterNumber == 10 &&
+                                            widget.stage.stageNumber == 10) ||
+                                        widget.stage.globalIndex >= 900
                                     ? Icons.emoji_events_rounded
                                     : (widget.stage.stageNumber == 10
                                         ? Icons.movie_filter_rounded
@@ -900,16 +908,20 @@ class _BattleScreenState extends State<BattleScreen>
                           ),
                           label: Text(
                             summary.victory &&
+                                    widget.stage.globalIndex >= 1 &&
                                     widget.stage.globalIndex <
                                         CampaignCatalog.allStages.length
                                 ? (widget.stage.stageNumber == 10
                                     ? '🎬 제${widget.stage.chapterNumber + 1}현 대행군 출발!'
                                     : '다음 마을 진군 (${CampaignCatalog.allStages[widget.stage.globalIndex].code})')
                                 : (summary.victory &&
-                                        widget.stage.chapterNumber == 10 &&
-                                        widget.stage.stageNumber == 10
-                                    ? '🌅 100판 완승 · 본영 금의환향'
-                                    : '다시 도전하기'),
+                                        widget.stage.globalIndex >= 900
+                                    ? '🏆 100물결 제패 · 본영 금의환향'
+                                    : (summary.victory &&
+                                            widget.stage.chapterNumber == 10 &&
+                                            widget.stage.stageNumber == 10
+                                        ? '🌅 100판 완승 · 본영 금의환향'
+                                        : '다시 도전하기')),
                           ),
                         ),
                       ),
@@ -938,9 +950,16 @@ class _BattleScreenState extends State<BattleScreen>
   @override
   Widget build(BuildContext context) {
     final chapter = CampaignCatalog.chapterOf(widget.stage.chapterNumber);
-    return ScaffoldMessenger(
-      child: Scaffold(
-        body: SafeArea(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _confirmExitOrRestart(isRestart: false);
+        }
+      },
+      child: ScaffoldMessenger(
+        child: Scaffold(
+          body: SafeArea(
         child: Column(
           children: [
             // 상단 전장 상태 막대 + 실시간 초소 건설 기력(⚡) 충전 게이지 바
@@ -1431,16 +1450,22 @@ class _BattleScreenState extends State<BattleScreen>
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    chapter.bgAsset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Image.asset(
-                      NightArtRegistry.bgNightLobby,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          const ColoredBox(color: NightPalette.bgDeep),
+                  ClipRect(
+                    child: ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      child: Image.asset(
+                        chapter.bgAsset,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Image.asset(
+                          NightArtRegistry.bgNightLobby,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const ColoredBox(color: NightPalette.bgDeep),
+                        ),
+                      ),
                     ),
                   ),
+                  const ColoredBox(color: Color(0x9E060C18)),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -1457,7 +1482,7 @@ class _BattleScreenState extends State<BattleScreen>
                   Center(
                     child: InteractiveViewer(
                       transformationController: _zoomController,
-                      panEnabled: _zoomedView && !_sim.centralManualMode,
+                      panEnabled: _zoomedView,
                       scaleEnabled: _zoomedView,
                       minScale: 1.0,
                       maxScale: 2.2,
@@ -1466,8 +1491,7 @@ class _BattleScreenState extends State<BattleScreen>
                             CampaignCatalog.arenaHeight,
                         child: LayoutBuilder(
                           builder: (ctx, arenaConstraints) {
-                            final allowArenaPan =
-                                !_zoomedView || _sim.centralManualMode;
+                            final allowArenaPan = !_zoomedView;
                             return GestureDetector(
                               key: const Key('battle_arena_gesture'),
                               behavior: HitTestBehavior.opaque,
@@ -1705,7 +1729,8 @@ class _BattleScreenState extends State<BattleScreen>
                     valueListenable: _frameNotifier,
                     builder: (_, _, _) {
                       if (_sim.launchers.isNotEmpty ||
-                          _sim.bossInvasionAlertTimer > 0) {
+                          _sim.bossInvasionAlertTimer > 0 ||
+                          _sim.pendingPerkChoices.isNotEmpty) {
                         return const SizedBox.shrink();
                       }
                       return Positioned(
@@ -1748,7 +1773,9 @@ class _BattleScreenState extends State<BattleScreen>
                     valueListenable: _frameNotifier,
                     builder: (_, _, _) {
                       final alert = _sim.bossInvasionAlertText;
-                      if (alert == null || _sim.bossInvasionAlertTimer <= 0) {
+                      if (alert == null ||
+                          _sim.bossInvasionAlertTimer <= 0 ||
+                          _sim.pendingPerkChoices.isNotEmpty) {
                         return const SizedBox.shrink();
                       }
                       final opacity =
@@ -1857,7 +1884,8 @@ class _BattleScreenState extends State<BattleScreen>
                       final showCombo =
                           _sim.comboCount >= 3 || _sim.feverTimer > 0;
                       final canEarly = _sim.canCallNextWaveEarly;
-                      if (!showCombo && !canEarly && _sim.feverGauge < 15) {
+                      if (_sim.pendingPerkChoices.isNotEmpty ||
+                          (!showCombo && !canEarly && _sim.feverGauge < 15)) {
                         return const SizedBox.shrink();
                       }
                       return Positioned(
@@ -1974,8 +2002,14 @@ class _BattleScreenState extends State<BattleScreen>
                         sirenPulse,
                       )!;
                       final dockRightForTopMounts = _sim.chapter.number == 7;
+                      final hasRightTopHud = _sim.comboCount >= 3 ||
+                          _sim.feverTimer > 0 ||
+                          _sim.canCallNextWaveEarly ||
+                          _sim.feverGauge >= 15;
                       return Positioned(
-                        top: dockRightForTopMounts ? 88 : 42,
+                        top: dockRightForTopMounts
+                            ? (hasRightTopHud ? 124 : 88)
+                            : 44,
                         left: dockRightForTopMounts ? null : 10,
                         right: dockRightForTopMounts ? 10 : null,
                         child: ConstrainedBox(
@@ -2192,7 +2226,7 @@ class _BattleScreenState extends State<BattleScreen>
                                               child: Text(
                                                 crisis.maxHitShield > 0
                                                     ? '🎯터치 즉시타격 · 🛡️${crisis.hitShieldLeft}/${crisis.maxHitShield}타'
-                                                    : '🎯화면 터치 → 위험구역 즉시 정밀타격!',
+                                                    : '🎯터치 → 위험구역 즉시 타격!',
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
                                                   fontSize: 9.2,
@@ -2225,13 +2259,15 @@ class _BattleScreenState extends State<BattleScreen>
                           _sim.pendingPerkChoices.isNotEmpty) {
                         return const SizedBox.shrink();
                       }
+                      final hasTopGuideOrAlert = _sim.launchers.isEmpty ||
+                          _sim.bossInvasionAlertTimer > 0;
                       return Positioned(
-                        top: 38,
+                        top: hasTopGuideOrAlert ? 46 : 8,
                         left: 12,
                         right: 12,
                         child: Center(
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 460),
+                            constraints: const BoxConstraints(maxWidth: 520),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -2258,7 +2294,7 @@ class _BattleScreenState extends State<BattleScreen>
                                   Expanded(
                                     child: Text(
                                       '${line.speaker}: ${line.text}',
-                                      maxLines: 2,
+                                      maxLines: 3,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 11.2,
@@ -3121,6 +3157,8 @@ class _BattleScreenState extends State<BattleScreen>
                               ActionChip(
                                 key: const Key('quick_excavate_next_btn'),
                                 visualDensity: VisualDensity.compact,
+                                labelPadding:
+                                    const EdgeInsets.symmetric(horizontal: 3),
                                 backgroundColor: canExcavateNext
                                     ? const Color(0xFF3A2510)
                                     : NightPalette.bgDeep,
@@ -3132,7 +3170,7 @@ class _BattleScreenState extends State<BattleScreen>
                                 label: Text(
                                   '⛏️${unexcavatedSlot.slotIndex + 1}번거점개척($unexcavatedCost⚡)',
                                   style: TextStyle(
-                                    fontSize: 11.2,
+                                    fontSize: 11.0,
                                     fontWeight: FontWeight.bold,
                                     color: canExcavateNext
                                         ? NightPalette.accentGold
@@ -3156,13 +3194,15 @@ class _BattleScreenState extends State<BattleScreen>
                                       }
                                     : null,
                               ),
-                              const SizedBox(width: 5),
+                              const SizedBox(width: 4),
                             ],
                             if (readyEmptySlot != null &&
                                 recDirectType != null) ...[
                               ActionChip(
                                 key: const Key('quick_direct_build_btn'),
                                 visualDensity: VisualDensity.compact,
+                                labelPadding:
+                                    const EdgeInsets.symmetric(horizontal: 3),
                                 backgroundColor: canQuickDirect
                                     ? const Color(0xFF14382E)
                                     : NightPalette.bgDeep,
@@ -3174,7 +3214,7 @@ class _BattleScreenState extends State<BattleScreen>
                                 label: Text(
                                   '🔨추천축조[${recDirectType.name.split(" ").first}]($recDirectCost⚡)',
                                   style: TextStyle(
-                                    fontSize: 11.2,
+                                    fontSize: 11.0,
                                     fontWeight: FontWeight.bold,
                                     color: canQuickDirect
                                         ? const Color(0xFF80ED99)
@@ -3190,11 +3230,13 @@ class _BattleScreenState extends State<BattleScreen>
                                       }
                                     : null,
                               ),
-                              const SizedBox(width: 5),
+                              const SizedBox(width: 4),
                             ],
                             ActionChip(
                               key: const Key('quick_lucky_summon_btn'),
                               visualDensity: VisualDensity.compact,
+                              labelPadding:
+                                  const EdgeInsets.symmetric(horizontal: 3),
                               backgroundColor: canQuickLucky
                                   ? const Color(0xFF1E3252)
                                   : NightPalette.bgDeep,
@@ -3210,7 +3252,7 @@ class _BattleScreenState extends State<BattleScreen>
                                         ? '🪨개척후소환'
                                         : '🎲초소만석'),
                                 style: TextStyle(
-                                  fontSize: 11.2,
+                                  fontSize: 11.0,
                                   fontWeight: FontWeight.bold,
                                   color: canQuickLucky
                                       ? NightPalette.accentGold
@@ -3228,10 +3270,12 @@ class _BattleScreenState extends State<BattleScreen>
                                   : null,
                             ),
                             if (mergePair != null) ...[
-                              const SizedBox(width: 5),
+                              const SizedBox(width: 4),
                               ActionChip(
                                 key: const Key('quick_merge_any_btn'),
                                 visualDensity: VisualDensity.compact,
+                                labelPadding:
+                                    const EdgeInsets.symmetric(horizontal: 3),
                                 backgroundColor: const Color(0xFF3A2810),
                                 side: const BorderSide(
                                   color: NightPalette.accentGold,
@@ -3239,7 +3283,7 @@ class _BattleScreenState extends State<BattleScreen>
                                 label: Text(
                                   '☯️연성합체(${_sim.mergeCostForSlot(mergePair.$1)}⚡)',
                                   style: const TextStyle(
-                                    fontSize: 11.2,
+                                    fontSize: 11.0,
                                     fontWeight: FontWeight.bold,
                                     color: NightPalette.accentGold,
                                   ),
@@ -3252,10 +3296,12 @@ class _BattleScreenState extends State<BattleScreen>
                                 },
                               ),
                             ],
-                            const SizedBox(width: 5),
+                            const SizedBox(width: 4),
                             ActionChip(
                               key: const Key('live_upg_firepower_btn'),
                               visualDensity: VisualDensity.compact,
+                              labelPadding:
+                                  const EdgeInsets.symmetric(horizontal: 3),
                               backgroundColor: _sim.liveFirepowerLv < 5 &&
                                       _sim.fieldTokens >= _sim.liveFirepowerCost
                                   ? const Color(0xFF3A181C)
@@ -3272,7 +3318,7 @@ class _BattleScreenState extends State<BattleScreen>
                                     ? '⚔️화력만땅'
                                     : '⚔️화력업+${_sim.liveFirepowerLv}(${_sim.liveFirepowerCost}⚡)',
                                 style: TextStyle(
-                                  fontSize: 11.0,
+                                  fontSize: 10.8,
                                   fontWeight: FontWeight.bold,
                                   color: _sim.liveFirepowerLv < 5 &&
                                           _sim.fieldTokens >=
@@ -3291,10 +3337,12 @@ class _BattleScreenState extends State<BattleScreen>
                                     }
                                   : null,
                             ),
-                            const SizedBox(width: 5),
+                            const SizedBox(width: 4),
                             ActionChip(
                               key: const Key('live_upg_reload_btn'),
                               visualDensity: VisualDensity.compact,
+                              labelPadding:
+                                  const EdgeInsets.symmetric(horizontal: 3),
                               backgroundColor: _sim.liveReloadLv < 5 &&
                                       _sim.fieldTokens >= _sim.liveReloadCost
                                   ? const Color(0xFF122C44)
@@ -3310,7 +3358,7 @@ class _BattleScreenState extends State<BattleScreen>
                                     ? '⚡연사만땅'
                                     : '⚡연사업+${_sim.liveReloadLv}(${_sim.liveReloadCost}⚡)',
                                 style: TextStyle(
-                                  fontSize: 11.0,
+                                  fontSize: 10.8,
                                   fontWeight: FontWeight.bold,
                                   color: _sim.liveReloadLv < 5 &&
                                           _sim.fieldTokens >=
@@ -3329,10 +3377,12 @@ class _BattleScreenState extends State<BattleScreen>
                                     }
                                   : null,
                             ),
-                            const SizedBox(width: 5),
+                            const SizedBox(width: 4),
                             ActionChip(
                               key: const Key('live_upg_range_btn'),
                               visualDensity: VisualDensity.compact,
+                              labelPadding:
+                                  const EdgeInsets.symmetric(horizontal: 3),
                               backgroundColor: _sim.liveRangeLv < 4 &&
                                       _sim.fieldTokens >= _sim.liveRangeCost
                                   ? const Color(0xFF10343A)
@@ -3348,7 +3398,7 @@ class _BattleScreenState extends State<BattleScreen>
                                     ? '🔭사거리만땅'
                                     : '🔭사거리업+${_sim.liveRangeLv}(${_sim.liveRangeCost}⚡)',
                                 style: TextStyle(
-                                  fontSize: 11.0,
+                                  fontSize: 10.8,
                                   fontWeight: FontWeight.bold,
                                   color: _sim.liveRangeLv < 4 &&
                                           _sim.fieldTokens >= _sim.liveRangeCost
@@ -3366,10 +3416,12 @@ class _BattleScreenState extends State<BattleScreen>
                                     }
                                   : null,
                             ),
-                            const SizedBox(width: 5),
+                            const SizedBox(width: 4),
                             ActionChip(
                               key: const Key('live_upg_barrier_btn'),
                               visualDensity: VisualDensity.compact,
+                              labelPadding:
+                                  const EdgeInsets.symmetric(horizontal: 3),
                               backgroundColor: _sim.liveBarrierLv < 5 &&
                                       _sim.fieldTokens >= _sim.liveBarrierCost
                                   ? const Color(0xFF123328)
@@ -3385,7 +3437,7 @@ class _BattleScreenState extends State<BattleScreen>
                                     ? '🛡️결계만땅'
                                     : '🛡️결계업+${_sim.liveBarrierLv}(${_sim.liveBarrierCost}⚡)',
                                 style: TextStyle(
-                                  fontSize: 11.0,
+                                  fontSize: 10.8,
                                   fontWeight: FontWeight.bold,
                                   color: _sim.liveBarrierLv < 5 &&
                                           _sim.fieldTokens >=
@@ -3718,6 +3770,7 @@ class _BattleScreenState extends State<BattleScreen>
           ],
         ),
       ),
+        ),
       ),
     );
   }

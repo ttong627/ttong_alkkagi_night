@@ -127,13 +127,14 @@ class CodexScreen extends StatelessWidget {
                             foregroundColor: NightPalette.hanjiInk,
                           ),
                           onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => EndlessSurvivalScreen(
-                                  controller: controller,
-                                ),
-                              ),
+                            final route = buildSmoothScreenRoute(
+                              EndlessSurvivalScreen(controller: controller),
                             );
+                            if (embeddedInShell) {
+                              Navigator.of(context).push(route);
+                            } else {
+                              Navigator.of(context).pushReplacement(route);
+                            }
                           },
                           icon: const Icon(
                             Icons.local_fire_department_rounded,
@@ -267,7 +268,7 @@ class CodexScreen extends StatelessWidget {
           ),
         ),
         ...LauncherType.values.map((t) {
-          final unlocked = t.unlockChapter <= p.highestUnlockedChapter + 1;
+          final unlocked = t.unlockChapter <= p.highestUnlockedChapter;
           final permLv = p.launcherPermanentLevels[t] ?? 1;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),

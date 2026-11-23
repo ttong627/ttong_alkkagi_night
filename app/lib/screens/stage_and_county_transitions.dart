@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:defense_core/defense_core.dart';
 import 'package:flutter/material.dart';
@@ -293,7 +294,6 @@ class _CountyTransitionScreenState extends State<CountyTransitionScreen>
     _didNavigate = true;
     _autoEnterAnim.stop();
     widget.controller.setSelectedChapter(spec.toChapter);
-    widget.controller.applyRecommendedLoadoutForStage(nextFirstStage);
     Navigator.of(context).pushReplacement(
       buildSmoothBattleRoute(
         controller: widget.controller,
@@ -319,20 +319,26 @@ class _CountyTransitionScreenState extends State<CountyTransitionScreen>
             CampaignCatalog.countyTransitions.first;
         final nextChapterSpec = CampaignCatalog.chapterOf(spec.toChapter);
         final nextFirstStage = CampaignCatalog.stageAt(spec.toChapter, 1);
-        final maxUnlockedTransition =
-            (p.highestUnlockedChapter - 1).clamp(1, 9);
-        final maxViewable = widget.fromChapter > maxUnlockedTransition
-            ? widget.fromChapter.clamp(1, 9)
-            : maxUnlockedTransition;
+        final highestClearedCounty =
+            (p.highestClearedGlobalStage ~/ 10).clamp(0, 10);
+        final isFromCountyCleared = spec.fromChapter <= highestClearedCounty;
+        final clearedInFromCounty =
+            (p.highestClearedGlobalStage - (spec.fromChapter - 1) * 10)
+                .clamp(0, 10);
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(
-              widget.openedFromVictory
-                  ? '현(縣) 완전 정화 · 다음 현 대행군'
-                  : '10대 현 대행군 이동 영상록',
+        return PopScope(
+          onPopInvokedWithResult: (didPop, _) {
+            _didNavigate = true;
+            _autoEnterAnim.stop();
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(
+                widget.openedFromVictory
+                    ? '현(縣) 완전 정화 · 다음 현 대행군'
+                    : '10대 현 대행군 이동 영상록',
+              ),
             ),
-          ),
           body: NightSceneBackdrop(
             assetPath: nextChapterSpec.bgAsset,
             fallbackAssetPath: NightArtRegistry.bgNightLobby,
@@ -353,7 +359,10 @@ class _CountyTransitionScreenState extends State<CountyTransitionScreen>
                             children: List.generate(9, (idx) {
                               final fromCh = idx + 1;
                               final toCh = fromCh + 1;
-                              final unlocked = fromCh <= maxViewable ||
+                              final unlocked =
+                                  fromCh <= highestClearedCounty ||
+                                  (widget.openedFromVictory &&
+                                      fromCh == widget.fromChapter) ||
                                   p.highestClearedGlobalStage >=
                                       CampaignCatalog.allStages.length;
                               final selected = fromCh == _selectedFromChapter;
@@ -459,19 +468,27 @@ class _CountyTransitionScreenState extends State<CountyTransitionScreen>
                                               vertical: 5,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xDD11353B),
+                                              color: isFromCountyCleared
+                                                  ? const Color(0xDD11353B)
+                                                  : const Color(0xDD282238),
                                               borderRadius:
                                                   BorderRadius.circular(12),
                                               border: Border.all(
-                                                color: NightPalette.jadeGreen,
+                                                color: isFromCountyCleared
+                                                    ? NightPalette.jadeGreen
+                                                    : NightPalette.accentGold,
                                               ),
                                             ),
                                             child: Text(
-                                              '✓ 제${spec.fromChapter}현 10판 정화 완수!',
-                                              style: const TextStyle(
+                                              isFromCountyCleared
+                                                  ? '✓ 제${spec.fromChapter}현 10판 정화 완수!'
+                                                  : '⏳ 제${spec.fromChapter}현 수호 중 ($clearedInFromCounty/10판)',
+                                              style: TextStyle(
                                                 fontSize: 11.8,
                                                 fontWeight: FontWeight.bold,
-                                                color: NightPalette.jadeGreen,
+                                                color: isFromCountyCleared
+                                                    ? NightPalette.jadeGreen
+                                                    : NightPalette.accentGold,
                                               ),
                                             ),
                                           ),
@@ -771,18 +788,18 @@ class _CountyTransitionScreenState extends State<CountyTransitionScreen>
                                 backgroundColor: NightPalette.accentGold,
                                 foregroundColor: NightPalette.hanjiInk,
                               ),
-                              onPressed: () {
-                                if (p.isStageUnlocked(nextFirstStage)) {
-                                  _launchNextCountyFirstVillage();
-                                } else {
-                                  _didNavigate = true;
-                                  _autoEnterAnim.stop();
-                                  Navigator.of(context).pop();
-                                }
-                              },
-                              icon: const Icon(Icons.rocket_launch_rounded),
+                              onPressed: p.isStageUnlocked(nextFirstStage)
+                                  ? _launchNextCountyFirstVillage
+                                  : null,
+                              icon: Icon(
+                                p.isStageUnlocked(nextFirstStage)
+                                    ? Icons.rocket_launch_rounded
+                                    : Icons.lock_outline_rounded,
+                              ),
                               label: Text(
-                                '제${spec.toChapter}현 1판 [${nextFirstStage.villageNodeName}] 출정!',
+                                p.isStageUnlocked(nextFirstStage)
+                                    ? '제${spec.toChapter}현 1판 [${nextFirstStage.villageNodeName}] 출정!'
+                                    : '제${spec.fromChapter}현 10판 정화 시 개방',
                               ),
                             ),
                           ],
@@ -793,6 +810,7 @@ class _CountyTransitionScreenState extends State<CountyTransitionScreen>
                 ),
               ),
             ),
+          ),
           ),
         );
       },
@@ -825,7 +843,12 @@ class QuickPlayAndMenuBar extends StatelessWidget {
       onSwitchShellTab!(shellTabIndex);
       return;
     }
-    Navigator.of(context).push(buildSmoothScreenRoute(builder()));
+    final route = buildSmoothScreenRoute(builder());
+    if (embeddedInShell) {
+      Navigator.of(context).push(route);
+    } else {
+      Navigator.of(context).pushReplacement(route);
+    }
   }
 
   @override
@@ -903,11 +926,14 @@ class QuickPlayAndMenuBar extends StatelessWidget {
                   ),
                   onPressed: () {
                     NightAudioController.instance.playAsset('ui_tap.ogg');
-                    Navigator.of(context).push(
-                      buildSmoothScreenRoute(
-                        CampaignScreen(controller: controller),
-                      ),
+                    final route = buildSmoothScreenRoute(
+                      CampaignScreen(controller: controller),
                     );
+                    if (embeddedInShell) {
+                      Navigator.of(context).push(route);
+                    } else {
+                      Navigator.of(context).pushReplacement(route);
+                    }
                   },
                   icon: const Icon(Icons.map_rounded, size: 15),
                   label: Text(
@@ -932,11 +958,14 @@ class QuickPlayAndMenuBar extends StatelessWidget {
                     ),
                     onPressed: () {
                       NightAudioController.instance.playAsset('ui_tap.ogg');
-                      Navigator.of(context).push(
-                        buildSmoothScreenRoute(
-                          EndlessSurvivalScreen(controller: controller),
-                        ),
+                      final route = buildSmoothScreenRoute(
+                        EndlessSurvivalScreen(controller: controller),
                       );
+                      if (embeddedInShell) {
+                        Navigator.of(context).push(route);
+                      } else {
+                        Navigator.of(context).pushReplacement(route);
+                      }
                     },
                     icon: const Icon(
                       Icons.all_inclusive_rounded,
@@ -1115,7 +1144,11 @@ class _VictoryContinuousMarchCardState extends State<VictoryContinuousMarchCard>
                         ? const Color(0xFF1A463B)
                         : const Color(0xFF2B3548),
                     label: Text(
-                      contOn ? '🏃연속이동 ON (터치시 정지)' : '⏸️연속이동 일시정지됨',
+                      contOn
+                          ? '🏃연속이동 ON (터치시 정지)'
+                          : (!widget.controller.continuousVillageMarch
+                              ? '⏸️연속수호 OFF (터치시 켜기)'
+                              : '⏸️이번 판 정지됨 (터치시 재개)'),
                       style: TextStyle(
                         fontSize: 11.0,
                         color: contOn
@@ -1393,17 +1426,25 @@ class _CountyRealRoadMapWidgetState extends State<CountyRealRoadMapWidget>
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // 와이드 태블릿 여백에도 어색함 없이 이어지는 은은한 지형 블러 배경
+            // 와이드 태블릿 여백에도 중복 건물 없이 은은하게 이어지는 블러 야경 배경
             Positioned.fill(
-              child: Opacity(
-                opacity: 0.30,
-                child: Image.asset(
-                  NightArtRegistry.countyRegionalMapAsset(widget.chSpec.number),
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              child: ImageFiltered(
+                imageFilter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Opacity(
+                  opacity: 0.42,
+                  child: Image.asset(
+                    NightArtRegistry.countyRegionalMapAsset(
+                      widget.chSpec.number,
+                    ),
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
                 ),
               ),
+            ),
+            const Positioned.fill(
+              child: ColoredBox(color: Color(0x66060C18)),
             ),
             // 1344:768 (16:9) 정비율 고정 실측 지도 프레임 (모든 해상도에서 도로 좌표 1:1 완전 일치!)
             Center(

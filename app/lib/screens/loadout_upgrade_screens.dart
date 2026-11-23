@@ -316,6 +316,34 @@ class LoadoutScreen extends StatelessWidget {
                       }
                     },
                   ),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    key: const Key('loadout_auto_upgrade_switch'),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    activeThumbColor: NightPalette.accentGold,
+                    title: const Text(
+                      '전투 중 여유 기력(95⚡+) 포대 자동 승급',
+                      style: TextStyle(
+                        fontSize: 13.2,
+                        fontWeight: FontWeight.bold,
+                        color: NightPalette.textPrimary,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      '켜 두면 기력이 95⚡ 이상 모일 때 설치된 발사대를 자동으로 1단계씩 승급합니다.',
+                      style: TextStyle(
+                        fontSize: 11.4,
+                        color: NightPalette.textMuted,
+                      ),
+                    ),
+                    value: preset.autoUpgradeInBattle,
+                    onChanged: (val) {
+                      controller.updatePreset(
+                        (pr) => pr.autoUpgradeInBattle = val,
+                      );
+                    },
+                  ),
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 14),
                     child: Divider(height: 1, color: Colors.white12),

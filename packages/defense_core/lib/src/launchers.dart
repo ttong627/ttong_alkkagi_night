@@ -59,7 +59,7 @@ enum LauncherType {
   qiAmplifier(
     id: 'qiAmplifier',
     name: '내공 증폭기',
-    roleSummary: '인접(195) 다른 계통 포탑의 화력·연사·사거리를 증폭 및 문파 무공 발동·내공 충전',
+    roleSummary: '인접(195) 타 계통 포탑의 화력·연사·사거리를 증폭 및 문파 무공 발동·내공 충전(사격 180)',
     tierNames: ['1형 기운 공명석', '2형 문파 가속 주입기', '3형 회심 폭주 진법', '4형 기명 천하 사방진'],
     baseCooldownSec: 1.28,
     baseDamage: 2.2,
@@ -100,7 +100,7 @@ enum LauncherType {
   final int colorHex;
 
   /// 전장 내 이미 배치된 발사대 수에 비례하여 증가하는 체증 건설 비용!
-  /// (초중반 무지성 포탑 도배를 +14⚡씩 강하게 억제하되, 10~14초소 대협곡 확장이 가능하도록 최대 +70⚡ 상한 적용)
+  /// (초중반 무지성 포탑 도배를 +14⚡씩 강하게 억제하되, 10~14초소 대협곡 확장이 가능하도록 최대 +98⚡ 상한 적용)
   int progressiveBuildCost(int existingLauncherCount) =>
       buildCostTokens + (existingLauncherCount.clamp(0, 20) * 14).clamp(0, 98);
 

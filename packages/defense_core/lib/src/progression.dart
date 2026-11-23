@@ -629,11 +629,12 @@ class PlayerProgress {
 
   // --- 수호 도감 수집률 및 세트 가산치 (최대 +12% 화력·방어막 보너스) ---
   int get unlockedLauncherCount =>
-      LauncherType.values.where((t) => t.unlockChapter <= highestUnlockedChapter + 1).length;
+      LauncherType.values.where((t) => t.unlockChapter <= highestUnlockedChapter).length;
   int get unlockedBeastCount => beastLevels.values.where((v) => v > 0).length;
   int get unlockedCompanionCount => companionLevels.values.where((v) => v > 0).length;
 
   int get codexCollectedCount =>
+      1 + // 중앙 기명 수호탑 기본 보유
       unlockedStones.length +
       unlockedLauncherCount +
       unlockedBeastCount +
@@ -641,6 +642,7 @@ class PlayerProgress {
       seenMutants.length;
 
   int get codexTotalCount =>
+      1 + // 중앙 기명 수호탑 포함
       StoneMaterial.values.length +
       LauncherType.values.length +
       SpiritBeast.values.length +
@@ -695,7 +697,7 @@ class PlayerProgress {
   }) {
     final day = todayKey ?? _todayString();
     if (_isFarFutureClockDrift(lastMeditationDayKey, day)) {
-      // 잘못된 먼 미래 시계(45일 초과)에서 정상 날짜로 복귀한 경우 당일 중복 보상은 막되 내일부터 정상 회복!
+      // 잘못된 먼 미래 시계(180일 초과)에서 정상 날짜로 복귀한 경우 당일 중복 보상은 막되 내일부터 정상 회복!
       lastMeditationDayKey = day;
       dailyEnlightenmentUsed = 10;
     } else if (lastMeditationDayKey.isEmpty || day.compareTo(lastMeditationDayKey) > 0) {
@@ -1701,12 +1703,27 @@ class PlayerProgress {
           }
         }
 
-        if (stage.globalIndex > highestClearedGlobalStage) {
+        final isFirstClear = stage.globalIndex > highestClearedGlobalStage;
+        if (isFirstClear) {
           highestClearedGlobalStage = stage.globalIndex;
+        }
 
-          // 관문 진행에 따른 동료(13인) · 영수(4종) 지속 구출 합류!
+        // 관문 진행에 따른 동료(13인) · 영수(4종) 지속 구출 합류!
+        // (세이브 이관·경계 재클리어 시에도 아직 미합류(Lv.0) 구출 대상이 있으면 누락 없이 합류 보장!)
+        final needMissingCompanion = stage.rescueCompanion != null &&
+            (companionLevels[stage.rescueCompanion!] ?? 0) <= 0;
+        final needMissingMukhyeon = stage.alsoRescuesMukhyeon &&
+            (companionLevels[CompanionHero.mukhyeon] ?? 0) <= 0;
+        final needMissingBeast = stage.rescueBeast != null &&
+            (beastLevels[stage.rescueBeast!] ?? 0) <= 0;
+
+        if (isFirstClear ||
+            needMissingCompanion ||
+            needMissingMukhyeon ||
+            needMissingBeast) {
           final rescueNotices = <String>[];
-          if (stage.rescueCompanion != null) {
+          if (stage.rescueCompanion != null &&
+              (isFirstClear || needMissingCompanion)) {
             final hero = stage.rescueCompanion!;
             final prevLv = companionLevels[hero] ?? 0;
             companionLevels[hero] = prevLv <= 0 ? 1 : (prevLv + 1).clamp(1, 10);
@@ -1723,15 +1740,19 @@ class PlayerProgress {
             );
           }
 
-          if (stage.alsoRescuesMukhyeon) {
+          if (stage.alsoRescuesMukhyeon &&
+              (isFirstClear || needMissingMukhyeon)) {
             final prevMuk = companionLevels[CompanionHero.mukhyeon] ?? 0;
             companionLevels[CompanionHero.mukhyeon] =
                 prevMuk <= 0 ? 1 : (prevMuk + 1).clamp(1, 10);
-            supportTokens = (supportTokens + 2).clamp(0, 9999);
+            if (isFirstClear || prevMuk <= 0) {
+              supportTokens = (supportTokens + 2).clamp(0, 999999);
+            }
             rescueNotices.add('⚔️ 숙적 「묵현」 귀순 합류 & 지원패 +2!');
           }
 
-          if (stage.rescueBeast != null) {
+          if (stage.rescueBeast != null &&
+              (isFirstClear || needMissingBeast)) {
             final beast = stage.rescueBeast!;
             final prevBeastLv = beastLevels[beast] ?? 0;
             beastLevels[beast] = prevBeastLv <= 0 ? 1 : (prevBeastLv + 1).clamp(1, 10);

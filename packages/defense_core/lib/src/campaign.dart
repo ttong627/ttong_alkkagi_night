@@ -351,7 +351,8 @@ class StageSpec {
   final List<StoryLine> introDialogue;
   final List<StoryLine> outroDialogue;
 
-  bool get hasRescueReward => rescueCompanion != null || rescueBeast != null;
+  bool get hasRescueReward =>
+      rescueCompanion != null || rescueBeast != null || alsoRescuesMukhyeon;
 
   String get rescueBadgeText {
     if (rescueCompanion != null && alsoRescuesMukhyeon) {
@@ -362,6 +363,9 @@ class StageSpec {
     }
     if (rescueBeast != null) {
       return '영수 [${rescueBeast!.name}] 구출';
+    }
+    if (alsoRescuesMukhyeon) {
+      return '동료 [묵현] 귀순 합류';
     }
     return '';
   }
@@ -1427,8 +1431,8 @@ class CampaignCatalog {
       ],
       cliffs: const [
         CliffZone(center: Vec2(88, 520), radius: 36, label: '서쪽 청옥 대운하'),
-        CliffZone(center: Vec2(276, 440), radius: 30, label: '제1수로 급류'),
-        CliffZone(center: Vec2(444, 440), radius: 30, label: '제2수로 급류'),
+        CliffZone(center: Vec2(276, 560), radius: 30, label: '제1수로 급류'),
+        CliffZone(center: Vec2(444, 560), radius: 30, label: '제2수로 급류'),
       ],
     ),
 
@@ -1743,7 +1747,7 @@ class CampaignCatalog {
         TerrainPillar(center: Vec2(368, 295), radius: 18, sides: 8, rotationSpeedRad: -1.35, restitutionBoost: 1.48),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(368, 565), radius: 44, label: '중앙 대태엽 기어 구동공'),
+        CliffZone(center: Vec2(368, 430), radius: 38, label: '중앙 대태엽 기어 구동공'),
         CliffZone(center: Vec2(368, 760), radius: 34, label: '기관 동력 심연'),
         CliffZone(center: Vec2(28, 512), radius: 30, label: '서쪽 기관 수렁'),
       ],
@@ -2026,8 +2030,8 @@ class CampaignCatalog {
         TerrainPillar(center: Vec2(360, 905), radius: 19, sides: 4, rotationSpeedRad: -1.35, restitutionBoost: 1.42),
       ],
       cliffs: const [
-        CliffZone(center: Vec2(360, 495), radius: 48, label: '상단 오아시스 심연'),
-        CliffZone(center: Vec2(360, 905), radius: 48, label: '하단 오아시스 심연'),
+        CliffZone(center: Vec2(360, 588), radius: 40, label: '상단 오아시스 심연'),
+        CliffZone(center: Vec2(360, 818), radius: 40, label: '하단 오아시스 심연'),
         CliffZone(center: Vec2(28, 696), radius: 34, label: '열사 서쪽 벼랑'),
       ],
     ),

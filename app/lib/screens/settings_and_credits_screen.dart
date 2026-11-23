@@ -77,62 +77,66 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _showImportDialog(BuildContext context) async {
     final inputCtrl = TextEditingController();
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: NightPalette.bgPanel,
-        title: const Text(
-          '📥 백업 부호로 진행도 복원',
-          style: TextStyle(color: NightPalette.accentGold, fontSize: 18),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '보관해 둔 SUHO1:... 백업 부호를 붙여넣으세요. 위변조 검증 합산값이 일치할 때만 안전하게 복원됩니다.',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              key: const Key('import_backup_textfield'),
-              controller: inputCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'SUHO1:XXXXXXXX:...',
-                border: OutlineInputBorder(),
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: NightPalette.bgPanel,
+          title: const Text(
+            '📥 백업 부호로 진행도 복원',
+            style: TextStyle(color: NightPalette.accentGold, fontSize: 18),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '보관해 둔 SUHO1:... 백업 부호를 붙여넣으세요. 위변조 검증 합산값이 일치할 때만 안전하게 복원됩니다.',
+                style: TextStyle(fontSize: 13),
               ),
+              const SizedBox(height: 10),
+              TextField(
+                key: const Key('import_backup_textfield'),
+                controller: inputCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: 'SUHO1:XXXXXXXX:...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              key: const Key('confirm_import_backup_btn'),
+              style: FilledButton.styleFrom(
+                backgroundColor: NightPalette.accentGold,
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () async {
+                final ok = await controller.importBackupCode(inputCtrl.text);
+                if (ctx.mounted) {
+                  Navigator.of(ctx).pop();
+                }
+                if (!context.mounted) return;
+                if (ok) {
+                  _toast(context, '✅ 백업 진행도가 완벽하게 복원되었습니다!');
+                } else {
+                  _toast(context, '⚠️ 백업 부호 형식이 올바르지 않거나 손상되었습니다.');
+                }
+              },
+              child: const Text('복원 실행'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            key: const Key('confirm_import_backup_btn'),
-            style: FilledButton.styleFrom(
-              backgroundColor: NightPalette.accentGold,
-              foregroundColor: Colors.black,
-            ),
-            onPressed: () async {
-              final ok = await controller.importBackupCode(inputCtrl.text);
-              if (ctx.mounted) {
-                Navigator.of(ctx).pop();
-              }
-              if (!context.mounted) return;
-              if (ok) {
-                _toast(context, '✅ 백업 진행도가 완벽하게 복원되었습니다!');
-              } else {
-                _toast(context, '⚠️ 백업 부호 형식이 올바르지 않거나 손상되었습니다.');
-              }
-            },
-            child: const Text('복원 실행'),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      inputCtrl.dispose();
+    }
   }
 
   Future<void> _showCrashDiagDialog(BuildContext context) async {
@@ -562,9 +566,9 @@ class CreditsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    '• 한글 글꼴: 검은고딕(Black Han Sans, ZESSTYPE) 및 고운바탕(Gowun Batang, 양희재) — SIL 오픈 폰트 라이선스 1.1 준수.\n'
+                    '• 한글 글꼴: 검은고딕(Black Han Sans, ZESSTYPE) · 배달의민족 도현체(Do Hyeon, 우아한형제들) · 본고딕(Noto Sans KR) — SIL 오픈 폰트 라이선스 1.1 준수.\n'
                     '• 음향 자산: 탄지무림 세계관 정본 국악 배경음 계승 및 심야기습 전용 자체 파형 합성 효과음·출두 풍악 10종 수록.\n'
-                    '• 시각 자산: 통통 스튜디오 코덱스 수묵 무협 원화(배경·변이체·발사대·수호석·비약·이펙트) 및 실시간 60프레임 물리 캔버스 합성 엔진.',
+                    '• 시각 자산: 통통 스튜디오 코덱스 3D 회화풍 무협 원화(10현 실측 도로 지도·현간 이동 영상·배경·변이체·발사대·수호석·비약·이펙트) 및 실시간 60프레임 물리 캔버스 합성 엔진.',
                     style: TextStyle(fontSize: 13, height: 1.5),
                   ),
                   const SizedBox(height: 12),
@@ -575,7 +579,7 @@ class CreditsScreen extends StatelessWidget {
                         showLicensePage(
                           context: context,
                           applicationName: '수호알까기 · 탄지무림 심야기습',
-                          applicationVersion: '1.0.0+30',
+                          applicationVersion: '1.0.0+31',
                           applicationLegalese: '© 2026 (주)웰쉐어로지스 (TTong Studio)',
                         );
                       },

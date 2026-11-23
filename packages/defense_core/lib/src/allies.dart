@@ -66,7 +66,7 @@ enum SpiritBeast {
     unlockElixirs: 4,
     baseCooldownSec: 9.5,
     defaultCondition: AutoTriggerCondition.shieldCrisis,
-    skillSummary: '외곽 방어막 위기 시 현무 등껍질 결계로 방어막 18% 즉시 수복 + 접근 적 밀침!',
+    skillSummary: '외곽 방어막 위기 시 현무 등껍질 결계로 방어막 17.5%~31% 즉시 수복 + 접근 적 밀침!',
     battleCry: '크오오—! 현무의 등껍질은 뚫리지 않는다!',
     colorHex: 0xFF2A9D8F,
   ),
@@ -162,7 +162,7 @@ enum CompanionHero {
     unlockElixirs: 0,
     cooldownSec: 7.5,
     defaultCondition: AutoTriggerCondition.qiFullBurst,
-    skillDesc: '출격 시 내공 +0.65칸 즉시 보충 및 정화 유도탄 발사',
+    skillDesc: '출격 시 내공 +0.69칸(레벨·공명 비례 증가) 즉시 보충 및 정화 유도탄 발사',
   ),
   bandal(
     id: 'bandal',
@@ -195,7 +195,7 @@ enum CompanionHero {
     unlockElixirs: 0,
     cooldownSec: 8.5,
     defaultCondition: AutoTriggerCondition.anyEnemyInRange,
-    skillDesc: '5초 동안 마을 모든 길목 자동 발사대의 장전 속도를 1.45배 가속!',
+    skillDesc: '약 5초(4.8초~) 동안 마을 모든 길목 자동 발사대의 장전 속도를 1.41배~ 가속!',
   ),
   yonga(
     id: 'yonga',
@@ -217,7 +217,7 @@ enum CompanionHero {
     unlockElixirs: 5,
     cooldownSec: 8.0,
     defaultCondition: AutoTriggerCondition.qiFullBurst,
-    skillDesc: '호리병 선기를 불어넣어 내공 +1.1칸 급속 충전 및 취권 지그재그 탄 발사',
+    skillDesc: '호리병 선기를 불어넣어 내공 +1.11칸(레벨 비례 증가) 급속 충전 및 취권 지그재그 탄 발사',
   ),
   mukgaek(
     id: 'mukgaek',
@@ -272,7 +272,7 @@ enum CompanionHero {
     unlockElixirs: 16,
     cooldownSec: 9.0,
     defaultCondition: AutoTriggerCondition.shieldCrisis,
-    skillDesc: '자비의 금빛 종소리로 외곽 방어막 22% 회복 및 논밭·가축 독기 즉시 정화!',
+    skillDesc: '자비의 금빛 종소리로 외곽 방어막 19.6%~34% 회복 및 논밭·가축 독기 즉시 정화!',
   ),
   mukhyeon(
     id: 'mukhyeon',

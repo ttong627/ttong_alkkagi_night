@@ -667,9 +667,10 @@ class NightBattleSprites {
         NightArtRegistry.beastStripAsset(sb),
         NightArtRegistry.beastAsset(sb),
       ],
-      for (final ch in (activeHeroes.isEmpty
-          ? CompanionHero.values.take(4)
-          : activeHeroes)) ...[
+      for (final ch in <CompanionHero>{
+        ...(activeHeroes.isEmpty ? CompanionHero.values.take(4) : activeHeroes),
+        CompanionHero.mukhyeon,
+      }) ...[
         NightArtRegistry.heroStripAsset(ch),
         NightArtRegistry.heroIdleAsset(ch),
         NightArtRegistry.heroAttackAsset(ch),

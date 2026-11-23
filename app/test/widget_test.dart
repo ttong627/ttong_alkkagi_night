@@ -1101,8 +1101,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.textContaining('탄지무림 10대 거점 심야 수호 대륙도'), findsOneWidget);
 
-    // 대륙 지도 위의 2장 거점 핀 터치 시 즉시 2장 선택 전환 확인
-    await tester.tap(find.text('✓2장').first);
+    // 대륙 지도 위의 2현 거점 핀 터치 시 즉시 2현 선택 전환 확인
+    await tester.tap(find.text('✓2현').first);
     await tester.pump(const Duration(milliseconds: 200));
     expect(controller.selectedChapter, 2);
 
@@ -1527,5 +1527,100 @@ void main() {
       expect(find.byKey(Key('village_node_$ch-10')), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
+  });
+
+  testWidgets(
+      'v1.0.0+31 정밀 감사 UI 회귀 검증: 진법 자동승급 스위치 · 미완수 현 이동 잠금 표기 · 호송 보급 버프 이탈 경고',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2280);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final earlyCtrl = GameController(
+      initialProgress: PlayerProgress(
+        tokens: 300,
+        elixirs: 10,
+        supportTokens: 2,
+        convoySupplyBuffBattles: 1,
+        highestClearedGlobalStage: 3, // 1현 3판까지만 클리어 (1현 미완수!)
+        tutorialSeen: true,
+        bgmVolume: 0.0,
+        sfxVolume: 0.0,
+      ),
+    );
+
+    // 1) 진법 편성실(LoadoutScreen) 포대 여유 기력 자동 승급 토글 동작 검증
+    await tester.pumpWidget(
+      MaterialApp(home: LoadoutScreen(controller: earlyCtrl)),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    final autoSwitch = find.byKey(const Key('loadout_auto_upgrade_switch'));
+    final initialAuto = earlyCtrl.progress.activePreset.autoUpgradeInBattle;
+    await tester.scrollUntilVisible(
+      autoSwitch,
+      200.0,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(autoSwitch, findsOneWidget);
+    await tester.tap(autoSwitch);
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(earlyCtrl.progress.activePreset.autoUpgradeInBattle, !initialAuto);
+    expect(tester.takeException(), isNull);
+
+    // 2) 1현 미완수 상태에서 CountyTransitionScreen 열람 시 거짓 완수 배지 대신 수호 중 안내 & 출발 버튼 비활성화 검증
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CountyTransitionScreen(
+          controller: earlyCtrl,
+          fromChapter: 1,
+          openedFromVictory: false,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.textContaining('⏳ 제1현 수호 중'), findsOneWidget);
+    final departBtn = tester.widget<ButtonStyleButton>(
+      find.byKey(const Key('county_trans_battle_btn')),
+    );
+    expect(departBtn.onPressed, isNull);
+    expect(tester.takeException(), isNull);
+
+    // 3) 호송 보급 버프가 차감된 전투에서 안드로이드 뒤로가기(maybePop) 시도 시 소멸 경고 다이얼로그 작동 검증
+    expect(earlyCtrl.progress.convoySupplyBuffBattles, 1);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                key: const Key('enter_buffed_battle'),
+                onPressed: () => Navigator.of(ctx).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => BattleScreen(
+                      controller: earlyCtrl,
+                      stage: CampaignCatalog.stageAt(1, 1),
+                    ),
+                  ),
+                ),
+                child: const Text('출정'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('enter_buffed_battle')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(earlyCtrl.progress.convoySupplyBuffBattles, 0);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.textContaining('호송 보급 버프는 복구되지 않습니다'), findsOneWidget);
+    await tester.tap(find.text('전투 계속'));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byType(BattleScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
