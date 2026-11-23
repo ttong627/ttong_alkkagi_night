@@ -1344,7 +1344,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 150));
     expect(find.textContaining('전 100판(10현×10마을) 완전 정화 달성'), findsOneWidget);
-    expect(find.text('최종 관문 재출정'), findsOneWidget);
+    expect(find.text('최종판 재출정'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     // 2) 무한 혈전 화면에서 쉬움·보통·악몽 난이도 선택지가 작동하는지 검증
@@ -1492,8 +1492,40 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.byKey(const Key('victory_continuous_march_card')), findsOneWidget);
+    expect(find.byKey(const Key('victory_live_road_map')), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 3200));
     expect(autoAdvanceCount, 1);
     expect(tester.takeException(), isNull);
+
+    // 5) v1.0.0+30: 1~10현 코덱스 실측 도로 지도 자산 경로 및 전 현 실제 도로 행군 지도 무오류 렌더링 검증
+    final fullCtrl = GameController(
+      initialProgress: PlayerProgress(
+        tokens: 2000,
+        elixirs: 100,
+        supportTokens: 5,
+        highestClearedGlobalStage: 100,
+        tutorialSeen: true,
+        bgmVolume: 0.0,
+        sfxVolume: 0.0,
+      ),
+    );
+    for (int ch = 1; ch <= 10; ch++) {
+      expect(
+        NightArtRegistry.countyRegionalMapAsset(ch),
+        'assets/images/scenes/county_map_ch$ch.webp',
+      );
+      fullCtrl.setSelectedChapter(ch);
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey('county_road_map_test_$ch'),
+          home: CampaignScreen(controller: fullCtrl),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(find.byType(CountyRealRoadMapWidget), findsOneWidget);
+      expect(find.byKey(Key('village_node_$ch-1')), findsOneWidget);
+      expect(find.byKey(Key('village_node_$ch-10')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
   });
 }

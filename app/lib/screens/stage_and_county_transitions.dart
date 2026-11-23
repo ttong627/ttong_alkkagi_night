@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:defense_core/defense_core.dart';
 import 'package:flutter/material.dart';
 
@@ -1136,6 +1138,28 @@ class _VictoryContinuousMarchCardState extends State<VictoryContinuousMarchCard>
                 ],
               ),
               const SizedBox(height: 8),
+              if (!isCountyFinale) ...[
+                AnimatedBuilder(
+                  animation: _countdownAnim,
+                  builder: (context, _) {
+                    return CountyRealRoadMapWidget(
+                      key: const Key('victory_live_road_map'),
+                      controller: widget.controller,
+                      chSpec: chSpec,
+                      stages: countyStages,
+                      currentOrderStage: widget.nextStage,
+                      allCampaignCleared: false,
+                      interactive: false,
+                      compact: true,
+                      maxHeight: 158,
+                      marchFromStage: widget.clearedStage.stageNumber,
+                      externalMarchProgress:
+                          contOn ? _countdownAnim.value : 0.45,
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
               // 현내 1~10번 마을 징검다리 행군 표시줄
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -1239,4 +1263,565 @@ class _VictoryContinuousMarchCardState extends State<VictoryContinuousMarchCard>
       },
     );
   }
+}
+
+/// 제1현~제10현 전용 코덱스 실측 지형·도로 조감도(`county_map_ch1..10.webp`, 16:9) 위에서
+/// 실제 등불 돌길·운하교·잔도·무지개운교 곡선을 따라 마을마다 행군하는 고해상도 지도 위젯.
+class CountyRealRoadMapWidget extends StatefulWidget {
+  const CountyRealRoadMapWidget({
+    super.key,
+    required this.controller,
+    required this.chSpec,
+    required this.stages,
+    required this.currentOrderStage,
+    required this.allCampaignCleared,
+    this.interactive = true,
+    this.compact = false,
+    this.maxHeight = 320,
+    this.marchFromStage,
+    this.externalMarchProgress,
+  });
+
+  final GameController controller;
+  final ChapterSpec chSpec;
+  final List<StageSpec> stages;
+  final StageSpec currentOrderStage;
+  final bool allCampaignCleared;
+  final bool interactive;
+  final bool compact;
+  final double maxHeight;
+  final int? marchFromStage;
+  final double? externalMarchProgress;
+
+  @override
+  State<CountyRealRoadMapWidget> createState() =>
+      _CountyRealRoadMapWidgetState();
+}
+
+class _CountyRealRoadMapWidgetState extends State<CountyRealRoadMapWidget>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _patrolAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.externalMarchProgress == null) {
+      _patrolAnim = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 3600),
+      )..repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CountyRealRoadMapWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.externalMarchProgress == null && _patrolAnim == null) {
+      _patrolAnim = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 3600),
+      )..repeat();
+    } else if (widget.externalMarchProgress != null && _patrolAnim != null) {
+      _patrolAnim!.dispose();
+      _patrolAnim = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _patrolAnim?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = widget.controller.progress;
+    int clearedInCounty = 0;
+    for (final s in widget.stages) {
+      if (s.globalIndex <= progress.highestClearedGlobalStage) {
+        clearedInCounty++;
+      }
+    }
+
+    final int activeFromStage = (widget.marchFromStage ??
+            (clearedInCounty >= 10
+                ? 9
+                : (clearedInCounty <= 0 ? 1 : clearedInCounty)))
+        .clamp(1, 9);
+
+    final smoothedSegments = List<List<Offset>>.generate(9, (idx) {
+      return widget.chSpec
+          .smoothedCountyRoadSegment(idx)
+          .map((v) => Offset(v.x, v.y))
+          .toList(growable: false);
+    }, growable: false);
+
+    Widget buildMapFrame(double animPhase) {
+      final double rawT = widget.externalMarchProgress ?? animPhase;
+      final double effectiveMarchT = (clearedInCounty == 0 &&
+              widget.marchFromStage == null &&
+              !widget.allCampaignCleared)
+          ? (0.04 + 0.18 * (0.5 - 0.5 * math.cos(rawT * math.pi * 2.0)))
+          : rawT.clamp(0.0, 1.0);
+      final marchVec = widget.chSpec.sampleCountyRoadMarch(
+        activeFromStage,
+        effectiveMarchT,
+      );
+
+      final StageSpec focusStage = widget.marchFromStage != null
+          ? widget.stages[activeFromStage.clamp(1, widget.stages.length - 1)]
+          : (clearedInCounty >= 10
+              ? widget.stages.last
+              : widget.stages[clearedInCounty.clamp(0, widget.stages.length - 1)]);
+
+      return Container(
+        width: double.infinity,
+        constraints: BoxConstraints(maxHeight: widget.maxHeight),
+        decoration: BoxDecoration(
+          color: const Color(0xFF08101E),
+          borderRadius: widget.compact
+              ? BorderRadius.circular(12)
+              : BorderRadius.zero,
+          border: widget.compact
+              ? Border.all(
+                  color: NightPalette.accentGold.withValues(alpha: 0.65),
+                  width: 1.2,
+                )
+              : null,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // 와이드 태블릿 여백에도 어색함 없이 이어지는 은은한 지형 블러 배경
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.30,
+                child: Image.asset(
+                  NightArtRegistry.countyRegionalMapAsset(widget.chSpec.number),
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+            // 1344:768 (16:9) 정비율 고정 실측 지도 프레임 (모든 해상도에서 도로 좌표 1:1 완전 일치!)
+            Center(
+              child: AspectRatio(
+                aspectRatio: 1344.0 / 768.0,
+                child: LayoutBuilder(
+                  builder: (ctx, box) {
+                    final w = box.maxWidth;
+                    final h = box.maxHeight;
+                    final heroPx = (marchVec.x * w).clamp(18.0, w - 18.0);
+                    final heroPy = (marchVec.y * h).clamp(18.0, h - 18.0);
+                    final double avatarSize = widget.compact ? 22.0 : 28.0;
+
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          NightArtRegistry.countyRegionalMapAsset(
+                            widget.chSpec.number,
+                          ),
+                          fit: BoxFit.fill,
+                          gaplessPlayback: true,
+                          errorBuilder: (_, _, _) => Image.asset(
+                            widget.chSpec.bgAsset,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        // 원화 등불과 물결 색감을 살리는 가장자리 미세 비네팅
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              center: Alignment.center,
+                              radius: 0.96,
+                              colors: [
+                                Colors.transparent,
+                                const Color(0x52050B16),
+                              ],
+                              stops: const [0.64, 1.0],
+                            ),
+                          ),
+                        ),
+                        // 실제 지형 도로 곡선 · 등불 발자국 · 행군 궤적 페인터
+                        CustomPaint(
+                          painter: _CountyRealRoadPainter(
+                            segments: smoothedSegments,
+                            clearedCountInCounty: clearedInCounty,
+                            activeSegmentIndex: activeFromStage - 1,
+                            marchProgress: effectiveMarchT,
+                            dashPhase: animPhase,
+                            compact: widget.compact,
+                          ),
+                        ),
+                        // 1~10번 마을 거점 명패 노드
+                        for (int i = 0; i < widget.stages.length; i++)
+                          _buildVillagePin(
+                            context: context,
+                            st: widget.stages[i],
+                            progress: progress,
+                            mapW: w,
+                            mapH: h,
+                          ),
+                        // 실제 도로 곡선을 따라 마을에서 다음 마을로 걸어가는 수호대 행군 마커!
+                        Positioned(
+                          left: heroPx - avatarSize * 0.5,
+                          top: heroPy - avatarSize * 0.65,
+                          width: avatarSize,
+                          height: avatarSize,
+                          child: IgnorePointer(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF10243A),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 1.8,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0xCCFFD166),
+                                    blurRadius: 10,
+                                    spreadRadius: 1.5,
+                                  ),
+                                ],
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Image.asset(
+                                NightArtRegistry.charFace('seokdu'),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const Icon(
+                                  Icons.directions_run_rounded,
+                                  size: 14,
+                                  color: NightPalette.accentGold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // 하단 현·마을 도로 안내 명패 (말줄임 잘림 없는 깔끔한 지도 범례)
+                        if (!widget.compact)
+                          Positioned(
+                            left: 8,
+                            bottom: 6,
+                            right: 8,
+                            child: Align(
+                              alignment: Alignment.bottomLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 3.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xE60A1324),
+                                  borderRadius: BorderRadius.circular(9),
+                                  border: Border.all(
+                                    color: NightPalette.accentGold
+                                        .withValues(alpha: 0.72),
+                                  ),
+                                ),
+                                child: Text(
+                                  '🗺️ ${widget.chSpec.countyName} ($clearedInCounty/10마을) · 현재 가도: [${focusStage.villageNodeName}] · 마을 터치 즉시 출정',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 10.6,
+                                    fontWeight: FontWeight.bold,
+                                    color: NightPalette.accentGold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_patrolAnim != null) {
+      return AnimatedBuilder(
+        animation: _patrolAnim!,
+        builder: (context, _) => buildMapFrame(_patrolAnim!.value),
+      );
+    }
+    return buildMapFrame(widget.externalMarchProgress ?? 0.5);
+  }
+
+  Widget _buildVillagePin({
+    required BuildContext context,
+    required StageSpec st,
+    required PlayerProgress progress,
+    required double mapW,
+    required double mapH,
+  }) {
+    final unlocked = progress.isStageUnlocked(st);
+    final cleared = st.globalIndex <= progress.highestClearedGlobalStage;
+    final isCurrent = !widget.allCampaignCleared &&
+        st.globalIndex == widget.currentOrderStage.globalIndex;
+    final isNextMarchTarget = widget.marchFromStage != null &&
+        st.stageNumber == widget.marchFromStage! + 1;
+    final norm = st.villageMapCoord;
+
+    final double pinW = widget.compact
+        ? (st.stageNumber == 10 ? 40.0 : 32.0)
+        : (st.stageNumber == 10 ? 58.0 : 46.0);
+    final double pinH = widget.compact ? 18.0 : 23.0;
+    final px = (norm.x * mapW).clamp(pinW * 0.52, mapW - pinW * 0.52);
+    final py = (norm.y * mapH).clamp(pinH * 0.55, mapH - (widget.compact ? 12.0 : 26.0));
+
+    final bool highlightGold = isCurrent || isNextMarchTarget;
+    final Color bgCol = highlightGold
+        ? NightPalette.accentGold
+        : (cleared
+            ? const Color(0xEA14493E)
+            : (unlocked
+                ? const Color(0xEA8B2929)
+                : const Color(0xCF0E1728)));
+    final Color fgCol = highlightGold
+        ? NightPalette.hanjiInk
+        : (unlocked ? NightPalette.textPrimary : NightPalette.textMuted);
+
+    final String prefix = unlocked
+        ? (highlightGold ? '⚔️' : (cleared ? '✓' : '▶'))
+        : '🔒';
+    final String labelText = widget.compact
+        ? '$prefix${st.stageNumber}'
+        : (st.stageNumber == 10
+            ? '${prefix}10성👑'
+            : '$prefix${st.stageNumber}판');
+
+    final badge = Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: bgCol,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: highlightGold
+              ? Colors.white
+              : (st.isBossStage
+                  ? NightPalette.crimsonMoon
+                  : (unlocked
+                      ? NightPalette.accentGold
+                      : NightPalette.borderGold.withValues(alpha: 0.35))),
+          width: highlightGold ? 1.9 : 1.15,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x99000000),
+            blurRadius: 4,
+            offset: Offset(0, 1.5),
+          ),
+        ],
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          labelText,
+          maxLines: 1,
+          softWrap: false,
+          style: TextStyle(
+            fontSize: widget.compact ? 9.4 : 10.6,
+            fontWeight: FontWeight.w800,
+            color: fgCol,
+          ),
+        ),
+      ),
+    );
+
+    return Positioned(
+      left: px - pinW * 0.5,
+      top: py - pinH * 0.5,
+      width: pinW,
+      height: pinH,
+      child: widget.interactive
+          ? GestureDetector(
+              key: Key('village_node_${st.code}'),
+              onTap: unlocked
+                  ? () {
+                      Navigator.of(context).push(
+                        buildSmoothBattleRoute(
+                          controller: widget.controller,
+                          stage: st,
+                        ),
+                      );
+                    }
+                  : null,
+              child: badge,
+            )
+          : badge,
+    );
+  }
+}
+
+class _CountyRealRoadPainter extends CustomPainter {
+  const _CountyRealRoadPainter({
+    required this.segments,
+    required this.clearedCountInCounty,
+    required this.activeSegmentIndex,
+    required this.marchProgress,
+    required this.dashPhase,
+    required this.compact,
+  });
+
+  final List<List<Offset>> segments;
+  final int clearedCountInCounty;
+  final int activeSegmentIndex;
+  final double marchProgress;
+  final double dashPhase;
+  final bool compact;
+
+  Path _buildScaledPath(List<Offset> pts, Size size) {
+    final path = Path();
+    if (pts.isEmpty) return path;
+    path.moveTo(pts.first.dx * size.width, pts.first.dy * size.height);
+    for (int i = 1; i < pts.length; i++) {
+      path.lineTo(pts[i].dx * size.width, pts[i].dy * size.height);
+    }
+    return path;
+  }
+
+  void _drawSteppingStones(
+    Canvas canvas,
+    List<Offset> pts,
+    Size size, {
+    required Color color,
+    required double radius,
+    int stride = 3,
+  }) {
+    final dotPaint = Paint()..color = color;
+    for (int i = stride; i < pts.length - 1; i += stride) {
+      canvas.drawCircle(
+        Offset(pts[i].dx * size.width, pts[i].dy * size.height),
+        radius,
+        dotPaint,
+      );
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (segments.isEmpty) return;
+
+    final casingPaint = Paint()
+      ..color = const Color(0xB508111F)
+      ..strokeWidth = compact ? 4.4 : 5.8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    final clearedGlowPaint = Paint()
+      ..color = const Color(0x58FFD166)
+      ..strokeWidth = compact ? 7.0 : 9.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+
+    final clearedRoadPaint = Paint()
+      ..color = const Color(0xF2FFD166)
+      ..strokeWidth = compact ? 2.2 : 3.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    final activeWalkedGlow = Paint()
+      ..color = const Color(0x884EE3C0)
+      ..strokeWidth = compact ? 7.5 : 10.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
+
+    final activeWalkedLine = Paint()
+      ..color = const Color(0xFF4EE3C0)
+      ..strokeWidth = compact ? 2.5 : 3.3
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    final lockedCasingPaint = Paint()
+      ..color = const Color(0x9908111F)
+      ..strokeWidth = compact ? 3.0 : 3.8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    final lockedRoadPaint = Paint()
+      ..color = const Color(0x68CBD5E1)
+      ..strokeWidth = compact ? 1.4 : 1.8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    for (int segIdx = 0; segIdx < segments.length; segIdx++) {
+      final pts = segments[segIdx];
+      if (pts.length < 2) continue;
+      final fullPath = _buildScaledPath(pts, size);
+      final bool isSegmentCleared = (segIdx + 2) <= clearedCountInCounty;
+      final bool isActiveMarch = segIdx == activeSegmentIndex;
+
+      if (isSegmentCleared && !(isActiveMarch && clearedCountInCounty < 10)) {
+        canvas.drawPath(fullPath, clearedGlowPaint);
+        canvas.drawPath(fullPath, casingPaint);
+        canvas.drawPath(fullPath, clearedRoadPaint);
+        _drawSteppingStones(
+          canvas,
+          pts,
+          size,
+          color: const Color(0xEEFFF6CC),
+          radius: compact ? 1.2 : 1.6,
+          stride: 4,
+        );
+      } else if (isActiveMarch) {
+        canvas.drawPath(fullPath, casingPaint);
+        final int splitIdx =
+            ((pts.length - 1) * marchProgress.clamp(0.0, 1.0)).round();
+        if (splitIdx >= 1) {
+          final walkedPts = pts.sublist(0, splitIdx + 1);
+          final walkedPath = _buildScaledPath(walkedPts, size);
+          canvas.drawPath(walkedPath, activeWalkedGlow);
+          canvas.drawPath(walkedPath, activeWalkedLine);
+        }
+        // 전방 이동 예정 도로 위에 흐르는 등불 발자국 점선 표시
+        final aheadDotPaint = Paint()..color = const Color(0xEEFF9F43);
+        final phaseShift = ((dashPhase * 6.0).floor()) % 3;
+        for (int i = math.max(1, splitIdx); i < pts.length - 1; i++) {
+          if ((i + phaseShift) % 3 == 0) {
+            canvas.drawCircle(
+              Offset(pts[i].dx * size.width, pts[i].dy * size.height),
+              compact ? 1.6 : 2.2,
+              aheadDotPaint,
+            );
+          }
+        }
+      } else {
+        canvas.drawPath(fullPath, lockedCasingPaint);
+        canvas.drawPath(fullPath, lockedRoadPaint);
+        _drawSteppingStones(
+          canvas,
+          pts,
+          size,
+          color: const Color(0x7794A3B8),
+          radius: compact ? 1.0 : 1.3,
+          stride: 5,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CountyRealRoadPainter oldDelegate) =>
+      oldDelegate.clearedCountInCounty != clearedCountInCounty ||
+      oldDelegate.activeSegmentIndex != activeSegmentIndex ||
+      (oldDelegate.marchProgress - marchProgress).abs() > 0.004 ||
+      (oldDelegate.dashPhase - dashPhase).abs() > 0.01;
 }

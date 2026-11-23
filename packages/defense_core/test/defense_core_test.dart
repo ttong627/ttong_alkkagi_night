@@ -2824,5 +2824,39 @@ void main() {
       expect(migrated.stageStars['9-10'], 2);
       expect(migrated.stageStars.containsKey('4-12'), isFalse);
     });
+
+    test('v1.0.0+30 10대 현 실측 지도 9구간 실제 도로 곡선 연속성 및 행군 보간 정밀 검증', () {
+      for (final ch in CampaignCatalog.chapters) {
+        final segs = ch.countyRoadSegments;
+        expect(segs.length, 9, reason: '제${ch.number}현 마을 간 도로 구간은 정확히 9개여야 함');
+        for (int s = 0; s < segs.length; s++) {
+          expect(segs[s].length, greaterThanOrEqualTo(3));
+          final smoothed = ch.smoothedCountyRoadSegment(s);
+          expect(smoothed.length, greaterThanOrEqualTo(20));
+          // 모든 보간 좌표가 16:9 정규화 안전 영역(0.04~0.96, 0.06~0.94) 안에 위치해야 함
+          for (final pt in smoothed) {
+            expect(pt.x, inInclusiveRange(0.04, 0.96));
+            expect(pt.y, inInclusiveRange(0.06, 0.94));
+          }
+          // 인접 마을 구간의 끝점과 다음 구간 시작점이 끊김 없이 정확히 일치해야 함!
+          if (s + 1 < segs.length) {
+            expect(
+              segs[s].last.distanceTo(segs[s + 1].first),
+              lessThan(1e-6),
+              reason: '제${ch.number}현 ${s + 1}->${s + 2} 도로 연결점 불일치',
+            );
+          }
+        }
+        // sampleCountyRoadMarch(fromStage, 0.0 -> 1.0) 시작·끝 마을 좌표 일치 검증
+        for (int st = 1; st <= 9; st++) {
+          final startPt = ch.sampleCountyRoadMarch(st, 0.0);
+          final midPt = ch.sampleCountyRoadMarch(st, 0.5);
+          final endPt = ch.sampleCountyRoadMarch(st, 1.0);
+          expect(startPt.distanceTo(ch.villageMapCoordAt(st)), lessThan(1e-5));
+          expect(endPt.distanceTo(ch.villageMapCoordAt(st + 1)), lessThan(1e-5));
+          expect(midPt.distanceTo(startPt), greaterThan(0.01));
+        }
+      }
+    });
   });
 }

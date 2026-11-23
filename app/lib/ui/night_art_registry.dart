@@ -28,6 +28,12 @@ class NightArtRegistry {
     return 'assets/images/motions/county_travel_${safeFrom}_to_${safeFrom + 1}.webp';
   }
 
+  /// 제1현~제10현 각 현 전용 실측 지형 · 도로 · 10개 마을 조감도 지도 원화 경로 (`county_map_ch1..10.webp`).
+  static String countyRegionalMapAsset(int chapterNumber) {
+    final safeCh = chapterNumber.clamp(1, 10);
+    return 'assets/images/scenes/county_map_ch$safeCh.webp';
+  }
+
   static const String bgNightSplash = 'assets/images/scenes/bg_night_splash.webp';
   static const String bgNightLobby = 'assets/images/scenes/bg_night_lobby.webp';
   static const String bgLobbyFallback = 'assets/images/scenes/bg_lobby.webp';

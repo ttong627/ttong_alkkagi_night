@@ -570,151 +570,17 @@ class _CampaignScreenState extends State<CampaignScreen> {
     required StageSpec currentOrderStage,
     required bool allCampaignCleared,
   }) {
-    final villageCoords = stages
-        .map((s) => Offset(s.villageMapCoord.x, s.villageMapCoord.y))
-        .toList();
-    int clearedInCounty = 0;
-    for (final s in stages) {
-      if (s.globalIndex <= progress.highestClearedGlobalStage) {
-        clearedInCounty++;
-      }
-    }
-
-    return SizedBox(
-      height: 196,
-      child: LayoutBuilder(
-        builder: (ctx, box) {
-          final w = box.maxWidth;
-          final h = box.maxHeight;
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.asset(
-                chSpec.bgAsset,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Image.asset(
-                  NightArtRegistry.bgNightLobby,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              Container(color: const Color(0x6E070E1B)),
-              CustomPaint(
-                painter: _CountyVillageRoutePainter(
-                  coords: villageCoords,
-                  clearedCountInCounty: clearedInCounty,
-                ),
-              ),
-              for (int i = 0; i < stages.length; i++)
-                Builder(
-                  builder: (_) {
-                    final st = stages[i];
-                    final unlocked = progress.isStageUnlocked(st);
-                    final cleared =
-                        st.globalIndex <= progress.highestClearedGlobalStage;
-                    final isCurrent = !allCampaignCleared &&
-                        st.globalIndex == currentOrderStage.globalIndex;
-                    final norm = villageCoords[i];
-                    final px = (norm.dx * w).clamp(32.0, w - 32.0);
-                    final py = (norm.dy * h).clamp(18.0, h - 24.0);
-
-                    final Color bgCol = isCurrent
-                        ? NightPalette.accentGold
-                        : (cleared
-                            ? const Color(0xEE164B41)
-                            : (unlocked
-                                ? const Color(0xEE8E2A2A)
-                                : const Color(0xCC101929)));
-                    final Color fgCol = isCurrent
-                        ? NightPalette.hanjiInk
-                        : (unlocked
-                            ? NightPalette.textPrimary
-                            : NightPalette.textMuted);
-
-                    return Positioned(
-                      left: px - 29,
-                      top: py - 13,
-                      width: 58,
-                      height: 26,
-                      child: GestureDetector(
-                        key: Key('village_node_${st.code}'),
-                        onTap: unlocked
-                            ? () {
-                                Navigator.of(context).push(
-                                  buildSmoothBattleRoute(
-                                    controller: controller,
-                                    stage: st,
-                                  ),
-                                );
-                              }
-                            : null,
-                        child: Container(
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(horizontal: 3),
-                          decoration: BoxDecoration(
-                            color: bgCol,
-                            borderRadius: BorderRadius.circular(13),
-                            border: Border.all(
-                              color: isCurrent
-                                  ? Colors.white
-                                  : (st.isBossStage
-                                      ? NightPalette.crimsonMoon
-                                      : (unlocked
-                                          ? NightPalette.accentGold
-                                          : NightPalette.borderGold
-                                              .withValues(alpha: 0.3))),
-                              width: isCurrent ? 2.0 : 1.1,
-                            ),
-                          ),
-                          child: Text(
-                            '${unlocked ? (isCurrent ? "⚔️" : (cleared ? "✓" : "▶")) : "🔒"}${st.stageNumber}판${st.stageNumber == 10 ? "👑" : ""}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10.2,
-                              fontWeight: FontWeight.bold,
-                              color: fgCol,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              Positioned(
-                left: 8,
-                bottom: 6,
-                right: 8,
-                child: Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xE00C1526),
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(
-                        color: NightPalette.accentGold.withValues(alpha: 0.65),
-                      ),
-                    ),
-                    child: Text(
-                      '🏘️ ${chSpec.countyName} ($clearedInCounty/10판 · 마을 터치 시 즉시 진입)',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: NightPalette.accentGold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+    final screenH = MediaQuery.sizeOf(context).height;
+    final adaptiveMaxH = (screenH * 0.275).clamp(172.0, 388.0);
+    return CountyRealRoadMapWidget(
+      controller: controller,
+      chSpec: chSpec,
+      stages: stages,
+      currentOrderStage: currentOrderStage,
+      allCampaignCleared: allCampaignCleared,
+      interactive: true,
+      compact: false,
+      maxHeight: adaptiveMaxH,
     );
   }
 
@@ -1161,7 +1027,11 @@ class _CampaignScreenState extends State<CampaignScreen> {
                               const SizedBox(width: 8),
                               FilledButton(
                                 style: FilledButton.styleFrom(
-                                  minimumSize: const Size(94, 42),
+                                  minimumSize: const Size(104, 40),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
                                   backgroundColor: NightPalette.hanjiInk,
                                   foregroundColor: NightPalette.accentGold,
                                 ),
@@ -1174,7 +1044,9 @@ class _CampaignScreenState extends State<CampaignScreen> {
                                   );
                                 },
                                 child: Text(
-                                  allCampaignCleared ? '최종 관문 재출정' : '이번 차례 출정',
+                                  allCampaignCleared ? '최종판 재출정' : '이번 판 출정',
+                                  maxLines: 1,
+                                  softWrap: false,
                                 ),
                               ),
                             ],
@@ -1512,59 +1384,6 @@ class _CampaignScreenState extends State<CampaignScreen> {
       },
     );
   }
-}
-
-class _CountyVillageRoutePainter extends CustomPainter {
-  const _CountyVillageRoutePainter({
-    required this.coords,
-    required this.clearedCountInCounty,
-  });
-
-  final List<Offset> coords;
-  final int clearedCountInCounty;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (coords.length < 2) return;
-    final clearedGlow = Paint()
-      ..color = const Color(0x554EE3C0)
-      ..strokeWidth = 6.5
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    final clearedLine = Paint()
-      ..color = const Color(0xEEFFD166)
-      ..strokeWidth = 2.8
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    final nextLine = Paint()
-      ..color = const Color(0xAAFF7B54)
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    final lockedLine = Paint()
-      ..color = const Color(0x558D99AE)
-      ..strokeWidth = 1.6
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    for (int i = 0; i < coords.length - 1; i++) {
-      final p1 = Offset(coords[i].dx * size.width, coords[i].dy * size.height);
-      final p2 =
-          Offset(coords[i + 1].dx * size.width, coords[i + 1].dy * size.height);
-      if (i + 1 <= clearedCountInCounty) {
-        canvas.drawLine(p1, p2, clearedGlow);
-        canvas.drawLine(p1, p2, clearedLine);
-      } else if (i == clearedCountInCounty) {
-        canvas.drawLine(p1, p2, nextLine);
-      } else {
-        canvas.drawLine(p1, p2, lockedLine);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _CountyVillageRoutePainter oldDelegate) =>
-      oldDelegate.clearedCountInCounty != clearedCountInCounty;
 }
 
 class _WorldMapRoutePainter extends CustomPainter {
