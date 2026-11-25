@@ -371,7 +371,7 @@ class LoadoutScreen extends StatelessWidget {
                     children: List.generate(preset.mountTypes.length, (slotIdx) {
                       final curType = preset.mountTypes[slotIdx];
                       final unlockedTypes = LauncherType.values
-                          .where((t) => t.unlockChapter <= p.highestUnlockedChapter)
+                          .where((t) => t.unlockChapter <= p.effectiveArsenalChapter)
                           .toList();
                       return ActionChip(
                         key: Key('loadout_mount_slot_$slotIdx'),
@@ -422,7 +422,7 @@ class LoadoutScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   ...LauncherType.values.map((lt) {
                     final unlocked =
-                        lt.unlockChapter <= p.highestUnlockedChapter;
+                        lt.unlockChapter <= p.effectiveArsenalChapter;
                     final permLv = p.launcherPermanentLevels[lt] ?? 1;
                     final targetMutant =
                         NightArtRegistry.counterTargetOfLauncher(lt);
@@ -1285,7 +1285,7 @@ class UpgradeScreen extends StatelessWidget {
                         final lv = p.launcherPermanentLevels[lt] ?? 1;
                         final cost = lt.permanentUpgradeCost(lv);
                         final ltUnlocked =
-                            lt.unlockChapter <= p.highestUnlockedChapter;
+                            lt.unlockChapter <= p.effectiveArsenalChapter;
                         return Row(
                           children: [
                             NightSpriteIcon(
@@ -1379,7 +1379,7 @@ class UpgradeScreen extends StatelessWidget {
                         final owned = p.unlockedStones.contains(s);
                         final shards = p.stoneShards[s] ?? 0;
                         final chapterLocked =
-                            p.highestUnlockedChapter < s.minChapter;
+                            p.effectiveArsenalChapter < s.minChapter;
                         final canCraft = p.canUnlockStone(s);
                         return Row(
                           children: [
@@ -1622,6 +1622,64 @@ class UpgradeScreen extends StatelessWidget {
                             ),
                           ],
                         ),
+                        if (p.reincarnationCount > 0) ...[
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Divider(height: 1, color: Color(0x331B2538)),
+                          ),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.autorenew_rounded,
+                                size: 40,
+                                color: Color(0xFF7B2CBF),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '🌟 윤회 초월 단련 (${p.transcendenceLevel}단 · 총 화력/결계 ×${p.transcendenceMultiplier.toStringAsFixed(2)}배)',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15.0,
+                                        color: NightPalette.hanjiInk,
+                                      ),
+                                    ),
+                                    Text(
+                                      '제${p.reincarnationCount}환생(난이도 ×${p.reincarnationDifficultyMultiplier.round()}배) 마기를 제압하기 위한 초월 승수 단련',
+                                      style: const TextStyle(
+                                        fontSize: 12.2,
+                                        color: NightPalette.hanjiSubInk,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton(
+                                key: const Key('upgrade_transcendence_btn'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF3C096C),
+                                  foregroundColor: NightPalette.accentGold,
+                                  disabledBackgroundColor:
+                                      const Color(0x241F2B42),
+                                  disabledForegroundColor:
+                                      const Color(0x9E1F2B42),
+                                ),
+                                onPressed: p.tokens >=
+                                            p.transcendenceTokenCost &&
+                                        p.elixirs >= p.transcendenceElixirCost
+                                    ? controller.upgradeTranscendence
+                                    : null,
+                                child: Text(
+                                  '증표${p.transcendenceTokenCost}·영약${p.transcendenceElixirCost}',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1699,8 +1757,8 @@ class UpgradeScreen extends StatelessWidget {
                             Builder(
                               builder: (_) {
                                 final chOpen =
-                                    p.highestUnlockedChapter >= b.unlockChapter;
-                                final canBuy = lv < 10 &&
+                                    p.effectiveArsenalChapter >= b.unlockChapter;
+                                final canBuy = lv < p.maxAllyLevel &&
                                     p.elixirs >= cost &&
                                     (lv > 0 || chOpen);
                                 return FilledButton(
@@ -1708,7 +1766,7 @@ class UpgradeScreen extends StatelessWidget {
                                       ? () => controller.upgradeBeast(b)
                                       : null,
                                   child: Text(
-                                    lv >= 10
+                                    lv >= p.maxAllyLevel
                                         ? '최고단계'
                                         : (lv == 0
                                             ? (chOpen
@@ -1763,7 +1821,7 @@ class UpgradeScreen extends StatelessWidget {
                             lv == 0 ? h.unlockElixirs : h.upgradeElixirCost(lv);
                         final canAcquire = lv > 0 ||
                             (h.unlockElixirs > 0 &&
-                                p.highestUnlockedChapter >= h.unlockChapter);
+                                p.effectiveArsenalChapter >= h.unlockChapter);
                         return Row(
                           children: [
                             NightSpriteIcon(
@@ -1803,14 +1861,17 @@ class UpgradeScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             FilledButton(
-                              onPressed:
-                                  (canAcquire && lv < 10 && p.elixirs >= cost)
-                                      ? () => controller.upgradeCompanion(h)
-                                      : null,
+                              onPressed: (canAcquire &&
+                                      lv < p.maxAllyLevel &&
+                                      p.elixirs >= cost)
+                                  ? () => controller.upgradeCompanion(h)
+                                  : null,
                               child: Text(
                                 !canAcquire
                                     ? '${h.unlockChapter}장 개방'
-                                    : (lv >= 10 ? '최고' : '영약 $cost'),
+                                    : (lv >= p.maxAllyLevel
+                                        ? '최고'
+                                        : '영약 $cost'),
                               ),
                             ),
                           ],

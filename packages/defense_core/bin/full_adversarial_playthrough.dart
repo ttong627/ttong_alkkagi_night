@@ -90,7 +90,7 @@ void _configureSmartLoadoutForStage(
   final chSpec = CampaignCatalog.chapterOf(stage.chapterNumber);
   for (int i = 0; i < chSpec.mounts.length && i < preset.mountTypes.length; i++) {
     final rec = chSpec.mounts[i].recommendedType;
-    if (rec.unlockChapter <= p.highestUnlockedChapter) {
+    if (rec.unlockChapter <= p.effectiveArsenalChapter) {
       preset.mountTypes[i] = rec;
     }
   }
@@ -156,10 +156,10 @@ void _runBetweenBattleGrowth(
   while (p.breakthroughRealm()) {}
 
   p.claimAllReadyRewards(rng, todayKey: todayKey, autoRedispatch: true);
-  if (p.highestUnlockedChapter >= 2 && !p.convoyActive && p.convoyBattlesRemaining == 0) {
+  if (p.effectiveArsenalChapter >= 2 && !p.convoyActive && p.convoyBattlesRemaining == 0) {
     p.startSupplyConvoy();
   }
-  if (p.highestUnlockedChapter >= 4 && !p.exploreActive && p.exploreBattlesRemaining == 0) {
+  if (p.effectiveArsenalChapter >= 4 && !p.exploreActive && p.exploreBattlesRemaining == 0) {
     p.startNightExplore();
   }
 

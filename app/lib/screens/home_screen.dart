@@ -341,7 +341,9 @@ class _HomeScreenState extends State<HomeScreen>
                                       ),
                                     ),
                                     Text(
-                                      '경지 [${p.realm.name}] · ${p.highestClearedGlobalStage}/${CampaignCatalog.allStages.length}판(10현) · 영웅 ${p.unlockedCompanionCount}/14 · 신수 ${p.unlockedBeastCount}/5',
+                                      p.reincarnationCount > 0
+                                          ? '☯️제${p.reincarnationCount}환생(×${p.reincarnationDifficultyMultiplier.round()}배) · 경지 [${p.realm.name}] · ${p.highestClearedGlobalStage}/${CampaignCatalog.allStages.length}판 · 영웅 ${p.unlockedCompanionCount}/14'
+                                          : '경지 [${p.realm.name}] · ${p.highestClearedGlobalStage}/${CampaignCatalog.allStages.length}판(10현) · 영웅 ${p.unlockedCompanionCount}/14 · 신수 ${p.unlockedBeastCount}/5',
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 11.2,
@@ -400,6 +402,17 @@ class _HomeScreenState extends State<HomeScreen>
                             scrollDirection: Axis.horizontal,
                             child: Row(
                               children: [
+                                if (p.reincarnationCount > 0) ...[
+                                  ResourcePill(
+                                    key: const Key('home_reincarnation_pill'),
+                                    icon: Icons.autorenew_rounded,
+                                    label: '제${p.reincarnationCount}환생',
+                                    value:
+                                        '×${p.reincarnationDifficultyMultiplier.round()}배',
+                                    color: NightPalette.elixirPurple,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
                                 ResourcePill(
                                   iconAsset: NightArtRegistry.nightToken,
                                   icon: Icons.toll_rounded,
@@ -505,6 +518,16 @@ class _HomeScreenState extends State<HomeScreen>
                         onBatchClaimAll: _handleBatchClaimAll,
                         artHeight: isWide ? 186 : 124,
                       ),
+                      if (p.canPerformReincarnation ||
+                          p.canChallengeReincarnationBoss ||
+                          p.highestClearedGlobalStage >=
+                              CampaignCatalog.allStages.length ||
+                          p.reincarnationCount > 0) ...[
+                        const SizedBox(height: 10),
+                        _ReincarnationSanctumCard(
+                          controller: widget.controller,
+                        ),
+                      ],
                       const SizedBox(height: 10),
 
                       // 3) 제2 받침 묶음: 성채 앞 영웅 대 변이 교전 디오라마 + 실전 전각 카드 6종 통합 석판
@@ -1707,5 +1730,268 @@ class _FacilityCardMatrix extends StatelessWidget {
       rows.add(Row(children: slice));
     }
     return Column(children: rows);
+  }
+}
+
+/// 본영 윤회 최종 보스전(<5%) · 무한 다회차 3배 환생 등선 제단 카드.
+class _ReincarnationSanctumCard extends StatelessWidget {
+  const _ReincarnationSanctumCard({required this.controller});
+
+  final GameController controller;
+
+  Future<void> _confirmAndReincarnate(BuildContext context) async {
+    final p = controller.progress;
+    final nextN = p.reincarnationCount + 1;
+    final nextMult = (p.reincarnationDifficultyMultiplier * 3).round();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        backgroundColor: NightPalette.bgPanel,
+        title: Text(
+          '☯️ 제$nextN환생 등선 의식 실행',
+          style: const TextStyle(
+            color: NightPalette.accentGold,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          '지금까지 단련한 모든 능력치(내공 경지·십대 경맥·수호탑·5발사대·13수호석·14동료·5영수·신기연마·영기공명·재화)가 100% 그대로 유지된 채 제1현 1-1 마을부터 새롭게 시작합니다!\n\n'
+          '• 전 난이도 적 전력: 기존 대비 3배 상승 (누적 ×$nextMult배)\n'
+          '• 영구 증표·영약 보상: ×$nextMult배 증폭 + 윤회 초월 단련 개방\n'
+          '• 등선 축하 군수품: 지원패 +3개 · 전술 비약 각 +2개 지급',
+          style: const TextStyle(fontSize: 13.5, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dCtx).pop(false),
+            child: const Text('잠시 보류'),
+          ),
+          FilledButton(
+            key: const Key('home_confirm_reincarnation_btn'),
+            style: FilledButton.styleFrom(
+              backgroundColor: NightPalette.accentGold,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () => Navigator.of(dCtx).pop(true),
+            child: Text('제$nextN환생 등선!'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      controller.performReincarnation();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            backgroundColor: NightPalette.bgCard,
+            content: Text(
+              '☯️ 제$nextN환생 완료! 모든 능력치를 유지한 채 1-1(난이도 ×$nextMult배)에서 새로운 수호를 시작합니다!',
+              style: const TextStyle(color: NightPalette.accentGold),
+            ),
+          ),
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = controller.progress;
+    final nextN = p.reincarnationCount + 1;
+    final nextMult = (p.reincarnationDifficultyMultiplier * 3).round();
+
+    final bool readyReinc = p.canPerformReincarnation;
+    final bool readyBoss = p.canChallengeReincarnationBoss;
+    final bool all100Done =
+        p.highestClearedGlobalStage >= CampaignCatalog.allStages.length;
+
+    final String headline;
+    final String desc;
+    if (readyReinc) {
+      headline =
+          '☯️ 【제$nextN환생 등선 개방!】 능력치 100% 계승 · 1-1 재출발 (난이도 ×$nextMult배)';
+      desc =
+          '5% 미만의 【윤회 최종 보스전】을 제패했습니다! 기존 능력치를 모두 품고 3배 강해진 새 차원으로 환생하세요.';
+    } else if (readyBoss) {
+      headline =
+          '🔥 【윤회 최종 보스전 개방】 태초 심연 마제 · 무극혼돈신 (성공률 <5% · 도전 ${p.reincarnationBossAttempts}회)';
+      desc =
+          '악몽 10현 돌파자 전용 10물결 종결전! 패배해도 지원패·비약이 보존됩니다. 토벌 시 제$nextN환생(×$nextMult배)이 열립니다!';
+    } else if (all100Done) {
+      headline =
+          '⚡ [악몽] 제10현 최종 결전(10-10) 정화 시 【윤회 최종 보스전(<5%)】 & 【환생】 개방!';
+      desc =
+          '현재 100판을 정화했습니다. [악몽] 난이도로 10-10을 깨면 최종 보스전과 능력치 계승 제$nextN환생(×$nextMult배)에 도전할 수 있습니다!';
+    } else {
+      headline =
+          '☯️ 제${p.reincarnationCount}환생 수호 대장정 진행 중 (전 난이도 ×${p.reincarnationDifficultyMultiplier.round()}배 · 보상 ×${p.reincarnationRewardMultiplier.round()}배)';
+      desc =
+          '강해진 능력치에 맞춰 전 관문이 ×${p.reincarnationDifficultyMultiplier.round()}배 격상되었습니다! 윤회 초월 단련(${p.transcendenceLevel}단)을 쌓아 악몽 10현과 차기 환생에 도전하세요.';
+    }
+
+    return Container(
+      key: const Key('home_reincarnation_sanctum_card'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: readyReinc
+              ? const [Color(0xFF133B35), Color(0xFF2B1E4E)]
+              : (readyBoss
+                  ? const [Color(0xFF3E1424), Color(0xFF1E2742)]
+                  : const [Color(0xFF241B3E), Color(0xFF17273E)]),
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: readyReinc
+              ? NightPalette.jadeGreen
+              : (readyBoss
+                  ? NightPalette.crimsonMoon
+                  : NightPalette.accentGold),
+          width: 2.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                readyReinc
+                    ? Icons.autorenew_rounded
+                    : (readyBoss
+                        ? Icons.whatshot_rounded
+                        : Icons.auto_awesome_rounded),
+                color: readyReinc
+                    ? NightPalette.jadeGreen
+                    : NightPalette.accentGold,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      headline,
+                      style: const TextStyle(
+                        fontFamily: 'BlackHanSans',
+                        fontSize: 14.5,
+                        color: NightPalette.accentGold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      desc,
+                      style: const TextStyle(
+                        fontSize: 12.0,
+                        color: NightPalette.textPrimary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (readyReinc || readyBoss || all100Done || p.reincarnationCount > 0) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.end,
+              children: [
+                if (p.reincarnationCount > 0 &&
+                    p.tokens >= p.transcendenceTokenCost &&
+                    p.elixirs >= p.transcendenceElixirCost)
+                  OutlinedButton.icon(
+                    key: const Key('home_quick_transcendence_btn'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: NightPalette.jadeGreen,
+                      side: const BorderSide(color: NightPalette.jadeGreen),
+                    ),
+                    onPressed: () {
+                      if (controller.upgradeTranscendence()) {
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '🌟 윤회 초월 단련 ${p.transcendenceLevel}단 돌파! (총 화력·결계 ×${p.transcendenceMultiplier.toStringAsFixed(2)}배)',
+                              ),
+                            ),
+                          );
+                      }
+                    },
+                    icon: const Icon(Icons.bolt_rounded, size: 17),
+                    label: Text(
+                      '윤회 초월 단련 (${p.transcendenceLevel}➔${p.transcendenceLevel + 1}단)',
+                    ),
+                  ),
+                if (readyBoss)
+                  FilledButton.icon(
+                    key: const Key('home_reincarnation_boss_btn'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NightPalette.crimsonMoon,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      final bossStage = controller.buildReincarnationBossStage();
+                      controller.setDifficulty(DefenseDifficulty.nightmare);
+                      Navigator.of(context).push(
+                        buildSmoothBattleRoute(
+                          controller: controller,
+                          stage: bossStage,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.whatshot_rounded, size: 18),
+                    label: Text(
+                      readyReinc ? '최종 보스 재도전 (<5%)' : '⚔️ 윤회 최종 보스전 출정! (<5%)',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                if (!readyBoss && all100Done)
+                  FilledButton.icon(
+                    key: const Key('home_nightmare_10_10_btn'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NightPalette.crimsonMoon,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      controller.setDifficulty(DefenseDifficulty.nightmare);
+                      controller.setSelectedChapter(10);
+                      Navigator.of(context).push(
+                        buildSmoothBattleRoute(
+                          controller: controller,
+                          stage: CampaignCatalog.allStages.last,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.local_fire_department_rounded, size: 18),
+                    label: const Text(
+                      '🔥 악몽 10-10 즉시 도전',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                if (readyReinc)
+                  FilledButton.icon(
+                    key: const Key('home_reincarnate_btn'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NightPalette.jadeGreen,
+                      foregroundColor: Colors.black,
+                    ),
+                    onPressed: () => _confirmAndReincarnate(context),
+                    icon: const Icon(Icons.autorenew_rounded, size: 18),
+                    label: Text(
+                      '☯️ 제$nextN환생 실행 (×$nextMult배!)',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

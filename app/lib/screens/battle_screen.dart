@@ -458,7 +458,8 @@ class _BattleScreenState extends State<BattleScreen>
                     ),
                   if (summary.victory &&
                       widget.stage.chapterNumber == 10 &&
-                      widget.stage.stageNumber == 10) ...[
+                      widget.stage.stageNumber == 10 &&
+                      !widget.stage.isReincarnationBossStage) ...[
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -475,27 +476,165 @@ class _BattleScreenState extends State<BattleScreen>
                           width: 2.0,
                         ),
                       ),
-                      child: const Column(
+                      child: Column(
                         children: [
                           Text(
-                            '🏆 열 마을 완전 정화 · 태극석 귀향 대단원 달성!',
+                            widget.controller.selectedDifficulty ==
+                                    DefenseDifficulty.nightmare
+                                ? '🔥 악몽 10현 완전 정화 · 【윤회 최종 보스전(<5%)】 개방!'
+                                : '🏆 열 마을 완전 정화 · 태극석 귀향 대단원 달성!',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontFamily: 'BlackHanSans',
                               fontSize: 16.5,
                               color: NightPalette.accentGold,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            '오염된 태초 탄신의 삼중 마갑을 깨뜨리고 강호 열 마을의 평화를 되찾았습니다! 이제 100물결 무한 혈전에서 진법의 극한에 도전해보세요.',
+                            widget.controller.selectedDifficulty ==
+                                    DefenseDifficulty.nightmare
+                                ? '악몽 난이도 제10현을 정복하여 성공 확률 5% 미만의 【윤회 심판전 · 무극혼돈신】 도전 자격이 열렸습니다! 토벌 시 모든 능력치를 유지한 채 3배 강해진 새 강호로 환생할 수 있습니다!'
+                                : '오염된 태초 탄신의 삼중 마갑을 깨뜨리고 평화를 되찾았습니다! [악몽] 난이도로 제10현 최종 결전(10-10)을 돌파하면 【윤회 최종 보스전(<5%)】과 【환생】이 개방됩니다.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12.5,
                               color: NightPalette.textPrimary,
                               height: 1.38,
                             ),
                           ),
+                          if (widget.controller.progress
+                              .canChallengeReincarnationBoss) ...[
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                key: const Key(
+                                    'victory_go_reincarnation_boss_btn'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: NightPalette.crimsonMoon,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () {
+                                  if (modalHandled) return;
+                                  modalHandled = true;
+                                  Navigator.of(ctx).pop();
+                                  _handedOffBgm = true;
+                                  final bossStage = widget.controller
+                                      .buildReincarnationBossStage();
+                                  Navigator.of(context).pushReplacement(
+                                    buildSmoothBattleRoute(
+                                      controller: widget.controller,
+                                      stage: bossStage,
+                                      previousStage: widget.stage,
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.whatshot_rounded),
+                                label: const Text(
+                                  '⚔️ 지금 바로 【윤회 최종 보스전(성공률 <5%)】 도전!',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (widget.stage.isReincarnationBossStage) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      key: const Key('reincarnation_boss_result_banner'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: summary.victory
+                              ? const [Color(0xFF143D37), Color(0xFF2E2252)]
+                              : const [Color(0xFF3D1322), Color(0xFF1A2238)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: summary.victory
+                              ? NightPalette.jadeGreen
+                              : NightPalette.crimsonMoon,
+                          width: 2.0,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            summary.victory
+                                ? '☯️ 5% 미만의 기적 돌파! 무극혼돈신 토벌 · 환생 개방!'
+                                : '💀 윤회 심판전 패배 (누적 도전 ${widget.controller.progress.reincarnationBossAttempts}회 · 돌파 확률 <5%)',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'BlackHanSans',
+                              fontSize: 16.0,
+                              color: summary.victory
+                                  ? NightPalette.jadeGreen
+                                  : NightPalette.accentGold,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            summary.victory
+                                ? '기존의 모든 능력치·동료·영수·수호석·재화를 100% 그대로 계승한 채 1-1부터 다시 출발하되, 전 난이도가 기존 대비 3배(누적 ×${(widget.controller.progress.reincarnationDifficultyMultiplier * 3).round()}배) 상승합니다!'
+                                : '성공 확률 5% 미만의 극한 결전입니다! 패배해도 보유 지원패와 전술 비약은 차감되지 않고 100% 보존되었으니, 비급·돌림판·약점 저격 기연을 노려 즉시 재도전하세요!',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 12.4,
+                              color: NightPalette.textPrimary,
+                              height: 1.38,
+                            ),
+                          ),
+                          if (summary.victory &&
+                              widget.controller.progress
+                                  .canPerformReincarnation) ...[
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                key: const Key(
+                                    'victory_perform_reincarnation_btn'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: NightPalette.jadeGreen,
+                                  foregroundColor: Colors.black,
+                                ),
+                                onPressed: () {
+                                  if (modalHandled) return;
+                                  modalHandled = true;
+                                  final nextN = widget.controller.progress
+                                          .reincarnationCount +
+                                      1;
+                                  final nextMult = (widget.controller.progress
+                                              .reincarnationDifficultyMultiplier *
+                                          3)
+                                      .round();
+                                  widget.controller.performReincarnation();
+                                  Navigator.of(ctx).pop();
+                                  Navigator.of(context).pop();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '☯️ 제$nextN환생 완료! 전 능력치를 유지한 채 1-1(난이도 ×$nextMult배)에서 새 여정을 시작합니다!',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.autorenew_rounded),
+                                label: Text(
+                                  '☯️ 지금 바로 제${widget.controller.progress.reincarnationCount + 1}환생 실행 (×${(widget.controller.progress.reincarnationDifficultyMultiplier * 3).round()}배!)',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -889,6 +1028,7 @@ class _BattleScreenState extends State<BattleScreen>
                             } else if (summary.victory &&
                                 ((widget.stage.chapterNumber == 10 &&
                                         widget.stage.stageNumber == 10) ||
+                                    widget.stage.isReincarnationBossStage ||
                                     widget.stage.globalIndex >= 900)) {
                               Navigator.of(context).pop();
                             } else {
@@ -899,6 +1039,7 @@ class _BattleScreenState extends State<BattleScreen>
                             summary.victory
                                 ? ((widget.stage.chapterNumber == 10 &&
                                             widget.stage.stageNumber == 10) ||
+                                        widget.stage.isReincarnationBossStage ||
                                         widget.stage.globalIndex >= 900
                                     ? Icons.emoji_events_rounded
                                     : (widget.stage.stageNumber == 10
@@ -915,13 +1056,17 @@ class _BattleScreenState extends State<BattleScreen>
                                     ? '🎬 제${widget.stage.chapterNumber + 1}현 대행군 출발!'
                                     : '다음 마을 진군 (${CampaignCatalog.allStages[widget.stage.globalIndex].code})')
                                 : (summary.victory &&
-                                        widget.stage.globalIndex >= 900
-                                    ? '🏆 100물결 제패 · 본영 금의환향'
+                                        widget.stage.isReincarnationBossStage
+                                    ? '☯️ 윤회 심판 정복 · 본영 복귀'
                                     : (summary.victory &&
-                                            widget.stage.chapterNumber == 10 &&
-                                            widget.stage.stageNumber == 10
-                                        ? '🌅 100판 완승 · 본영 금의환향'
-                                        : '다시 도전하기')),
+                                            widget.stage.globalIndex >= 900
+                                        ? '🏆 100물결 제패 · 본영 금의환향'
+                                        : (summary.victory &&
+                                                widget.stage.chapterNumber ==
+                                                    10 &&
+                                                widget.stage.stageNumber == 10
+                                            ? '🌅 100판 완승 · 본영 금의환향'
+                                            : '다시 도전하기'))),
                           ),
                         ),
                       ),
@@ -1022,7 +1167,7 @@ class _BattleScreenState extends State<BattleScreen>
                           const SizedBox(width: 2),
                           Expanded(
                             child: Text(
-                              '${widget.stage.title} · 🌊${_sim.currentWaveIndex + 1}/${widget.stage.waves.length}',
+                              '${widget.controller.progress.reincarnationCount > 0 ? "[☯️${widget.controller.progress.reincarnationCount}환생 ×${widget.controller.progress.reincarnationDifficultyMultiplier.round()}배] " : ""}${widget.stage.title} · 🌊${_sim.currentWaveIndex + 1}/${widget.stage.waves.length}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(

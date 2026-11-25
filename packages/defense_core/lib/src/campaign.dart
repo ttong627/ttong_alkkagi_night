@@ -370,7 +370,13 @@ class StageSpec {
     return '';
   }
 
-  String get code => '$chapterNumber-$stageNumber';
+  String get code =>
+      globalIndex == CampaignCatalog.reincarnationBossGlobalIndex
+          ? '윤회결전'
+          : '$chapterNumber-$stageNumber';
+
+  bool get isReincarnationBossStage =>
+      globalIndex == CampaignCatalog.reincarnationBossGlobalIndex;
 }
 
 /// 각 장(1~10장) 명세 — 코덱스 10종 완전 차별화 맵 원화(도로·다리·석조 좌대·수호 제단·마을 건물) 1:1 픽셀 보정 및 장별 고유 특색 정의.
@@ -997,6 +1003,7 @@ class ChapterSpec {
 class CampaignCatalog {
   static const double arenaWidth = 720.0;
   static const double arenaHeight = 1360.0;
+  static const int reincarnationBossGlobalIndex = 888;
 
   /// 기본 수호 제단 및 결계 기준 상수 (실제 전투에서는 각 장의 `chapter.towerPos`를 1:1로 사용!).
   static const Vec2 centralTowerPos = Vec2(360.0, 885.0);
@@ -2809,6 +2816,224 @@ class CampaignCatalog {
       }
     }
     return null;
+  }
+
+  /// 악몽 10현(10-10) 완전 정화 시 개방되는 【윤회 심판전】 최종 보스 결전 (성공 확률 5% 미만 극한 레이드 · 승리 시 차기 환생 개방!).
+  static StageSpec buildReincarnationFinalBossStage({int reincarnationCount = 0}) {
+    final ch10 = chapterOf(10);
+    final laneCount = ch10.lanes.length;
+    final cycleLabel = reincarnationCount <= 0
+        ? '초회차 윤회 심판'
+        : '제$reincarnationCount환생(×${math.pow(3, reincarnationCount).round()}배) 윤회 심판';
+    return StageSpec(
+      chapterNumber: 10,
+      stageNumber: 11,
+      globalIndex: reincarnationBossGlobalIndex,
+      villageNodeName: '무극 혼돈 심연단',
+      villageMapCoord: ch10.villageMapCoordAt(10),
+      title: reincarnationCount <= 0
+          ? '【윤회 심판전】 태초 심연 마제 · 무극혼돈신'
+          : '【제${reincarnationCount + 1}윤회 심판전】 무극혼돈신 (×${math.pow(3, reincarnationCount).round()}배)',
+      subtitle:
+          '$cycleLabel · 성공 확률 5% 미만 극한 10물결 결전 · 격파 시 능력치 100% 계승 환생(난이도 ×3배 상승) 개방!',
+      tacticalHint:
+          '돌파 성공률 5% 미만의 신역 심판입니다! 14곳 전 초소 개척·연성 합체·실시간 4종 강화·돌파 비급·기연 돌림판·약점 저격·비약·지원패 출두가 모두 맞물려야 3,200타 혼돈 마갑을 파쇄할 수 있습니다! (패배 재도전 시 지원패·비약 자동 보존)',
+      recommendedStone: StoneMaterial.taegeuk,
+      recommendedLaunchers: const [
+        LauncherType.qiAmplifier,
+        LauncherType.heavy,
+        LauncherType.frostField,
+        LauncherType.curveSpin,
+        LauncherType.rapid,
+      ],
+      startingFieldTokens: 150,
+      clearElixirBonus: 24,
+      isBossStage: true,
+      maxMountCount: 14,
+      waves: _buildReincarnationFinalBossWaves(laneCount, reincarnationCount),
+      introDialogue: [
+        const StoryLine(
+          speaker: '무극혼돈신',
+          portraitPrefix: 'tansin',
+          text: '필멸의 수호자여… 악몽에 잠긴 열 현을 정화한 것만으로 윤회의 사슬을 끊을 수 있다 믿었느냐! 백에 다섯도 넘지 못하는 심연의 심판을 견뎌 보아라!!',
+        ),
+        StoryLine(
+          speaker: '묵현',
+          portraitPrefix: 'mukhyeon',
+          text: '14곳 성좌 초소를 모두 깨우고 연성 신기와 어기어석·출두 기연까지 한 치 오차 없이 터뜨려야 한다! 이 결전을 넘으면 모든 내공과 동료를 간직한 채 더 높은 차원으로 환생할 수 있다!',
+        ),
+      ],
+      outroDialogue: [
+        const StoryLine(
+          speaker: '태초 탄신',
+          portraitPrefix: 'tansin',
+          text: '경이롭도다… 실로 5% 미만의 바늘구멍 같은 천기를 뚫고 무극의 혼돈 마갑을 산산이 부수었구나! 이제 윤회의 문이 열렸으니, 그대의 모든 무공을 품고 새로운 차원으로 등선하라!',
+        ),
+        StoryLine(
+          speaker: '청명',
+          portraitPrefix: 'cheongmyeong',
+          text: '해냈습니다!! 이제 본영과 캠페인에서 【제${reincarnationCount + 1}환생】 의식을 거행해 모든 능력치를 그대로 유지한 채 3배 강해진 새 강호(1-1)로 나아갈 수 있습니다!',
+        ),
+      ],
+    );
+  }
+
+  static List<List<WaveSpawnGroup>> _buildReincarnationFinalBossWaves(
+    int laneCount,
+    int reincarnationCount,
+  ) {
+    final shieldMult = 1.0 + reincarnationCount * 0.38;
+    int sh(int base) => (base * shieldMult).round();
+    return [
+      [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 88, laneIndex: 0, intervalSec: 0.20),
+        WaveSpawnGroup(kind: MutantKind.bloodWingBat, count: 28, laneIndex: 1 % laneCount, intervalSec: 0.34),
+        WaveSpawnGroup(kind: MutantKind.shieldYacha, count: 16, laneIndex: laneCount - 1, intervalSec: 0.72),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 96, laneIndex: 1 % laneCount, intervalSec: 0.19),
+        WaveSpawnGroup(kind: MutantKind.ironBoar, count: 16, laneIndex: 2 % laneCount, intervalSec: 0.78),
+        WaveSpawnGroup(
+          kind: MutantKind.swiftShadowBoss,
+          count: 1,
+          laneIndex: 0,
+          intervalSec: 1.5,
+          customBossTitle: '심연 선봉장 · 무극 질풍귀',
+          customHitShield: sh(360),
+          hierarchyRank: '심판 선봉장',
+        ),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.sickHound, count: 52, laneIndex: 0, intervalSec: 0.24),
+        WaveSpawnGroup(kind: MutantKind.bloodWingBat, count: 32, laneIndex: 2 % laneCount, intervalSec: 0.32),
+        WaveSpawnGroup(kind: MutantKind.plagueToad, count: 16, laneIndex: 1 % laneCount, intervalSec: 0.74),
+        WaveSpawnGroup(
+          kind: MutantKind.abyssalGargoyle,
+          count: 1,
+          laneIndex: (laneCount - 1),
+          intervalSec: 1.5,
+          customBossTitle: '심연 창공장 · 흑익 마룡귀',
+          customHitShield: sh(440),
+          hierarchyRank: '공중 행동대장',
+        ),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 104, laneIndex: 2 % laneCount, intervalSec: 0.18),
+        WaveSpawnGroup(kind: MutantKind.shieldYacha, count: 18, laneIndex: 0, intervalSec: 0.68),
+        WaveSpawnGroup(
+          kind: MutantKind.ironColossusBoss,
+          count: 1,
+          laneIndex: 1 % laneCount,
+          intervalSec: 1.5,
+          customBossTitle: '심연 수문장 · 태고 현철거신',
+          customHitShield: sh(620),
+          hierarchyRank: '중간보스',
+        ),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.sickHound, count: 58, laneIndex: 1 % laneCount, intervalSec: 0.22),
+        WaveSpawnGroup(kind: MutantKind.ironBoar, count: 18, laneIndex: 0, intervalSec: 0.72),
+        WaveSpawnGroup(
+          kind: MutantKind.crimsonBreakerBoss,
+          count: 1,
+          laneIndex: 2 % laneCount,
+          intervalSec: 1.5,
+          customBossTitle: '심연 파성왕 · 적멸 마염귀',
+          customHitShield: sh(740),
+          hierarchyRank: '중간보스',
+        ),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 112, laneIndex: 0, intervalSec: 0.17),
+        WaveSpawnGroup(kind: MutantKind.bloodWingBat, count: 36, laneIndex: 1 % laneCount, intervalSec: 0.30),
+        WaveSpawnGroup(kind: MutantKind.plagueToad, count: 18, laneIndex: 2 % laneCount, intervalSec: 0.70),
+        WaveSpawnGroup(
+          kind: MutantKind.raiderHeukpung,
+          count: 1,
+          laneIndex: laneCount ~/ 2,
+          intervalSec: 1.6,
+          customBossTitle: '혼돈에 잠식된 패왕 흑풍',
+          customPortrait: 'budumok',
+          customHitShield: sh(920),
+          hierarchyRank: '중간보스',
+        ),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.sickHound, count: 64, laneIndex: 2 % laneCount, intervalSec: 0.21),
+        WaveSpawnGroup(kind: MutantKind.shieldYacha, count: 20, laneIndex: 1 % laneCount, intervalSec: 0.66),
+        WaveSpawnGroup(
+          kind: MutantKind.abyssalGargoyle,
+          count: 2,
+          laneIndex: 0,
+          intervalSec: 2.2,
+          customBossTitle: '쌍두 심연 철익귀',
+          customHitShield: sh(580),
+          hierarchyRank: '공중 행동대장',
+        ),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 118, laneIndex: 1 % laneCount, intervalSec: 0.16),
+        WaveSpawnGroup(kind: MutantKind.ironBoar, count: 20, laneIndex: 0, intervalSec: 0.68),
+        WaveSpawnGroup(
+          kind: MutantKind.chapterOverlord,
+          count: 1,
+          laneIndex: laneCount ~/ 2,
+          intervalSec: 2.0,
+          customBossTitle: '심연 선구자 · 구천 마제 환영',
+          customPortrait: 'maengju',
+          customHitShield: sh(1550),
+          hierarchyRank: '장 보스',
+        ),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.sickHound, count: 72, laneIndex: 0, intervalSec: 0.19),
+        WaveSpawnGroup(kind: MutantKind.bloodWingBat, count: 40, laneIndex: 2 % laneCount, intervalSec: 0.28),
+        WaveSpawnGroup(kind: MutantKind.plagueToad, count: 20, laneIndex: 1 % laneCount, intervalSec: 0.66),
+        WaveSpawnGroup(
+          kind: MutantKind.ironColossusBoss,
+          count: 1,
+          laneIndex: 0,
+          intervalSec: 1.5,
+          customBossTitle: '혼돈 좌호법 · 불멸 금강마신',
+          customHitShield: sh(980),
+          hierarchyRank: '친위 보스',
+        ),
+        WaveSpawnGroup(
+          kind: MutantKind.crimsonBreakerBoss,
+          count: 1,
+          laneIndex: (laneCount - 1),
+          intervalSec: 1.8,
+          customBossTitle: '혼돈 우호법 · 업화 파천마신',
+          customHitShield: sh(980),
+          hierarchyRank: '친위 보스',
+        ),
+      ],
+      [
+        WaveSpawnGroup(kind: MutantKind.swarmRat, count: 128, laneIndex: 0, intervalSec: 0.15),
+        WaveSpawnGroup(kind: MutantKind.bloodWingBat, count: 44, laneIndex: 1 % laneCount, intervalSec: 0.26),
+        WaveSpawnGroup(kind: MutantKind.ironBoar, count: 22, laneIndex: 2 % laneCount, intervalSec: 0.65),
+        WaveSpawnGroup(kind: MutantKind.shieldYacha, count: 22, laneIndex: (laneCount - 1), intervalSec: 0.65),
+        WaveSpawnGroup(
+          kind: MutantKind.swiftShadowBoss,
+          count: 1,
+          laneIndex: 0,
+          intervalSec: 1.4,
+          customBossTitle: '무극 호위 · 섬광 암살왕',
+          customHitShield: sh(860),
+          hierarchyRank: '친위 보스',
+        ),
+        WaveSpawnGroup(
+          kind: MutantKind.chapterOverlord,
+          count: 1,
+          laneIndex: laneCount ~/ 2,
+          intervalSec: 2.2,
+          customBossTitle: '태초 심연 마제 · 무극혼돈신',
+          customPortrait: 'tansin',
+          customHitShield: sh(3200),
+          hierarchyRank: '윤회 최종 보스',
+        ),
+      ],
+    ];
   }
 
   /// 제1현~제9현 정화 완료 시 다음 현으로 대행군하는 9종 시네마틱 여정 카탈로그.

@@ -436,6 +436,12 @@ class PlayerProgress {
     this.bestEndlessWave = 0,
     this.forgeMasteryLevel = 0,
     this.elixirResonanceLevel = 0,
+    this.reincarnationCount = 0,
+    this.nightmareChapter10Cleared = false,
+    this.reincarnationBossCleared = false,
+    this.reincarnationBossAttempts = 0,
+    this.reincarnationBossWins = 0,
+    this.transcendenceLevel = 0,
     this.tutorialSeen = false,
     this.bgmVolume = 0.38,
     this.sfxVolume = 0.72,
@@ -579,6 +585,24 @@ class PlayerProgress {
   int bestEndlessWave;
   int forgeMasteryLevel;
   int elixirResonanceLevel;
+
+  /// 누적 환생(윤회 등선) 횟수 (0 = 초회차, 1 = 제1환생 ×3배, 2 = 제2환생 ×9배, k = ×3^k배 무한 상승!).
+  int reincarnationCount;
+
+  /// 현재 회차에서 [악몽] 난이도 제10현 최종 결전(10-10)을 정화했는지 여부.
+  bool nightmareChapter10Cleared;
+
+  /// 현재 회차에서 【윤회 최종 보스전】(성공 확률 <5%)을 격파해 환생 자격이 열렸는지 여부.
+  bool reincarnationBossCleared;
+
+  /// 누적 윤회 최종 보스전 도전 및 토벌 횟수.
+  int reincarnationBossAttempts;
+  int reincarnationBossWins;
+
+  /// 환생자(reincarnationCount > 0) 전용 「윤회 초월 단련」 단계 — 환생 직후 능력치는 기존과 100% 동일하게 유지되며,
+  /// 환생 후 높아진 3^k배 전장에서 획득한 증표·영약으로 초월 단련을 쌓아 다음 환생까지 무한 성장한다!
+  int transcendenceLevel;
+
   bool tutorialSeen;
   double bgmVolume;
   double sfxVolume;
@@ -625,11 +649,90 @@ class PlayerProgress {
     return CampaignCatalog.allStages[nextGlobal - 1].chapterNumber;
   }
 
-  bool isStageUnlocked(StageSpec stage) => stage.globalIndex <= highestClearedGlobalStage + 1;
+  /// 무구·발사대·수호석·동료·영수·호송·탐색 개방 기준 장 번호:
+  /// 환생(reincarnationCount > 0) 후 1-1부터 새로 행군할 때도 기존에 열었던 전 10현 무구·동료·영수·호송을 100% 그대로 사용할 수 있다!
+  int get effectiveArsenalChapter =>
+      reincarnationCount > 0 ? 10 : highestUnlockedChapter;
+
+  /// 영수·동료 최대 단련 상한 (초회차 10단, 환생마다 +10단씩 확장되어 다회차 환생에서도 영약 성장이 계속 이어짐!).
+  int get maxAllyLevel => (10 + reincarnationCount * 10).clamp(10, 999);
+
+  /// 누적 환생 횟수에 따른 전 난이도 배율 (1환생 = 3배, 2환생 = 9배, 3환생 = 27배, k환생 = 3^k배!).
+  double get reincarnationDifficultyMultiplier =>
+      reincarnationCount <= 0 ? 1.0 : pow(3.0, reincarnationCount).toDouble();
+
+  /// 환생 회차에 비례하는 영구 재화(증표·영약·내공·수련인장) 획득 배율.
+  double get reincarnationRewardMultiplier =>
+      reincarnationCount <= 0 ? 1.0 : pow(3.0, reincarnationCount).toDouble();
+
+  /// 환생 후 「윤회 초월 단련」에 의한 총 공격력·호신강기 증폭 배율 (환생 직후 0단일 때는 1.0배로 기존 능력치 100% 그대로 유지!).
+  double get transcendenceMultiplier =>
+      transcendenceLevel <= 0 ? 1.0 : pow(1.12, transcendenceLevel).toDouble();
+
+  int get transcendenceTokenCost {
+    final tier = transcendenceLevel ~/ 10;
+    final stepInTier = transcendenceLevel % 10;
+    final raw = (360 + stepInTier * 90) * pow(3.0, tier);
+    return raw.isFinite ? raw.round().clamp(360, 900000000) : 900000000;
+  }
+
+  int get transcendenceElixirCost {
+    final tier = transcendenceLevel ~/ 10;
+    final stepInTier = transcendenceLevel % 10;
+    final raw = (10 + stepInTier * 3) * pow(2.6, tier);
+    return raw.isFinite ? raw.round().clamp(10, 90000000) : 90000000;
+  }
+
+  bool upgradeTranscendence() {
+    if (reincarnationCount <= 0 || transcendenceLevel >= 9999) return false;
+    final tCost = transcendenceTokenCost;
+    final eCost = transcendenceElixirCost;
+    if (tokens < tCost || elixirs < eCost) return false;
+    tokens -= tCost;
+    elixirs -= eCost;
+    transcendenceLevel++;
+    return true;
+  }
+
+  /// 현재 회차에서 윤회 최종 보스전에 도전할 수 있는지 여부 (악몽 10-10 클리어 완료 & 아직 보스 미격파, 또는 격파 후에도 재도전 가능하도록 별도 안내).
+  bool get canChallengeReincarnationBoss => nightmareChapter10Cleared;
+
+  /// 현재 회차에서 윤회 최종 보스전까지 정복해 즉시 환생 의식을 거행할 수 있는지 여부.
+  bool get canPerformReincarnation =>
+      nightmareChapter10Cleared && reincarnationBossCleared && reincarnationCount < 999;
+
+  /// 【윤회 환생】 실행:
+  /// - 모든 영구 능력치(경지·경맥·내공·수련3대능력·중앙탑·5발사대·신기연마·영기공명·초월단련·13수호석·14동료·5영수·재화·지원패·비약·프리셋) 100% 유지!
+  /// - 캠페인 진행도만 1-1(0판)로 초기화하고 `reincarnationCount`를 +1 올려 전 난이도를 기존 대비 3배(누적 3^k배) 격상한다!
+  bool performReincarnation() {
+    if (!canPerformReincarnation) return false;
+    reincarnationCount = (reincarnationCount + 1).clamp(1, 999);
+    highestClearedGlobalStage = 0;
+    stageStars.clear();
+    nightmareChapter10Cleared = false;
+    reincarnationBossCleared = false;
+    lastRescueBanner = null;
+    lastRescuedCompanion = null;
+    lastRescuedBeast = null;
+
+    // 등선 축하 군수 보급: 새 회차 3배 혈전에 대비해 지원패 +3 및 전술 비약 3종 각 +2 수여
+    supportTokens = (supportTokens + 3).clamp(0, 999999);
+    for (final item in TacticalConsumable.values) {
+      consumables[item] = ((consumables[item] ?? 0) + 2).clamp(0, 999999);
+    }
+    return true;
+  }
+
+  bool isStageUnlocked(StageSpec stage) {
+    if (stage.isReincarnationBossStage) {
+      return nightmareChapter10Cleared;
+    }
+    return stage.globalIndex <= highestClearedGlobalStage + 1;
+  }
 
   // --- 수호 도감 수집률 및 세트 가산치 (최대 +12% 화력·방어막 보너스) ---
   int get unlockedLauncherCount =>
-      LauncherType.values.where((t) => t.unlockChapter <= highestUnlockedChapter).length;
+      LauncherType.values.where((t) => t.unlockChapter <= effectiveArsenalChapter).length;
   int get unlockedBeastCount => beastLevels.values.where((v) => v > 0).length;
   int get unlockedCompanionCount => companionLevels.values.where((v) => v > 0).length;
 
@@ -849,7 +952,7 @@ class PlayerProgress {
 
   bool canUnlockStone(StoneMaterial stone) {
     if (unlockedStones.contains(stone)) return false;
-    if (highestUnlockedChapter < stone.minChapter) return false;
+    if (effectiveArsenalChapter < stone.minChapter) return false;
     if (stone.isShardStone) {
       return (stoneShards[stone] ?? 0) >= stone.shardRequired;
     }
@@ -858,7 +961,7 @@ class PlayerProgress {
 
   bool unlockStoneWithTokens(StoneMaterial stone) {
     if (unlockedStones.contains(stone)) return false;
-    if (highestUnlockedChapter < stone.minChapter) return false;
+    if (effectiveArsenalChapter < stone.minChapter) return false;
     if (stone.isShardStone) {
       final have = stoneShards[stone] ?? 0;
       if (have < stone.shardRequired) return false;
@@ -896,9 +999,9 @@ class PlayerProgress {
 
   bool unlockOrUpgradeBeast(SpiritBeast beast) {
     final cur = beastLevels[beast] ?? 0;
-    if (cur == 0 && highestUnlockedChapter < beast.unlockChapter) return false;
+    if (cur == 0 && effectiveArsenalChapter < beast.unlockChapter) return false;
     final cost = cur == 0 ? beast.unlockElixirs : beast.upgradeElixirCost(lvOrZero(cur));
-    if (cur >= 10 || elixirs < cost) return false;
+    if (cur >= maxAllyLevel || elixirs < cost) return false;
     elixirs -= cost;
     beastLevels[beast] = cur + 1;
     if (cur == 0 && beast.index > activePreset.equippedBeast.index) {
@@ -913,11 +1016,11 @@ class PlayerProgress {
   bool unlockOrUpgradeCompanion(CompanionHero hero) {
     final cur = companionLevels[hero] ?? 0;
     if (cur == 0 &&
-        (hero.unlockElixirs <= 0 || highestUnlockedChapter < hero.unlockChapter)) {
+        (hero.unlockElixirs <= 0 || effectiveArsenalChapter < hero.unlockChapter)) {
       return false;
     }
     final cost = cur == 0 ? hero.unlockElixirs : hero.upgradeElixirCost(lvOrZero(cur));
-    if (cur >= 10 || elixirs < cost) return false;
+    if (cur >= maxAllyLevel || elixirs < cost) return false;
     elixirs -= cost;
     companionLevels[hero] = cur + 1;
     if (cur == 0 &&
@@ -931,7 +1034,7 @@ class PlayerProgress {
 
   /// 6) 물자 호송 & 심야 탐색 출발 및 수령 (지원패 3대 수급 경로 + 크리티컬·한 번 더 기연!).
   bool startSupplyConvoy() {
-    if (highestUnlockedChapter < 2 || convoyActive) return false;
+    if (effectiveArsenalChapter < 2 || convoyActive) return false;
     convoyActive = true;
     convoyBattlesRemaining = 2;
     return true;
@@ -943,9 +1046,10 @@ class PlayerProgress {
     convoyCompletedCount++;
     convoySupplyBuffBattles = 3;
 
-    final chScale = highestUnlockedChapter;
-    int gainTokens = 55 + chScale * 18;
-    int gainElixirs = 2 + (chScale ~/ 3);
+    final chScale = effectiveArsenalChapter;
+    final rMult = reincarnationRewardMultiplier;
+    int gainTokens = ((55 + chScale * 18) * rMult).round().clamp(1, 90000000);
+    int gainElixirs = ((2 + (chScale ~/ 3)) * rMult).round().clamp(1, 9000000);
     // 조건 달성 경로: 호송 완수 시 지원패 확정 1개 지급!
     int gainSupport = 1;
     int gainShards = rng.nextDouble() < 0.45 ? 2 : 1;
@@ -985,7 +1089,7 @@ class PlayerProgress {
   }
 
   bool startNightExplore() {
-    if (highestUnlockedChapter < 4 || exploreActive) return false;
+    if (effectiveArsenalChapter < 4 || exploreActive) return false;
     exploreActive = true;
     exploreBattlesRemaining = 2;
     return true;
@@ -995,9 +1099,10 @@ class PlayerProgress {
     if (!exploreActive || exploreBattlesRemaining > 0) return null;
     exploreActive = false;
 
-    final chScale = highestUnlockedChapter;
-    int gainTokens = 40 + chScale * 14;
-    int gainElixirs = 3 + (chScale ~/ 3);
+    final chScale = effectiveArsenalChapter;
+    final rMult = reincarnationRewardMultiplier;
+    int gainTokens = ((40 + chScale * 14) * rMult).round().clamp(1, 90000000);
+    int gainElixirs = ((3 + (chScale ~/ 3)) * rMult).round().clamp(1, 9000000);
     // 탐색 경로: 봉화대 정찰로 지원패 발굴!
     int gainSupport = rng.nextDouble() < 0.70 ? 1 : 0;
     int gainShards = 3;
@@ -1011,7 +1116,7 @@ class PlayerProgress {
     }
     if (isEncore) {
       gainSupport += 1;
-      gainTokens += 45;
+      gainTokens += (45 * rMult).round().clamp(45, 45000000);
     }
 
     tokens += gainTokens;
@@ -1040,9 +1145,10 @@ class PlayerProgress {
     if (moonOmenGauge < 100) return null;
     moonOmenGauge = 0;
 
-    final chScale = highestUnlockedChapter;
-    int gainTokens = 70 + chScale * 20;
-    int gainElixirs = 3 + (chScale ~/ 2);
+    final chScale = effectiveArsenalChapter;
+    final rMult = reincarnationRewardMultiplier;
+    int gainTokens = ((70 + chScale * 20) * rMult).round().clamp(1, 90000000);
+    int gainElixirs = ((3 + (chScale ~/ 2)) * rMult).round().clamp(1, 9000000);
     int gainSupport = 1;
     int gainShards = 4;
 
@@ -1223,15 +1329,19 @@ class PlayerProgress {
   bool isAchievementMet(NightAchievementSpec a) {
     switch (a.id) {
       case 'ach_first_dawn':
-        return highestClearedGlobalStage >= 1;
+        return reincarnationCount > 0 || highestClearedGlobalStage >= 1;
       case 'ach_ch1_clear':
-        return highestClearedGlobalStage >= CampaignCatalog.stagesOfChapter(1).last.globalIndex;
+        return reincarnationCount > 0 ||
+            highestClearedGlobalStage >= CampaignCatalog.stagesOfChapter(1).last.globalIndex;
       case 'ach_ch3_clear':
-        return highestClearedGlobalStage >= CampaignCatalog.stagesOfChapter(3).last.globalIndex;
+        return reincarnationCount > 0 ||
+            highestClearedGlobalStage >= CampaignCatalog.stagesOfChapter(3).last.globalIndex;
       case 'ach_ch6_clear':
-        return highestClearedGlobalStage >= CampaignCatalog.stagesOfChapter(6).last.globalIndex;
+        return reincarnationCount > 0 ||
+            highestClearedGlobalStage >= CampaignCatalog.stagesOfChapter(6).last.globalIndex;
       case 'ach_ch10_clear':
-        return highestClearedGlobalStage >= CampaignCatalog.allStages.length;
+        return reincarnationCount > 0 ||
+            highestClearedGlobalStage >= CampaignCatalog.allStages.length;
       case 'ach_meridian_5':
         return openedMeridianStep >= 5;
       case 'ach_meridian_10':
@@ -1285,8 +1395,8 @@ class PlayerProgress {
     if (moonOmenGauge >= 100) return true;
     if (convoyActive && convoyBattlesRemaining <= 0) return true;
     if (exploreActive && exploreBattlesRemaining <= 0) return true;
-    if (highestUnlockedChapter >= 2 && !convoyActive) return true;
-    if (highestUnlockedChapter >= 4 && !exploreActive) return true;
+    if (effectiveArsenalChapter >= 2 && !convoyActive) return true;
+    if (effectiveArsenalChapter >= 4 && !exploreActive) return true;
     return hasClaimableRewards(todayKey: todayKey);
   }
 
@@ -1374,10 +1484,10 @@ class PlayerProgress {
     bool sentConvoy = false;
     bool sentExplore = false;
     if (autoRedispatch) {
-      if (highestUnlockedChapter >= 2 && !convoyActive) {
+      if (effectiveArsenalChapter >= 2 && !convoyActive) {
         sentConvoy = startSupplyConvoy();
       }
-      if (highestUnlockedChapter >= 4 && !exploreActive) {
+      if (effectiveArsenalChapter >= 4 && !exploreActive) {
         sentExplore = startNightExplore();
       }
     }
@@ -1443,11 +1553,17 @@ class PlayerProgress {
         continue;
       }
 
+      // 3.5순위: 환생자 전용 「윤회 초월 단련」 가능 시 최우선 돌파 (3^k배 환생 난이도 대응 핵심 승수 성장!)
+      if (upgradeTranscendence()) {
+        logs.add('윤회 초월 단련 $transcendenceLevel단');
+        continue;
+      }
+
       // 4순위: 중앙 수호탑 vs 현재 진법/해금 주력 발사대 중 아직 상한(999단) 미만인 최소 비용 강화
       final unlockedLaunchers = LauncherType.values
           .where(
             (t) =>
-                t.unlockChapter <= highestUnlockedChapter &&
+                t.unlockChapter <= effectiveArsenalChapter &&
                 (launcherPermanentLevels[t] ?? 1) < 999,
           )
           .toList();
@@ -1492,7 +1608,7 @@ class PlayerProgress {
       SpiritBeast? newlyHiredBeast;
       for (final b in SpiritBeast.values.reversed) {
         if ((beastLevels[b] ?? 0) == 0 &&
-            b.unlockChapter <= highestUnlockedChapter &&
+            b.unlockChapter <= effectiveArsenalChapter &&
             unlockOrUpgradeBeast(b)) {
           newlyHiredBeast = b;
           break;
@@ -1505,7 +1621,7 @@ class PlayerProgress {
 
       final activeBeast = activePreset.equippedBeast;
       if ((beastLevels[activeBeast] ?? 0) > 0 &&
-          (beastLevels[activeBeast] ?? 0) < 10 &&
+          (beastLevels[activeBeast] ?? 0) < maxAllyLevel &&
           unlockOrUpgradeBeast(activeBeast)) {
         logs.add('${activeBeast.name} ${beastLevels[activeBeast]}단');
         continue;
@@ -1516,7 +1632,7 @@ class PlayerProgress {
         if (h != CompanionHero.mukhyeon &&
             (companionLevels[h] ?? 0) == 0 &&
             h.unlockElixirs > 0 &&
-            h.unlockChapter <= highestUnlockedChapter &&
+            h.unlockChapter <= effectiveArsenalChapter &&
             unlockOrUpgradeCompanion(h)) {
           newlyHiredHero = h;
           break;
@@ -1530,7 +1646,7 @@ class PlayerProgress {
       CompanionHero? upgradedHero;
       for (final h in activePreset.companions) {
         final lv = companionLevels[h] ?? 0;
-        if (lv > 0 && lv < 10 && unlockOrUpgradeCompanion(h)) {
+        if (lv > 0 && lv < maxAllyLevel && unlockOrUpgradeCompanion(h)) {
           upgradedHero = h;
           break;
         }
@@ -1620,19 +1736,28 @@ class PlayerProgress {
     lastRescuedBeast = null;
 
     final safeUsedSupport = max(0, usedSupportCount);
-    final safeEarnedTokens = max(0, earnedTokens);
-    final safeEarnedElixirs = max(0, earnedElixirs);
+    final rMult = reincarnationRewardMultiplier;
+    final safeEarnedTokens =
+        (max(0, earnedTokens) * rMult).round().clamp(0, 250000000);
+    final safeEarnedElixirs =
+        (max(0, earnedElixirs) * rMult).round().clamp(0, 25000000);
     final safeKillCount = max(0, killCount);
     final safePporok = max(0, pporokCount);
     final safeBank = max(0, bankShotCount);
     final safeChain = max(0, chainShatterCount);
     final safeSeren = max(0, serendipityCount);
 
-    if (!supportAlreadyDeductedInSim && safeUsedSupport > 0) {
+    if (stage.isReincarnationBossStage) {
+      reincarnationBossAttempts = (reincarnationBossAttempts + 1).clamp(1, 999999999);
+    }
+
+    if (!supportAlreadyDeductedInSim &&
+        !stage.isReincarnationBossStage &&
+        safeUsedSupport > 0) {
       supportTokens = (supportTokens - safeUsedSupport).clamp(0, 999999);
     }
-    tokens += safeEarnedTokens;
-    elixirs += safeEarnedElixirs;
+    tokens = (tokens + safeEarnedTokens).clamp(0, 999999999);
+    elixirs = (elixirs + safeEarnedElixirs).clamp(0, 999999999);
     moonOmenGauge = (moonOmenGauge + (victory ? 28 : 14)).clamp(0, 100);
 
     totalMutantKills += safeKillCount;
@@ -1665,16 +1790,37 @@ class PlayerProgress {
       }
 
       // 실전 방어 승리로 단전 내공과 수련 인장이 함께 성장 (전투와 수련의 유기적 선순환!)
-      naegongPoints += 16 + stage.chapterNumber * 5 + (stage.isBossStage ? 22 : 0);
-      trainingSeals += 4 + (stage.chapterNumber ~/ 2) + (stage.isBossStage ? 5 : 0);
+      final gainedNaegong =
+          ((16 + stage.chapterNumber * 5 + (stage.isBossStage ? 22 : 0)) * rMult)
+              .round()
+              .clamp(1, 50000000);
+      final gainedSeals =
+          ((4 + (stage.chapterNumber ~/ 2) + (stage.isBossStage ? 5 : 0)) * rMult)
+              .round()
+              .clamp(1, 10000000);
+      naegongPoints = (naegongPoints + gainedNaegong).clamp(0, 999999999);
+      trainingSeals = (trainingSeals + gainedSeals).clamp(0, 999999999);
       if (stage.isBossStage) {
         if (!bossElixirAlreadyIncluded) {
-          elixirs += 2 + (stage.chapterNumber ~/ 3);
+          final extraBossElixirs =
+              ((2 + (stage.chapterNumber ~/ 3)) * rMult).round().clamp(1, 5000000);
+          elixirs = (elixirs + extraBossElixirs).clamp(0, 999999999);
         }
         _grantRandomShards(
-          stage.stageNumber >= 10 ? 3 : 1,
+          stage.isReincarnationBossStage ? 6 : (stage.stageNumber >= 10 ? 3 : 1),
           Random(totalMutantKills + stage.globalIndex + 17),
         );
+      }
+
+      if (stage.chapterNumber == 10 &&
+          stage.stageNumber == 10 &&
+          difficultyId == DefenseDifficulty.nightmare.id) {
+        nightmareChapter10Cleared = true;
+      }
+      if (stage.isReincarnationBossStage) {
+        reincarnationBossWins = (reincarnationBossWins + 1).clamp(1, 999999999);
+        reincarnationBossCleared = true;
+        supportTokens = (supportTokens + 3).clamp(0, 999999);
       }
 
       // 승리 시 수호 재료 1종 확정 획득
@@ -1682,7 +1828,8 @@ class PlayerProgress {
           (stage.chapterNumber + totalMutantKills) % CraftMaterial.values.length];
       materials[dropMat] = (materials[dropMat] ?? 0) + 1;
 
-      final countsTowardDispatch = stage.globalIndex >= 900 ||
+      final countsTowardDispatch = reincarnationCount > 0 ||
+          stage.globalIndex >= 800 ||
           stage.chapterNumber >= max(1, highestUnlockedChapter - 2);
       if (countsTowardDispatch) {
         if (convoyActive && convoyBattlesRemaining > 0) {
@@ -1726,7 +1873,8 @@ class PlayerProgress {
               (isFirstClear || needMissingCompanion)) {
             final hero = stage.rescueCompanion!;
             final prevLv = companionLevels[hero] ?? 0;
-            companionLevels[hero] = prevLv <= 0 ? 1 : (prevLv + 1).clamp(1, 10);
+            companionLevels[hero] =
+                prevLv <= 0 ? 1 : (prevLv + 1).clamp(1, maxAllyLevel);
             for (final preset in presets) {
               if (preset.companions.length < 3 && !preset.companions.contains(hero)) {
                 preset.companions.add(hero);
@@ -1744,7 +1892,7 @@ class PlayerProgress {
               (isFirstClear || needMissingMukhyeon)) {
             final prevMuk = companionLevels[CompanionHero.mukhyeon] ?? 0;
             companionLevels[CompanionHero.mukhyeon] =
-                prevMuk <= 0 ? 1 : (prevMuk + 1).clamp(1, 10);
+                prevMuk <= 0 ? 1 : (prevMuk + 1).clamp(1, maxAllyLevel);
             if (isFirstClear || prevMuk <= 0) {
               supportTokens = (supportTokens + 2).clamp(0, 999999);
             }
@@ -1755,7 +1903,8 @@ class PlayerProgress {
               (isFirstClear || needMissingBeast)) {
             final beast = stage.rescueBeast!;
             final prevBeastLv = beastLevels[beast] ?? 0;
-            beastLevels[beast] = prevBeastLv <= 0 ? 1 : (prevBeastLv + 1).clamp(1, 10);
+            beastLevels[beast] =
+                prevBeastLv <= 0 ? 1 : (prevBeastLv + 1).clamp(1, maxAllyLevel);
             if (prevBeastLv <= 0 && beast.index > activePreset.equippedBeast.index) {
               activePreset.equippedBeast = beast;
               activePreset.beastCondition = beast.defaultCondition;
@@ -1822,6 +1971,12 @@ class PlayerProgress {
         'bestEndless': bestEndlessWave,
         'forgeMastery': forgeMasteryLevel,
         'elixirResonance': elixirResonanceLevel,
+        'reincCnt': reincarnationCount,
+        'nmCh10Clear': nightmareChapter10Cleared,
+        'reincBossClear': reincarnationBossCleared,
+        'reincBossTry': reincarnationBossAttempts,
+        'reincBossWin': reincarnationBossWins,
+        'transcendLv': transcendenceLevel,
         'tutSeen': tutorialSeen,
         'bgmVol': bgmVolume,
         'sfxVol': sfxVolume,
@@ -1931,6 +2086,21 @@ class PlayerProgress {
       bestEndlessWave: _safeInt(j['bestEndless'], 0).clamp(0, 9999),
       forgeMasteryLevel: _safeInt(j['forgeMastery'], 0).clamp(0, 9999),
       elixirResonanceLevel: _safeInt(j['elixirResonance'], 0).clamp(0, 9999),
+      reincarnationCount: _safeInt(j['reincCnt'] ?? j['reincarnationCount'], 0).clamp(0, 999),
+      nightmareChapter10Cleared: _safeBool(
+        j['nmCh10Clear'] ?? j['nightmareChapter10Cleared'],
+        false,
+      ),
+      reincarnationBossCleared: _safeBool(
+        j['reincBossClear'] ?? j['reincarnationBossCleared'],
+        false,
+      ),
+      reincarnationBossAttempts:
+          _safeInt(j['reincBossTry'] ?? j['reincarnationBossAttempts'], 0).clamp(0, 9999999),
+      reincarnationBossWins:
+          _safeInt(j['reincBossWin'] ?? j['reincarnationBossWins'], 0).clamp(0, 9999999),
+      transcendenceLevel:
+          _safeInt(j['transcendLv'] ?? j['transcendenceLevel'], 0).clamp(0, 9999),
       tutorialSeen: _safeBool(j['tutSeen'], false),
       bgmVolume: _safeDouble(j['bgmVol'] ?? j['bgmVolume'], 0.38).clamp(0.0, 1.0),
       sfxVolume: _safeDouble(j['sfxVol'] ?? j['sfxVolume'], 0.72).clamp(0.0, 1.0),
@@ -1981,7 +2151,7 @@ class PlayerProgress {
         final sb = SpiritBeast.values.where((e) => e.id == k || e.name == k).firstOrNull;
         if (sb != null) {
           final minLv = sb == SpiritBeast.nalssaendol ? 1 : 0;
-          p.beastLevels[sb] = _safeInt(v, minLv).clamp(minLv, 10);
+          p.beastLevels[sb] = _safeInt(v, minLv).clamp(minLv, p.maxAllyLevel);
         }
       });
     }
@@ -1989,7 +2159,7 @@ class PlayerProgress {
       (j['companions'] as Map).forEach((k, v) {
         final ch = CompanionHero.values.where((e) => e.id == k || e.name == k).firstOrNull;
         if (ch != null) {
-          p.companionLevels[ch] = _safeInt(v, 0).clamp(0, 10);
+          p.companionLevels[ch] = _safeInt(v, 0).clamp(0, p.maxAllyLevel);
         }
       });
     }

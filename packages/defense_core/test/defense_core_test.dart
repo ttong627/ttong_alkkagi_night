@@ -3114,5 +3114,182 @@ void main() {
       highHpSim.step(1 / 60);
       expect(dummy.hp, lessThan(360000.0), reason: '10만 이상 단일 화력이 99,999에서 잘리지 않아야 함');
     });
+
+    test(
+        'v1.0.0+35 악몽 10-10 클리어 시 윤회 최종 보스전 해금 · 보스 격파 후 능력치 100% 계승 다회차 환생(×3·×9·×27배) 및 SUHO1 복원 검증',
+        () {
+      final p = PlayerProgress(
+        tokens: 5400,
+        elixirs: 80,
+        trainingSeals: 150,
+        naegongPoints: 3600,
+        realmIndex: 7,
+        centralGuardianLevel: 22,
+        supportTokens: 6,
+        highestClearedGlobalStage: 99,
+        openedMeridianStep: 10,
+        forgeMasteryLevel: 12,
+        elixirResonanceLevel: 11,
+      );
+      p.unlockedStones.addAll(StoneMaterial.values);
+      for (final lt in LauncherType.values) {
+        p.launcherPermanentLevels[lt] = 19;
+      }
+      for (final b in SpiritBeast.values) {
+        p.beastLevels[b] = 10;
+      }
+      for (final h in CompanionHero.values) {
+        p.companionLevels[h] = 10;
+      }
+
+      final st1010 = CampaignCatalog.stageAt(10, 10);
+      // 1) 보통 난이도로 10-10을 깨면 윤회 최종 보스전이 해금되지 않아야 함!
+      p.onBattleFinished(
+        stage: st1010,
+        victory: true,
+        stars: 3,
+        earnedTokens: 80,
+        earnedElixirs: 10,
+        usedSupportCount: 0,
+        difficultyId: DefenseDifficulty.normal.id,
+      );
+      expect(p.highestClearedGlobalStage, 100);
+      expect(p.canChallengeReincarnationBoss, isFalse);
+      expect(p.canPerformReincarnation, isFalse);
+
+      // 2) 악몽(nightmare) 난이도로 10-10을 정화하면 【윤회 최종 보스전】이 즉시 해금!
+      p.onBattleFinished(
+        stage: st1010,
+        victory: true,
+        stars: 2,
+        earnedTokens: 120,
+        earnedElixirs: 14,
+        usedSupportCount: 1,
+        difficultyId: DefenseDifficulty.nightmare.id,
+        supportAlreadyDeductedInSim: true,
+      );
+      expect(p.canChallengeReincarnationBoss, isTrue);
+      expect(p.canPerformReincarnation, isFalse);
+
+      // 3) 윤회 최종 보스전 패배 시 지원패가 차감되지 않고 시도 횟수만 누적됨
+      final boss0 = CampaignCatalog.buildReincarnationFinalBossStage(reincarnationCount: 0);
+      final supBeforeFail = p.supportTokens;
+      p.onBattleFinished(
+        stage: boss0,
+        victory: false,
+        stars: 0,
+        earnedTokens: 20,
+        earnedElixirs: 0,
+        usedSupportCount: 3,
+        difficultyId: DefenseDifficulty.nightmare.id,
+      );
+      expect(p.supportTokens, supBeforeFail);
+      expect(p.reincarnationBossAttempts, 1);
+      expect(p.canPerformReincarnation, isFalse);
+
+      // 4) 윤회 최종 보스전 격파 시 제1환생 자격 개방 및 환생 실행!
+      p.onBattleFinished(
+        stage: boss0,
+        victory: true,
+        stars: 3,
+        earnedTokens: 320,
+        earnedElixirs: 30,
+        usedSupportCount: 2,
+        difficultyId: DefenseDifficulty.nightmare.id,
+      );
+      expect(p.canPerformReincarnation, isTrue);
+      expect(p.reincarnationBossWins, 1);
+
+      final preCentral = p.centralGuardianLevel;
+      final preForge = p.forgeMasteryLevel;
+      final preStones = p.unlockedStones.length;
+      expect(p.performReincarnation(), isTrue);
+      expect(p.reincarnationCount, 1);
+      expect(p.reincarnationDifficultyMultiplier, closeTo(3.0, 1e-6));
+      expect(p.highestClearedGlobalStage, 0, reason: '환생 후 1-1부터 새로 시작');
+      expect(p.stageStars, isEmpty);
+      expect(p.effectiveArsenalChapter, 10, reason: '환생 후에도 전 10현 무구·호송·탐색 해금 유지');
+      expect(p.centralGuardianLevel, preCentral);
+      expect(p.forgeMasteryLevel, preForge);
+      expect(p.unlockedStones.length, preStones);
+      expect(p.maxAllyLevel, 20, reason: '환생 시 영수·동료 성장 상한 확장');
+
+      // 5) 환생 직후 1-1 전장 적 체력이 초회차 대비 대폭 상승하고, 제2환생(×9배) 시 정확히 3배 더 상승하는지 물리 검증!
+      final freshP = PlayerProgress();
+      final simFresh11 = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 1),
+        difficulty: DefenseDifficulty.normal,
+        progress: freshP,
+        seed: 777,
+      );
+      final simReinc1 = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 1),
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        seed: 777,
+      );
+      for (int i = 0; i < 120; i++) {
+        simFresh11.step(1 / 30);
+        simReinc1.step(1 / 30);
+      }
+      expect(simReinc1.mutants, isNotEmpty);
+      expect(
+        simReinc1.mutants.first.maxHp,
+        greaterThan(simFresh11.mutants.first.maxHp * 50.0),
+        reason: '강해진 종결 능력치에 맞춰 환생 1-1 적 체력이 상향되어야 함',
+      );
+      final hpCycle1 = simReinc1.mutants.first.maxHp;
+
+      // 윤회 초월 단련 및 제2환생(×9배) -> 제3환생(×27배) 연쇄 검증
+      expect(p.upgradeTranscendence(), isTrue);
+      expect(p.transcendenceLevel, 1);
+
+      p.highestClearedGlobalStage = 99;
+      p.onBattleFinished(
+        stage: st1010,
+        victory: true,
+        stars: 3,
+        earnedTokens: 100,
+        earnedElixirs: 10,
+        usedSupportCount: 0,
+        difficultyId: DefenseDifficulty.nightmare.id,
+      );
+      final boss1 = CampaignCatalog.buildReincarnationFinalBossStage(reincarnationCount: 1);
+      p.onBattleFinished(
+        stage: boss1,
+        victory: true,
+        stars: 3,
+        earnedTokens: 400,
+        earnedElixirs: 40,
+        usedSupportCount: 1,
+        difficultyId: DefenseDifficulty.nightmare.id,
+      );
+      expect(p.performReincarnation(), isTrue);
+      expect(p.reincarnationCount, 2);
+      expect(p.reincarnationDifficultyMultiplier, closeTo(9.0, 1e-6));
+
+      final simReinc2 = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 1),
+        difficulty: DefenseDifficulty.normal,
+        progress: p,
+        seed: 777,
+      );
+      for (int i = 0; i < 120; i++) {
+        simReinc2.step(1 / 30);
+      }
+      expect(
+        simReinc2.mutants.first.maxHp / hpCycle1,
+        closeTo(3.0, 0.02),
+        reason: '매 환생마다 전 난이도 적 체력이 정확히 3배씩 누적 상승해야 함',
+      );
+
+      // SUHO1 백업 부호 무손실 복원 검증
+      final backup = p.exportBackupCode();
+      final decoded = PlayerProgress.tryDecodeBackupCode(backup);
+      expect(decoded, isNotNull);
+      expect(decoded!.reincarnationCount, 2);
+      expect(decoded.transcendenceLevel, 1);
+      expect(decoded.reincarnationBossWins, 2);
+    });
   });
 }

@@ -422,14 +422,17 @@ class _PendingSpawn {
 class DefenseBattleSim {
   DefenseBattleSim({
     required this.stage,
-    required this.difficulty,
+    required DefenseDifficulty difficulty,
     required this.progress,
     LoadoutPreset? overridePreset,
     int seed = 20261115,
     this.allowSupportTokens = true,
     this.allowSerendipity = true,
     this.autoBuildForSimVerify = false,
-  })  : chapter = CampaignCatalog.chapterOf(stage.chapterNumber),
+  })  : difficulty = stage.isReincarnationBossStage
+            ? DefenseDifficulty.nightmare
+            : difficulty,
+        chapter = CampaignCatalog.chapterOf(stage.chapterNumber),
         preset = overridePreset ?? progress.activePreset,
         rng = Random(seed) {
     _initBattle();
@@ -447,6 +450,11 @@ class DefenseBattleSim {
   /// 각 장 코덱스 맵 원화의 실제 원형 석조 수호 제단 좌표 (중앙 수호탑 및 외곽 기공 방어막 중심!).
   Vec2 get towerPos => chapter.towerPos;
   Vec2 get shieldCenter => chapter.towerPos;
+
+  /// 윤회 최종 보스전(`globalIndex == 888`)에서는 어느 난이도로 진입하더라도 항상 최고 극한(악몽+) 규격을 강제하며,
+  /// 패배 시 소모했던 지원패·전술비약을 원상 복구하여 5% 미만 확률 도전을 막힘없이 반복할 수 있게 한다!
+  DefenseDifficulty get effectiveDifficulty =>
+      stage.isReincarnationBossStage ? DefenseDifficulty.nightmare : difficulty;
 
   /// 실시간 위험 비상 알림 & 2.8배 공격 지점 확대 영상 모니터 상태!
   CrisisAlertInfo? activeCrisis;
@@ -593,12 +601,27 @@ class DefenseBattleSim {
     1.50,
   ];
 
-  /// 악몽(Nightmare) 난이도 전용 심야 공명 스케일링:
-  /// 만렙·고성장 계정이 하위 현(1~7현) 악몽에 진입해도 '설치 몇 번에 순삭'되지 않고 전 100판 모두 진검 승부가 되도록 보정한다.
-  double get _nightmareChallengeScale {
-    if (difficulty != DefenseDifficulty.nightmare || stage.globalIndex >= 900) {
-      return 1.0;
-    }
+  /// 환생(reincarnationCount >= 1) 시 기존 종결 능력치를 그대로 들고 1-1부터 출발하더라도
+  /// 1~9현이 싱겁지 않도록 각 현의 초소 대수(4→14곳)·경로 길이에 맞춰 종결 스펙 기준선으로 끌어올린 기본 체력 곡선!
+  /// (여기에 매 환생마다 3.0^reincarnationCount 배수 [1환생=3배, 2환생=9배, 3환생=27배...]가 전 난이도에 곱해진다!)
+  static const List<double> _reincarnationEndgameBaseCurve = <double>[
+    36.0,
+    44.0,
+    56.0,
+    68.0,
+    82.0,
+    98.0,
+    116.0,
+    136.0,
+    158.0,
+    182.0,
+  ];
+
+  /// 【윤회 최종 보스전】 성공 확률 <5%(목표 약 2.0~4.5%) 정밀 보정 계수.
+  static const double reincarnationBossHpPressure = 4.02;
+  static const double reincarnationBossAtkPressure = 4.12;
+
+  double get _playerLauncherDpsIndex {
     double permSum = 0.0;
     int permCnt = 0;
     for (final lt in LauncherType.values) {
@@ -608,20 +631,34 @@ class DefenseBattleSim {
       }
     }
     final avgPerm = permCnt > 0 ? permSum / permCnt : 1.0;
-    final launcherDpsIdx = (1.0 + (avgPerm - 1.0) * 0.16) *
+    return (1.0 + (avgPerm - 1.0) * 0.16) *
         progress.realm.powerMult *
         preset.primaryStone.damageMultiplier *
+        progress.transcendenceMultiplier *
         (1.0 +
             progress.meridianLauncherDmgBonus +
             progress.coreFirepowerBonus +
             progress.codexPowerBonus +
             progress.forgeMasteryPowerBonus);
+  }
 
+  /// 악몽(Nightmare) 난이도 전용 심야 공명 스케일링:
+  /// 만렙·고성장 계정이 하위 현(1~7현) 악몽에 진입해도 '설치 몇 번에 순삭'되지 않고 전 100판 모두 진검 승부가 되도록 보정한다.
+  double get _nightmareChallengeScale {
+    if (difficulty != DefenseDifficulty.nightmare ||
+        stage.globalIndex >= 900 ||
+        stage.isReincarnationBossStage) {
+      return 1.0;
+    }
+    final launcherDpsIdx = _playerLauncherDpsIndex;
     final chIdx =
         (stage.chapterNumber - 1).clamp(0, _chapterExpectedDpsCurve.length - 1);
-    final expectedDps = _chapterExpectedDpsCurve[chIdx];
+    // 환생 회차에서는 이미 _reincarnationEndgameBaseCurve * 3^k 가 전 장을 종결 기준선×3^k로 끌어올렸으므로,
+    // 기대 화력 역시 종결 기준선×3^k를 기준으로 삼아 중복 과잉 스케일링을 방지하고 성장 체감을 보존한다.
+    final expectedDps = progress.reincarnationCount > 0
+        ? (32.0 + chIdx * 12.2) * progress.reincarnationDifficultyMultiplier
+        : _chapterExpectedDpsCurve[chIdx];
     final overRatio = launcherDpsIdx / expectedDps;
-    // 8~10장 종결 구간(overRatio <= 2.65)은 순수 성장 화력을 100% 반영하고, 하위 장 재도전 시에만 심야 공명 하한선을 가동한다.
     if (overRatio <= 2.65) return 1.0;
     return pow(overRatio / 2.65, 0.84).toDouble().clamp(1.0, 58.0);
   }
@@ -852,6 +889,7 @@ class DefenseBattleSim {
   /// 지원패(암행어사 출두) 슬롯 및 연출 타이머.
   int supportChargesLeft = 0;
   int usedSupportCount = 0;
+  final Map<TacticalConsumable, int> _trialConsumableUsed = {};
   bool pendingFreeEncoreChuldu = false;
   double chulduSweepAnimTimer = 0.0;
   double dawnPurifyAnimTimer = 0.0;
@@ -921,6 +959,7 @@ class DefenseBattleSim {
       coreFirepowerBonus: progress.coreFirepowerBonus +
           progress.codexPowerBonus +
           progress.forgeMasteryPowerBonus,
+      transcendenceMultiplier: progress.transcendenceMultiplier,
     );
     shieldMaxHpDynamic =
         centralSpec.shieldMaxHp * (chapter.number == 6 ? 1.30 : 1.0);
@@ -928,7 +967,10 @@ class DefenseBattleSim {
     towerHp = centralSpec.coreMaxHp;
 
     final hasConvoyBuff = progress.convoySupplyBuffBattles > 0;
-    if (hasConvoyBuff && allowSupportTokens && !autoBuildForSimVerify) {
+    if (hasConvoyBuff &&
+        allowSupportTokens &&
+        !autoBuildForSimVerify &&
+        !stage.isReincarnationBossStage) {
       progress.convoySupplyBuffBattles = max(0, progress.convoySupplyBuffBattles - 1);
       _convoyBuffConsumedRealtime = true;
     }
@@ -936,8 +978,14 @@ class DefenseBattleSim {
     fieldTokens = (stage.startingFieldTokens * buffMult).round();
     qiBars = (progress.realm.startQiBars + progress.meridianStartQiBonus).clamp(0.0, maxQiBars);
 
+    _trialConsumableUsed.clear();
     if (allowSupportTokens) {
-      supportChargesLeft = min(preset.supportSlotCount, progress.supportTokens);
+      if (stage.isReincarnationBossStage) {
+        // <5% 극한 윤회 심판전에서는 패배 재도전 시 보유 지원패가 고갈되지 않도록 심판전 전용 공명 슬롯 부여
+        supportChargesLeft = max(1, preset.supportSlotCount.clamp(0, 3));
+      } else {
+        supportChargesLeft = min(preset.supportSlotCount, progress.supportTokens);
+      }
     }
 
     launchers.clear();
@@ -1175,9 +1223,9 @@ class DefenseBattleSim {
     return null;
   }
 
-  /// 발사대 종류 해금 여부 확인 (현재 관문 장 번호 또는 최고 해금 장 기준).
+  /// 발사대 종류 해금 여부 확인 (현재 관문 장 번호 또는 환생 포함 무구 해금 장 기준).
   bool isLauncherTypeUnlocked(LauncherType type) =>
-      type.unlockChapter <= max(stage.chapterNumber, progress.highestUnlockedChapter);
+      type.unlockChapter <= max(stage.chapterNumber, progress.effectiveArsenalChapter);
 
   void _spawnFlyingQiOrb(Vec2 fromPos, int amount, {int colorHex = 0xFFFFD166}) {
     if (amount <= 0) return;
@@ -2722,9 +2770,16 @@ class DefenseBattleSim {
   /// 전장 위기 순간 원터치 전술 비약·부적 발동!
   bool activateConsumable(TacticalConsumable item) {
     if (isFinished) return false;
-    final have = progress.consumables[item] ?? 0;
-    if (have <= 0) return false;
-    progress.consumables[item] = have - 1;
+    if (stage.isReincarnationBossStage) {
+      final used = _trialConsumableUsed[item] ?? 0;
+      final cap = max(1, min(2, progress.consumables[item] ?? 1));
+      if (used >= cap) return false;
+      _trialConsumableUsed[item] = used + 1;
+    } else {
+      final have = progress.consumables[item] ?? 0;
+      if (have <= 0) return false;
+      progress.consumables[item] = have - 1;
+    }
 
     switch (item) {
       case TacticalConsumable.qiSurgePill:
@@ -2780,10 +2835,16 @@ class DefenseBattleSim {
   bool triggerSupportChuldu({bool isFreeEncore = false}) {
     if (isFinished) return false;
     if (!isFreeEncore) {
-      if (supportChargesLeft <= 0 || progress.supportTokens <= 0) return false;
-      supportChargesLeft--;
-      usedSupportCount++;
-      progress.supportTokens = max(0, progress.supportTokens - 1);
+      if (stage.isReincarnationBossStage) {
+        if (supportChargesLeft <= 0) return false;
+        supportChargesLeft--;
+        usedSupportCount++;
+      } else {
+        if (supportChargesLeft <= 0 || progress.supportTokens <= 0) return false;
+        supportChargesLeft--;
+        usedSupportCount++;
+        progress.supportTokens = max(0, progress.supportTokens - 1);
+      }
     }
 
     chulduSweepAnimTimer = 1.35;
@@ -2842,7 +2903,14 @@ class DefenseBattleSim {
       final meridianMult = 1.0 + progress.meridianLauncherDmgBonus;
       final knockMult = 1.0 + progress.meridianKnockbackBonus;
       final dmg = (m.kind.isBoss
-              ? m.currentMaxHp * (isCritChuldu ? 0.58 : 0.40)
+              ? (stage.isReincarnationBossStage
+                  ? min(
+                      m.currentMaxHp * (isCritChuldu ? 0.13 : 0.075),
+                      centralSpec.baseDamage *
+                          (isCritChuldu ? 46.0 : 28.0) *
+                          progress.realm.powerMult,
+                    )
+                  : m.currentMaxHp * (isCritChuldu ? 0.58 : 0.40))
               : m.maxHp * 3.0) *
           meridianMult;
       _applyDamageToMutant(
@@ -3037,7 +3105,9 @@ class DefenseBattleSim {
         (goblinSpawnsDone == 1 && elapsedSec >= 44.0)) {
       goblinSpawnsDone++;
       final fromLeft = goblinSpawnsDone.isOdd;
-      final gobHp = (68.0 + stage.chapterNumber * 42.0) * difficulty.hpMult;
+      final gobHp = (progress.reincarnationCount > 0 || stage.isReincarnationBossStage)
+          ? _monsterHpScaleForWave(currentWaveIndex) * 4.2 * difficulty.hpMult
+          : (68.0 + stage.chapterNumber * 42.0) * difficulty.hpMult;
       treasureGoblin = TreasureGoblinEntity(
         pos: Vec2(fromLeft ? 32.0 : CampaignCatalog.arenaWidth - 32.0, 436.0),
         vel: Vec2(fromLeft ? 82.0 : -82.0, 6.0),
@@ -3069,10 +3139,12 @@ class DefenseBattleSim {
     // 초소가 설치된 상태에서만 호신 강기 방어막·수호탑 자연 회복 작동 (소수 설치 방치 시 진법 결속률 비례 감쇠!)
     if (launchers.isNotEmpty) {
       final resScale = formationResonanceScale;
+      final chaosHealDamp = stage.isReincarnationBossStage ? 0.32 : 1.0;
       final fortScale = (1.0 +
               progress.coreFortitudeBonus +
               progress.elixirResonanceBonus * 0.45) *
-          resScale;
+          resScale *
+          chaosHealDamp;
       if (shieldHp > 0 && shieldHp < shieldMaxHpDynamic) {
         final shieldRegenPerSec =
             max(1.25 * resScale, shieldMaxHpDynamic * 0.0085 * fortScale);
@@ -3464,8 +3536,8 @@ class DefenseBattleSim {
     }
 
     final chScale = _monsterHpScaleForWave(currentWaveIndex);
-    final ch1Ease = stage.chapterNumber == 1 ? 0.94 : 1.0;
-    final eliteFactor = stage.chapterNumber >= 5 ? 1.02 : 0.92;
+    final ch1Ease = (stage.chapterNumber == 1 && progress.reincarnationCount == 0) ? 0.94 : 1.0;
+    final eliteFactor = (stage.chapterNumber >= 5 || progress.reincarnationCount > 0) ? 1.02 : 0.92;
     final maxHp =
         kind.baseHp * kind.swarmHpFactor * chScale * ch1Ease * difficulty.hpMult * eliteFactor;
     final ch7DesertHaste = chapter.number == 7 ? 1.08 : 1.0;
@@ -3559,16 +3631,47 @@ class DefenseBattleSim {
 
   double _monsterHpScaleForWave(int waveIdx) {
     final chIdx = (stage.chapterNumber - 1).clamp(0, _chapterMonsterHpCurve.length - 1);
-    final baseCh = _chapterMonsterHpCurve[chIdx];
+    final reincMult = progress.reincarnationDifficultyMultiplier;
+    if (stage.isReincarnationBossStage) {
+      // 【윤회 최종 보스전】: 악몽 10-10 종결 기준선(launcherDpsIdx ≈ 76) 및 발사대 연사율·동료 한계돌파까지 반영해 매 회차 승률 <5% 고정!
+      double permSum = 0.0;
+      int permCnt = 0;
+      for (final lt in LauncherType.values) {
+        if (isLauncherTypeUnlocked(lt)) {
+          permSum += (progress.launcherPermanentLevels[lt] ?? 1);
+          permCnt++;
+        }
+      }
+      final avgPerm = permCnt > 0 ? permSum / permCnt : 1.0;
+      final rateRatio = max(1.0, (1.0 + (avgPerm - 1.0) * 0.045) / 1.765);
+      final maxAllyLv = progress.companionLevels.values.fold<int>(10, max);
+      final allyRatio = max(1.0, (1.50 + maxAllyLv * 0.20) / 3.50);
+      final extraThroughput = 0.70 * rateRatio + 0.30 * allyRatio;
+      final playerPowerRatio = max(
+        reincMult,
+        (_playerLauncherDpsIndex / 76.0) * extraThroughput,
+      );
+      final wEsc = waveIdx <= 0
+          ? 0.92
+          : (1.0 + pow(waveIdx, 1.52).toDouble() * 0.25);
+      return 182.0 *
+          1.60 *
+          reincarnationBossHpPressure *
+          playerPowerRatio *
+          wEsc;
+    }
     if (stage.globalIndex >= 900) {
       final w = max(0, waveIdx);
-      const endlessBase = 142.0;
+      final endlessBase = 142.0 * reincMult;
       if (w <= 15) {
         return endlessBase * (1.0 + w * 0.135);
       }
       // 16~100물결: 막 10-10을 깬 계정은 중후반(40~85물결)에서 한계를 느끼고, 엔드게임 연마 계정이 100물결을 정복하는 곡선!
       return endlessBase * (1.0 + w * 0.135 + pow(w - 15, 1.33).toDouble() * 0.062);
     }
+    final baseCh = progress.reincarnationCount > 0
+        ? _reincarnationEndgameBaseCurve[chIdx] * reincMult
+        : _chapterMonsterHpCurve[chIdx];
     // 물결이 진행되며 초소·비급·실시간 강화가 중첩되는 속도에 맞춰 중후반 적 본대 체력도 탄탄하게 상승! (입구컷 프리패스 방지)
     final waveEscalation = waveIdx <= 0
         ? (difficulty == DefenseDifficulty.nightmare ? 0.78 : 0.88)
@@ -3588,15 +3691,32 @@ class DefenseBattleSim {
   }
 
   double _mutantAttackScaleForWave(int waveIdx) {
+    if (stage.isReincarnationBossStage) {
+      final maxAllyLv = progress.companionLevels.values.fold<int>(10, max);
+      final allyHealScale = 1.0 + max(0, maxAllyLv - 10) * 0.018;
+      final shieldRatio = max(
+        pow(2.35, progress.reincarnationCount).toDouble(),
+        (centralSpec.shieldMaxHp / 1550.0) * allyHealScale,
+      );
+      final wFactor = waveIdx == 0 ? 0.80 : (1.0 + waveIdx * 0.085);
+      return 7.6 * 1.65 * reincarnationBossAtkPressure * shieldRatio * wFactor;
+    }
     double chMult = stage.globalIndex >= 900
         ? 7.4
-        : (1.0 +
-            (stage.chapterNumber - 1) * 0.50 +
-            (stage.chapterNumber >= 6 ? (stage.chapterNumber - 5) * 0.42 : 0.0));
+        : (progress.reincarnationCount > 0
+            ? (4.4 + (stage.chapterNumber - 1) * 0.36)
+            : (1.0 +
+                (stage.chapterNumber - 1) * 0.50 +
+                (stage.chapterNumber >= 6 ? (stage.chapterNumber - 5) * 0.42 : 0.0)));
     if (stage.globalIndex >= 900 && waveIdx > 15) {
       chMult *= 1.0 + (waveIdx - 15) * 0.033;
     }
-    final isFirstIntro = stage.globalIndex == 1 && difficulty == DefenseDifficulty.normal;
+    final reincAtkMult = progress.reincarnationCount > 0
+        ? pow(2.35, progress.reincarnationCount).toDouble()
+        : 1.0;
+    final isFirstIntro = stage.globalIndex == 1 &&
+        difficulty == DefenseDifficulty.normal &&
+        progress.reincarnationCount == 0;
     final earlyWaveEase = (waveIdx == 0 && stage.globalIndex < 900) ? 0.65 : 1.0;
     final nmWaveScale = _nightmareChallengeScaleForWave(waveIdx);
     final diffMult = switch (difficulty) {
@@ -3606,7 +3726,7 @@ class DefenseBattleSim {
         1.62 * pow(nmWaveScale, 0.22).toDouble(),
     };
     final ch9LavaAtk = chapter.number == 9 ? 1.10 : 1.0;
-    return chMult * diffMult * ch9LavaAtk * earlyWaveEase;
+    return chMult * reincAtkMult * diffMult * ch9LavaAtk * earlyWaveEase;
   }
 
   /// 장 진행 및 난이도에 따른 변이체 방어막·수호탑 공격력 배율 (1-1 보통은 1.00 정확 유지).
@@ -3623,7 +3743,9 @@ class DefenseBattleSim {
     }
 
     final chScale = _monsterHpScaleForWave(item.waveIndex);
-    final ch1Ease = (stage.chapterNumber == 1 && stage.globalIndex < 900)
+    final ch1Ease = (stage.chapterNumber == 1 &&
+            stage.globalIndex < 900 &&
+            progress.reincarnationCount == 0)
         ? (item.kind.isBoss ? 0.76 : 0.96)
         : 1.0;
     final maxHp = item.kind.baseHp *
@@ -3675,21 +3797,21 @@ class DefenseBattleSim {
       if (item.kind.isMidBoss) {
         spawned.enableBossPhases(
           phases: 2,
-          initialPlates: (isNightmare && stage.chapterNumber >= 3) ? 1 : 0,
+          initialPlates: (isNightmare && (stage.chapterNumber >= 3 || progress.reincarnationCount > 0)) ? 1 : 0,
           phase1HpScale: 0.78,
         );
       } else {
         spawned.enableBossPhases(
           phases: 3,
-          initialPlates: isNightmare ? 3 : 2,
-          phase1HpScale: 0.68,
+          initialPlates: stage.isReincarnationBossStage ? 4 : (isNightmare ? 3 : 2),
+          phase1HpScale: stage.isReincarnationBossStage ? 0.85 : 0.68,
         );
       }
       spawned.weakSpotAngleRad = rng.nextDouble() * pi * 2;
       final baseShieldHits = item.customHitShield ?? item.kind.baseHitShield;
-      final shieldHits = isNightmare
-          ? (baseShieldHits * 1.32).round()
-          : baseShieldHits;
+      final reincHitMult = 1.0 + progress.reincarnationCount * 0.22;
+      final shieldHits = ((isNightmare ? baseShieldHits * 1.32 : baseShieldHits) * reincHitMult)
+          .round();
       final rankLabel = item.hierarchyRank ?? (item.kind.isMidBoss ? '행동대장' : '장 보스');
       if (shieldHits > 0) {
         spawned.enableHitShield(shieldHits, rank: rankLabel);
@@ -3922,7 +4044,12 @@ class DefenseBattleSim {
           gaitMult *= 0.94 + 0.12 * sin(m.animPhase * 0.9).abs();
         }
 
-        final slowFactor = m.slowTimer > 0 ? 0.58 : 1.0;
+        final slowFactor = m.slowTimer > 0
+            ? (stage.isReincarnationBossStage && m.kind.isBoss ? 0.78 : 0.58)
+            : 1.0;
+        final trialBossStride = (stage.isReincarnationBossStage && m.kind.isBoss)
+            ? (1.18 + (elapsedSec > 165.0 ? min(0.85, (elapsedSec - 165.0) * 0.012) : 0.0))
+            : 1.0;
         final covRatio = formationCoverageRatio;
         final gapSpeedSurge = (currentWaveIndex >= 2 && covRatio < 0.84)
             ? (1.0 + (0.84 - covRatio) * 0.68)
@@ -3940,7 +4067,7 @@ class DefenseBattleSim {
             ),
           );
         }
-        final effectiveSpeed = m.speed * slowFactor * gaitMult * gapSpeedSurge;
+        final effectiveSpeed = m.speed * slowFactor * gaitMult * gapSpeedSurge * trialBossStride;
 
         // Catmull-Rom 곡선 경로 및 90° 직각 미궁 경로 정밀 주시(Look-Ahead Pure Pursuit)!
         if (m.waypoints.isNotEmpty) {
@@ -4096,7 +4223,12 @@ class DefenseBattleSim {
       final gapAtkSurge = (currentWaveIndex >= 2 && covForAtk < 0.84)
           ? (1.0 + (0.84 - covForAtk) * 3.6)
           : 1.0;
-      final atkScale = (m.attackScaleSnapshot > 0 ? m.attackScaleSnapshot : _mutantAttackScale) * gapAtkSurge;
+      final trialRageMult = stage.isReincarnationBossStage
+          ? (1.0 + max(0.0, elapsedSec - 90.0) * 0.032)
+          : 1.0;
+      final atkScale = (m.attackScaleSnapshot > 0 ? m.attackScaleSnapshot : _mutantAttackScale) *
+          gapAtkSurge *
+          trialRageMult;
       final frostShieldDr = seolhwaFrostShieldTimer > 0 ? 0.75 : 1.0;
       // 외곽 기공 방어막 충돌 처리 (외각 장갑이 깨지지 않은 다단 변이 보스는 결계를 1.48배로 부수며 밀침 저항!)
       if (shieldHp > 0 &&
@@ -4116,9 +4248,10 @@ class DefenseBattleSim {
           swarmHitsOnShield++;
         }
 
-        // 방어막 반동 충격파로 변이체 후방 밀침 (장갑을 두른 보스는 밀침 56% 저항 — 약점을 깨야 물러남!)
-        final pushScale =
-            (isFormationActive ? 2.35 : 1.42) * (m.carapacePlatesLeft > 0 ? 0.44 : 1.0);
+        // 방어막 반동 충격파로 변이체 후방 밀침 (장갑을 두른 보스는 밀침 56% 저항 · 윤회 심판 보스는 무극 패기로 제단에 밀착 강타!)
+        final pushScale = (isFormationActive ? 2.35 : 1.42) *
+            (m.carapacePlatesLeft > 0 ? 0.44 : 1.0) *
+            ((stage.isReincarnationBossStage && m.kind.isBoss) ? 0.22 : 1.0);
         final rawPush = m.pos - shieldCenter;
         final pushDir = rawPush.length > 1e-3 ? rawPush.normalized : const Vec2(0, -1);
         m.knockbackVel = pushDir * (centralSpec.shieldWavePush * pushScale / sqrt(m.kind.mass));
@@ -4570,6 +4703,7 @@ class DefenseBattleSim {
           permScale *
           ampDamage *
           progress.realm.powerMult *
+          progress.transcendenceMultiplier *
           (1.0 +
               progress.meridianLauncherDmgBonus +
               progress.coreFirepowerBonus +
@@ -4736,7 +4870,8 @@ class DefenseBattleSim {
         mutants.isNotEmpty) {
       mukhyeonTriggered = true;
       mukhyeonCooldownTimer = 26.0 * cdFactor.clamp(0.45, 1.0);
-      final mukLv = (progress.companionLevels[CompanionHero.mukhyeon] ?? 1).clamp(1, 10);
+      final mukLv =
+          (progress.companionLevels[CompanionHero.mukhyeon] ?? 1).clamp(1, progress.maxAllyLevel);
       shieldHp = min(shieldMaxHpDynamic, shieldHp + shieldMaxHpDynamic * 0.25);
       callouts.add(
         FloatingCallout(
@@ -4870,7 +5005,8 @@ class DefenseBattleSim {
         );
         break;
       case SpiritBeast.geumgangTurtle:
-        final turtleHeal = shieldMaxHpDynamic * (0.16 + lv * 0.015);
+        final healDamp = stage.isReincarnationBossStage ? 0.36 : 1.0;
+        final turtleHeal = shieldMaxHpDynamic * min(0.55, 0.16 + lv * 0.015) * healDamp;
         shieldHp = min(
           shieldMaxHpDynamic,
           shieldHp > 0 ? (shieldHp + turtleHeal) : (turtleHeal * 0.70),
@@ -4898,7 +5034,7 @@ class DefenseBattleSim {
         }
         break;
       case SpiritBeast.cheonghak:
-        cheonghakBuffTimer = 5.0 + lv * 0.25;
+        cheonghakBuffTimer = min(10.0, 5.0 + lv * 0.25);
         _spawnStoneShot(
           sourceKey: 'beast_cheonghak',
           sourceLabel: '영수 청학',
@@ -5029,7 +5165,7 @@ class DefenseBattleSim {
         );
         break;
       case CompanionHero.cheongmyeong:
-        qiBars = (qiBars + 0.65 + lv * 0.04).clamp(0.0, maxQiBars);
+        qiBars = (qiBars + min(1.85, 0.65 + lv * 0.04)).clamp(0.0, maxQiBars);
         // 마기 침식된 아군 초소 1기 즉시 정화!
         for (final l in launchers) {
           if (l.isCorrupted) {
@@ -5116,7 +5252,7 @@ class DefenseBattleSim {
       case CompanionHero.jeonggak:
         _jeonggakHasteMult =
             (1.38 + lv * 0.03 + progress.elixirResonanceBonus * 0.20).clamp(1.40, 2.05);
-        jeonggakHasteTimer = 4.5 + lv * 0.32;
+        jeonggakHasteTimer = min(9.5, 4.5 + lv * 0.32);
         final jeongEntry = _contribMap.putIfAbsent(
           key,
           () => ContributionEntry(key: key, label: '$label (기관 가속)'),
@@ -5144,7 +5280,7 @@ class DefenseBattleSim {
         );
         break;
       case CompanionHero.chwiseon:
-        qiBars = (qiBars + 1.05 + lv * 0.06).clamp(0.0, maxQiBars);
+        qiBars = (qiBars + min(2.40, 1.05 + lv * 0.06)).clamp(0.0, maxQiBars);
         _spawnStoneShot(
           sourceKey: key,
           sourceLabel: label,
@@ -5230,8 +5366,9 @@ class DefenseBattleSim {
         break;
       case CompanionHero.sinseung:
         final resonanceScale = 1.0 + progress.elixirResonanceBonus * 0.35;
-        final shieldHealRatio = (0.18 + lv * 0.016) * resonanceScale;
-        final ecoHeal = 0.24 + lv * 0.024;
+        final healDamp = stage.isReincarnationBossStage ? 0.36 : 1.0;
+        final shieldHealRatio = min(0.62, (0.18 + lv * 0.016) * resonanceScale) * healDamp;
+        final ecoHeal = min(0.75, 0.24 + lv * 0.024);
         final healedAmt = shieldMaxHpDynamic * shieldHealRatio;
         if (shieldHp > 0) {
           shieldHp = min(shieldMaxHpDynamic, shieldHp + healedAmt);
@@ -5925,8 +6062,10 @@ class DefenseBattleSim {
               ),
             );
             final kegMult = chapter.number == 2 ? 1.45 : 1.0;
-            final blastDmg =
-                (52.0 + stage.chapterNumber * 20.0) * kegMult * progress.realm.powerMult;
+            final blastDmg = (52.0 + stage.chapterNumber * 20.0) *
+                kegMult *
+                progress.realm.powerMult *
+                progress.transcendenceMultiplier;
             _spawnShockwaveRing(
               keg.pos,
               maxRadius: 108.0,
@@ -6187,7 +6326,9 @@ class DefenseBattleSim {
           precisionHitCount++;
           m.flankCrackCooldown = 4.6;
           m.carapacePlatesLeft--;
-          precisionBonusTrueDmg = m.currentMaxHp * 0.07;
+          precisionBonusTrueDmg = stage.isReincarnationBossStage
+              ? min(p.damage * 2.4, m.currentMaxHp * 0.022)
+              : m.currentMaxHp * 0.07;
           pendingSounds.add(SoundCue.criticalShatter);
           bursts.add(
             FxBurst(
@@ -6704,7 +6845,7 @@ class DefenseBattleSim {
         : dmg * (1.0 - armor).clamp(0.1, 1.0) * carapaceMult * gapBypassMult;
     final effectiveDmg = (sourceKey == 'support_chuldu' && !m.kind.isBoss)
         ? rawEffective
-        : min(1000000000.0, rawEffective);
+        : min(1000000000000000000.0, rawEffective);
 
     final dealt = min(m.hp, effectiveDmg);
     m.hp -= effectiveDmg;
@@ -6717,9 +6858,11 @@ class DefenseBattleSim {
     final impactScale = (stage.chapterNumber <= 2 && difficulty != DefenseDifficulty.nightmare)
         ? 1.0
         : (0.18 + 0.82 * (effectiveDmg / max(1.0, m.currentMaxHp * 0.14)).clamp(0.0, 1.0));
-    final nightmareKnockResist = difficulty == DefenseDifficulty.nightmare
-        ? 0.56
-        : (difficulty == DefenseDifficulty.normal ? 0.88 : 1.0);
+    final nightmareKnockResist = (stage.isReincarnationBossStage && m.kind.isBoss)
+        ? (elapsedSec > 165.0 ? 0.04 : 0.16)
+        : (difficulty == DefenseDifficulty.nightmare
+            ? 0.56
+            : (difficulty == DefenseDifficulty.normal ? 0.88 : 1.0));
     final oilKnockBoost = (!m.kind.isFlying && m.oilSlipTimer > 0) ? 1.25 : 1.0;
     m.knockbackVel = m.knockbackVel +
         knockDir *
@@ -7422,7 +7565,9 @@ class DefenseBattleSim {
       dawnPurifyAnimTimer = 1.5;
       earnedElixirs += stage.clearElixirBonus +
           (stage.isBossStage ? (2 + (stage.chapterNumber ~/ 3)) : 0);
-      earnedPermanentTokens += 20 + stage.chapterNumber * 8;
+      earnedPermanentTokens += stage.isReincarnationBossStage
+          ? 320
+          : (20 + stage.chapterNumber * 8);
       pendingSounds.add(SoundCue.dawnPurify);
     }
   }

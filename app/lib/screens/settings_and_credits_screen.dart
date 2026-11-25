@@ -104,6 +104,22 @@ class SettingsScreen extends StatelessWidget {
                   border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  key: const Key('paste_clipboard_backup_btn'),
+                  onPressed: () async {
+                    final clip = await Clipboard.getData(Clipboard.kTextPlain);
+                    final txt = clip?.text?.trim() ?? '';
+                    if (txt.isNotEmpty) {
+                      inputCtrl.text = txt;
+                    }
+                  },
+                  icon: const Icon(Icons.content_paste_rounded, size: 16),
+                  label: const Text('클립보드에서 바로 붙여넣기'),
+                ),
+              ),
             ],
           ),
           actions: [
@@ -579,7 +595,7 @@ class CreditsScreen extends StatelessWidget {
                         showLicensePage(
                           context: context,
                           applicationName: '수호알까기 · 탄지무림 심야기습',
-                          applicationVersion: '1.0.0+34',
+                          applicationVersion: '1.0.0+35',
                           applicationLegalese: '© 2026 (주)웰쉐어로지스 (TTong Studio)',
                         );
                       },
@@ -669,7 +685,8 @@ class ProductionNoteScreen extends StatelessWidget {
                     '• 공중 비행 변이 2종 & 3단 계급 보스(행동대장 100타+ · 중간보스 300타+ · 장 보스 1,000타+): 혈익 흡혈박쥐·심연 철익귀 방공 교전 및 누적 100~2,000타 이상 타격 파쇄 마갑 시스템\n'
                     '• 비상 위험 알림 & 실시간 2.8배 공격 확대 영상 모니터(PIP): 위험 구역 경보와 동시에 돌연변이 공격 지점을 2.8배 라이브 확대 영상으로 비추고 원터치 정밀 타격 지원\n'
                     '• 1~4배속 미세 분할 물리 & 0초 무정지 전투: 탄알 관통 오차 없는 1~4배속 가속 + 6.5초 비급·4.8초 초소 띠 미클릭 자동 패스\n'
-                    '• 실시간 군수 강화 4종 & 땅굴·월담·공중 기습: [⚔️화력·⚡연사·🔭사거리·🛡️결계] 즉시 강화 + 유료 연성 신기 합체 + 🕳️땅굴·🌲월담·🪽공중 비정규 침투!',
+                    '• 실시간 군수 강화 4종 & 땅굴·월담·공중 기습: [⚔️화력·⚡연사·🔭사거리·🛡️결계] 즉시 강화 + 유료 연성 신기 합체 + 🕳️땅굴·🌲월담·🪽공중 비정규 침투!\n'
+                    '• 윤회 최종 보스전(돌파율 5% 미만) & 무한 다회차 3배 환생 시스템: 악몽 제10현(10-10) 완전 정화 시 10물결 【윤회 심판전 · 무극혼돈신(성공률 <5%)】이 개방되며, 토벌 시 전 능력치를 100% 계승한 채 1-1부터 새로 출발하되 매 환생마다 전 난이도가 3배씩(×3·×9·×27…) 무한 격상!',
                     style: TextStyle(fontSize: 13, height: 1.5),
                   ),
                 ],

@@ -4,6 +4,7 @@ import 'package:alkkagi_night/screens/battle_screen.dart';
 import 'package:alkkagi_night/screens/codex_and_endless_screens.dart';
 import 'package:alkkagi_night/screens/convoy_campaign_screens.dart';
 import 'package:alkkagi_night/screens/daily_quests_screen.dart';
+import 'package:alkkagi_night/screens/home_screen.dart';
 import 'package:alkkagi_night/screens/loadout_upgrade_screens.dart';
 import 'package:alkkagi_night/screens/settings_and_credits_screen.dart';
 import 'package:alkkagi_night/screens/stage_and_county_transitions.dart';
@@ -1858,6 +1859,96 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('진법결속'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'v1.0.0+35 악몽 10현 돌파 후 윤회 최종 보스전 출정 카드 및 다회차(제1환생 ×3배 ➔ 제2환생 ×9배) 등선 UI 검증',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final p = PlayerProgress(
+      tokens: 8000,
+      elixirs: 120,
+      centralGuardianLevel: 24,
+      highestClearedGlobalStage: 100,
+      nightmareChapter10Cleared: true,
+      reincarnationBossCleared: false,
+      tutorialSeen: true,
+      bgmVolume: 0.0,
+      sfxVolume: 0.0,
+    );
+    p.unlockedStones.addAll(StoneMaterial.values);
+    final ctrl = GameController(initialProgress: p);
+
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(controller: ctrl)));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // 1) 악몽 10-10 정화 상태에서 윤회 최종 보스전(<5%) 출정 버튼 노출 확인
+    expect(find.byKey(const Key('home_reincarnation_sanctum_card')), findsOneWidget);
+    expect(find.byKey(const Key('home_reincarnation_boss_btn')), findsOneWidget);
+    expect(find.byKey(const Key('home_reincarnate_btn')), findsNothing);
+
+    // 2) 윤회 최종 보스전 승리 반영 후 제1환생(×3배) 등선 의식 실행 검증
+    final boss0 = ctrl.buildReincarnationBossStage();
+    ctrl.recordBattleSummary(
+      boss0,
+      const BattleSummary(
+        victory: true,
+        stars: 3,
+        earnedTokens: 320,
+        earnedElixirs: 30,
+        usedSupportCount: 2,
+        pporokCount: 4,
+        bankShotCount: 6,
+        chainShatterCount: 5,
+        serendipityCount: 3,
+        granaryRatio: 1.0,
+        cropsRatio: 1.0,
+        livestockRatio: 1.0,
+        contributions: [],
+        coachingTip: '완승',
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+
+    final reincBtn1 = find.byKey(const Key('home_reincarnate_btn'));
+    expect(reincBtn1, findsOneWidget);
+    await tester.ensureVisible(reincBtn1);
+    await tester.tap(reincBtn1);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byKey(const Key('home_confirm_reincarnation_btn')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('home_confirm_reincarnation_btn')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(ctrl.progress.reincarnationCount, 1);
+    expect(ctrl.progress.highestClearedGlobalStage, 0);
+    expect(ctrl.progress.centralGuardianLevel, 24);
+    expect(find.byKey(const Key('home_reincarnation_pill')), findsOneWidget);
+    expect(find.textContaining('×3배'), findsWidgets);
+
+    // 3) 제1환생 상태에서 다시 악몽 10-10 + 최종 보스 돌파 후 제2환생(×9배) 실행 검증
+    ctrl.progress.highestClearedGlobalStage = 100;
+    ctrl.progress.nightmareChapter10Cleared = true;
+    ctrl.progress.reincarnationBossCleared = true;
+    ctrl.notifyConsumableUsedInBattle();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    final reincBtn2 = find.byKey(const Key('home_reincarnate_btn'));
+    expect(reincBtn2, findsOneWidget);
+    await tester.ensureVisible(reincBtn2);
+    await tester.tap(reincBtn2);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('home_confirm_reincarnation_btn')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(ctrl.progress.reincarnationCount, 2);
+    expect(ctrl.progress.reincarnationDifficultyMultiplier, closeTo(9.0, 1e-6));
+    expect(find.textContaining('×9배'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

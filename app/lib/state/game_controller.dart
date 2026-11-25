@@ -141,7 +141,7 @@ class GameController extends ChangeNotifier {
     final chSpec = CampaignCatalog.chapterOf(stage.chapterNumber);
     for (int i = 0; i < chSpec.mounts.length && i < preset.mountTypes.length; i++) {
       final rec = chSpec.mounts[i].recommendedType;
-      if (rec.unlockChapter <= _progress.highestUnlockedChapter) {
+      if (rec.unlockChapter <= _progress.effectiveArsenalChapter) {
         preset.mountTypes[i] = rec;
       }
     }
@@ -327,7 +327,36 @@ class GameController extends ChangeNotifier {
     return ok;
   }
 
-  // --- 영약각 ---
+  // --- 영약각 & 윤회 등선 ---
+  StageSpec buildReincarnationBossStage() =>
+      CampaignCatalog.buildReincarnationFinalBossStage(
+        reincarnationCount: _progress.reincarnationCount,
+      );
+
+  bool upgradeTranscendence() {
+    final ok = _progress.upgradeTranscendence();
+    if (ok) {
+      NightAudioController.instance.playAsset('serendipity_jackpot.wav');
+      NightHaptics.instance.chulduRumble();
+      saveToDisk();
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  bool performReincarnation() {
+    final ok = _progress.performReincarnation();
+    if (ok) {
+      selectedChapter = 1;
+      NightAudioController.instance.playAsset('serendipity_jackpot.wav');
+      NightAudioController.instance.playAsset('jingle_levelup.ogg');
+      NightHaptics.instance.chulduRumble();
+      saveToDisk();
+      notifyListeners();
+    }
+    return ok;
+  }
+
   bool upgradeElixirResonance() {
     final ok = _progress.upgradeElixirResonance();
     if (ok) {
@@ -570,7 +599,9 @@ class GameController extends ChangeNotifier {
       serendipityCount: summary.serendipityCount,
       encounteredMutants: summary.encounteredMutants,
       endlessWavesCleared: stage.globalIndex >= 900 ? summary.wavesClearedCount : 0,
-      difficultyId: selectedDifficulty.id,
+      difficultyId: stage.isReincarnationBossStage
+          ? DefenseDifficulty.nightmare.id
+          : selectedDifficulty.id,
       supportAlreadyDeductedInSim: summary.supportDeductedRealtime,
       bossElixirAlreadyIncluded: summary.bossElixirIncluded,
       convoyBuffAlreadyConsumed: summary.convoyBuffConsumedRealtime,

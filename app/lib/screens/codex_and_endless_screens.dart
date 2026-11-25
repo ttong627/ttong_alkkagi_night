@@ -268,7 +268,7 @@ class CodexScreen extends StatelessWidget {
           ),
         ),
         ...LauncherType.values.map((t) {
-          final unlocked = t.unlockChapter <= p.highestUnlockedChapter;
+          final unlocked = t.unlockChapter <= p.effectiveArsenalChapter;
           final permLv = p.launcherPermanentLevels[t] ?? 1;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -893,7 +893,7 @@ class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedThemeChapter = widget.controller.progress.highestUnlockedChapter;
+    _selectedThemeChapter = widget.controller.progress.effectiveArsenalChapter;
   }
 
   @override
@@ -902,7 +902,7 @@ class _EndlessSurvivalScreenState extends State<EndlessSurvivalScreen> {
       listenable: widget.controller,
       builder: (context, _) {
         final p = widget.controller.progress;
-        final maxCh = p.highestUnlockedChapter.clamp(1, 10);
+        final maxCh = p.effectiveArsenalChapter.clamp(1, 10);
         final selectedChapter =
             CampaignCatalog.chapterOf(_selectedThemeChapter.clamp(1, maxCh));
 

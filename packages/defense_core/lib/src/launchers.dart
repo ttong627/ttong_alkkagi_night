@@ -216,18 +216,24 @@ class CentralGuardianSpec {
     required double meridianReloadBonus,
     required double coreFortitudeBonus,
     required double coreFirepowerBonus,
+    double transcendenceMultiplier = 1.0,
   }) {
     // 중앙 수호탑 자동 방어는 최후방 결계 코앞의 비상 견제 역할만 수행하며,
     // 길목 거점을 개척·설치하지 않으면 결계가 반드시 돌파되도록 긴장감 있게 설계!
+    final trans = transcendenceMultiplier <= 0 || !transcendenceMultiplier.isFinite
+        ? 1.0
+        : transcendenceMultiplier;
     final shieldHp = (240.0 + centralLevel * 30.0) *
         realmDefenseMult *
-        (1.0 + meridianShieldBonus + coreFortitudeBonus);
+        (1.0 + meridianShieldBonus + coreFortitudeBonus) *
+        trans;
     final towerHp = (210.0 + centralLevel * 25.0) *
         realmDefenseMult *
-        (1.0 + coreFortitudeBonus);
+        (1.0 + coreFortitudeBonus) *
+        trans;
     final interval = (1.58 / (1.0 + centralLevel * 0.045 + meridianReloadBonus))
         .clamp(0.65, 1.70);
-    final dmg = (13.0 + centralLevel * 3.6) * (1.0 + coreFirepowerBonus);
+    final dmg = (13.0 + centralLevel * 3.6) * (1.0 + coreFirepowerBonus) * trans;
     return CentralGuardianSpec(
       coreLevel: centralLevel,
       shieldMaxHp: shieldHp,
