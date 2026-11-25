@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:defense_core/defense_core.dart';
@@ -24,6 +25,7 @@ class GameController extends ChangeNotifier {
   bool autoChooseBattlePerks = false;
   bool continuousVillageMarch = true;
   final Random _rng = Random();
+  Timer? _volumeSaveDebounce;
 
   PlayerProgress get progress => _progress;
 
@@ -63,6 +65,8 @@ class GameController extends ChangeNotifier {
   }
 
   Future<bool> saveToDisk() async {
+    _volumeSaveDebounce?.cancel();
+    _volumeSaveDebounce = null;
     try {
       final prefs = await SharedPreferences.getInstance();
       return await prefs.setString(_prefsKey, _progress.encodeJson());
@@ -70,6 +74,24 @@ class GameController extends ChangeNotifier {
       debugPrint('자동 저장 예외 무시: $e');
       return false;
     }
+  }
+
+  void _scheduleDebouncedSave() {
+    _volumeSaveDebounce?.cancel();
+    _volumeSaveDebounce = Timer(const Duration(milliseconds: 220), () {
+      _volumeSaveDebounce = null;
+      unawaited(saveToDisk());
+    });
+  }
+
+  @override
+  void dispose() {
+    if (_volumeSaveDebounce != null) {
+      _volumeSaveDebounce?.cancel();
+      _volumeSaveDebounce = null;
+      unawaited(saveToDisk());
+    }
+    super.dispose();
   }
 
   void setDifficulty(DefenseDifficulty diff) {
@@ -529,14 +551,14 @@ class GameController extends ChangeNotifier {
   void setBgmVolume(double vol) {
     _progress.bgmVolume = vol.clamp(0.0, 1.0);
     _syncDeviceSettings();
-    saveToDisk();
+    _scheduleDebouncedSave();
     notifyListeners();
   }
 
   void setSfxVolume(double vol) {
     _progress.sfxVolume = vol.clamp(0.0, 1.0);
     _syncDeviceSettings();
-    saveToDisk();
+    _scheduleDebouncedSave();
     notifyListeners();
   }
 

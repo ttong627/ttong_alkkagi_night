@@ -1623,7 +1623,7 @@ class DefenseBattleSim {
     return _spawnQueue.length <= 8 && elapsedSec >= 3.0;
   }
 
-  /// 다음 물결을 즉시 앞당겨 호출하고 보너스 건설 기력 +14⚡ 획득! (이전 물결 적이 모두 정리될 때 클리어 물결 집계)
+  /// 다음 물결을 즉시 앞당겨 호출하고 보너스 건설 기력 +18⚡ 획득! (이전 물결 적이 모두 정리될 때 클리어 물결 집계)
   bool callNextWaveEarly() {
     if (!canCallNextWaveEarly) return false;
     final nextIdx = currentWaveIndex + 1;
@@ -1633,7 +1633,7 @@ class DefenseBattleSim {
     _enqueueWave(currentWaveIndex, appendExisting: true);
     _announceNewlyUnlockedPads();
 
-    const bonusQi = 14;
+    const bonusQi = 18;
     fieldTokens += bonusQi;
     _spawnFlyingQiOrb(const Vec2(360, 82), bonusQi, colorHex: 0xFF72EFDD);
     pendingSounds.add(SoundCue.serendipityJackpot);

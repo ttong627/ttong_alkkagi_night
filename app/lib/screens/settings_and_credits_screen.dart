@@ -259,6 +259,7 @@ class SettingsScreen extends StatelessWidget {
                             child: Slider(
                               value: p.bgmVolume,
                               onChanged: controller.setBgmVolume,
+                              onChangeEnd: (_) => controller.saveToDisk(),
                               activeColor: NightPalette.accentGold,
                             ),
                           ),
@@ -278,6 +279,7 @@ class SettingsScreen extends StatelessWidget {
                             child: Slider(
                               value: p.sfxVolume,
                               onChanged: controller.setSfxVolume,
+                              onChangeEnd: (_) => controller.saveToDisk(),
                               activeColor: NightPalette.accentGold,
                             ),
                           ),
@@ -432,6 +434,7 @@ class SettingsScreen extends StatelessWidget {
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _showCrashDiagDialog(context),
                       ),
+                      _SideloadUpdateTile(onToast: (msg) => _toast(context, msg)),
                       const Divider(height: 1),
                       ListTile(
                         key: const Key('open_credits_btn'),
@@ -595,7 +598,7 @@ class CreditsScreen extends StatelessWidget {
                         showLicensePage(
                           context: context,
                           applicationName: '수호알까기 · 탄지무림 심야기습',
-                          applicationVersion: '1.0.0+35',
+                          applicationVersion: '$kNightAppVersion+$kNightAppBuild',
                           applicationLegalese: '© 2026 (주)웰쉐어로지스 (TTong Studio)',
                         );
                       },
@@ -720,6 +723,132 @@ class ProductionNoteScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 직접 설치판(`sideload`)에서만 노출되는 수동 '새 판 확인 · 업데이트 설치' 타일 (플레이 스토어 배포판 및 웹에서는 자동 숨김).
+class _SideloadUpdateTile extends StatefulWidget {
+  const _SideloadUpdateTile({required this.onToast});
+  final ValueChanged<String> onToast;
+
+  @override
+  State<_SideloadUpdateTile> createState() => _SideloadUpdateTileState();
+}
+
+class _SideloadUpdateTileState extends State<_SideloadUpdateTile> {
+  bool _supported = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _probeSupport();
+  }
+
+  Future<void> _probeSupport() async {
+    final ok = await NightHaptics.instance.isSideloadUpdaterAvailable();
+    if (mounted && ok != _supported) {
+      setState(() => _supported = ok);
+    }
+  }
+
+  Future<void> _onTapTile(NightUpdateStage stage) async {
+    final haptics = NightHaptics.instance;
+    if (stage == NightUpdateStage.checking ||
+        stage == NightUpdateStage.downloading ||
+        stage == NightUpdateStage.installing) {
+      return;
+    }
+    if (stage == NightUpdateStage.available ||
+        stage == NightUpdateStage.needsPermission) {
+      final started = await haptics.startSideloadInstall();
+      if (mounted) {
+        widget.onToast(
+          started ? '새 판 내려받기를 시작합니다.' : haptics.updateMessage,
+        );
+      }
+      return;
+    }
+    final next = await haptics.checkSideloadUpdate();
+    if (mounted && haptics.updateMessage.isNotEmpty) {
+      widget.onToast(haptics.updateMessage);
+    }
+    if (next == NightUpdateStage.available && mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_supported) return const SizedBox.shrink();
+    final haptics = NightHaptics.instance;
+    return ValueListenableBuilder<NightUpdateStage>(
+      valueListenable: haptics.updateStage,
+      builder: (context, stage, _) {
+        return ValueListenableBuilder<int>(
+          valueListenable: haptics.updatePercent,
+          builder: (context, pct, _) {
+            final subtitleText = switch (stage) {
+              NightUpdateStage.idle =>
+                '현재 빌드 +$kNightAppBuild · 누르면 공식 저장소의 새 판 여부를 확인합니다',
+              NightUpdateStage.checking => '공식 저장소 최신 판본 확인 중...',
+              NightUpdateStage.upToDate =>
+                haptics.updateMessage.isNotEmpty
+                    ? haptics.updateMessage
+                    : '이미 최신 판본(+$kNightAppBuild)입니다',
+              NightUpdateStage.available =>
+                '${haptics.updateMessage} (한 번 더 누르면 즉시 설치)',
+              NightUpdateStage.needsPermission =>
+                '출처 허용 후 다시 누르면 설치를 이어갑니다',
+              NightUpdateStage.downloading => '새 판 내려받는 중 ($pct%) · SHA-256 지문 대조',
+              NightUpdateStage.installing => '무결성 검증 완료 · 패키지 설치 중...',
+              NightUpdateStage.failed => haptics.updateMessage,
+            };
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Divider(height: 1),
+                ListTile(
+                  key: const Key('sideload_check_update_tile'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    stage == NightUpdateStage.available
+                        ? Icons.system_update_alt_rounded
+                        : Icons.system_update_rounded,
+                    color: stage == NightUpdateStage.available
+                        ? NightPalette.accentGold
+                        : NightPalette.jadeGreen,
+                  ),
+                  title: const Text('직접 설치판 새 판 확인 및 업데이트'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(subtitleText),
+                      if (stage == NightUpdateStage.downloading) ...[
+                        const SizedBox(height: 6),
+                        LinearProgressIndicator(
+                          value: (pct / 100.0).clamp(0.0, 1.0),
+                          backgroundColor: Colors.white12,
+                          color: NightPalette.accentGold,
+                        ),
+                      ],
+                    ],
+                  ),
+                  trailing: stage == NightUpdateStage.checking ||
+                          stage == NightUpdateStage.installing
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                  onTap: () => _onTapTile(stage),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

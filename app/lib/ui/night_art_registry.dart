@@ -579,6 +579,7 @@ class NightBattleSprites {
   final Set<String> _missingOnce = <String>{};
 
   ui.Image? operator [](String assetPath) => _cache[assetPath];
+  int get cachedCount => _cache.length;
 
   ui.Image? get towerGuardian => _cache[NightArtRegistry.towerGuardian];
   ui.Image? get granary => _cache[NightArtRegistry.villageGranary];

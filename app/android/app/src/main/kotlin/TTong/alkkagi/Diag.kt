@@ -74,7 +74,7 @@ object Diag {
             -1L
         }
         val head = StringBuilder()
-            .append("알까기 시험판 ").append(build)
+            .append("수호알까기 · 탄지무림 심야기습 (빌드 ").append(build).append(")")
             .append(" · ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
             .append(" · 안드로이드 ").append(Build.VERSION.RELEASE).append(" (API ").append(Build.VERSION.SDK_INT).append(")\n")
         val crashFile = File(context.filesDir, CRASH_FILE)

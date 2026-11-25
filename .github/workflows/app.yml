@@ -1,4 +1,4 @@
-# 수호알까기 · 탄지무림 심야기습 — 자동 검증(111단계 시뮬레이션) + 안드로이드 설치판/스토어판 빌드 및 권한 검수
+# 수호알까기 · 탄지무림 심야기습 — 자동 검증(10현 100판 + 윤회 심판전 시뮬레이션) + 안드로이드 직접설치판/스토어판 빌드 및 무결성 검수
 name: app
 
 on:
@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      make_release:
+        description: 'APK·AAB 산출물을 GitHub 릴리스(build-번호 및 test-latest)에도 게시'
+        type: boolean
+        required: false
+        default: false
 
 env:
   FLUTTER_VERSION: 3.47.6
@@ -23,7 +29,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - name: 방어 물리 엔진 정적 분석 · 단위 시험 · 111단계 구성 검증
+      - name: 방어 물리 엔진 정적 분석 · 단위 시험 · 10현 100판 구성 검증
         working-directory: packages/defense_core
         run: |
           dart pub get
@@ -40,6 +46,9 @@ jobs:
   android_build:
     needs: verify_and_test
     runs-on: ubuntu-latest
+    outputs:
+      build_number: ${{ steps.bn.outputs.build_number }}
+      signed: ${{ steps.key.outputs.signed }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -51,42 +60,56 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - name: 업로드 키스토어 복원 (비밀값 존재 시)
-        if: ${{ env.ALKKAGI_UPLOAD_KEYSTORE_B64 != '' }}
+      - name: 업로드 키스토어 복원 (main 브랜치 및 비밀값 존재 시)
+        id: key
         env:
-          ALKKAGI_UPLOAD_KEYSTORE_B64: ${{ secrets.ALKKAGI_UPLOAD_KEYSTORE_B64 }}
+          KEYSTORE_B64: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && (secrets.ALKKAGI_UPLOAD_KEYSTORE_B64 || secrets.ANDROID_KEYSTORE_BASE64) || '' }}
         run: |
-          KEYSTORE_FILE="${RUNNER_TEMP}/alkkagi-upload.jks"
-          printf '%s' "$ALKKAGI_UPLOAD_KEYSTORE_B64" | base64 --decode > "$KEYSTORE_FILE"
-          echo "ALKKAGI_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+          if [ -n "$KEYSTORE_B64" ]; then
+            KEYSTORE_FILE="${RUNNER_TEMP}/alkkagi-upload.jks"
+            printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_FILE"
+            echo "ALKKAGI_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "업로드 키스토어를 복원하여 정식 서명으로 빌드합니다."
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::업로드 키 비밀값이 없거나 PR 실행이므로 디버그 키로 서명합니다(플레이 콘솔 업로드 불가)."
+          fi
+      - name: 빌드 번호 산출
+        id: bn
+        run: |
+          BUILD_NUM=$((100 + GITHUB_RUN_NUMBER))
+          VERSION_NAME=$(sed -nE 's/^version: *([^+]+).*/\1/p' app/pubspec.yaml)
+          echo "BUILD_NUM=$BUILD_NUM" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "build_number=$BUILD_NUM" >> "$GITHUB_OUTPUT"
       - name: 설치판 및 플레이 스토어 꾸러미 빌드
         working-directory: app
         env:
-          ALKKAGI_KEYSTORE_PASSWORD: ${{ secrets.ALKKAGI_KEYSTORE_PASSWORD }}
-          ALKKAGI_KEY_ALIAS: ${{ secrets.ALKKAGI_KEY_ALIAS }}
-          ALKKAGI_KEY_PASSWORD: ${{ secrets.ALKKAGI_KEY_PASSWORD }}
+          ALKKAGI_KEYSTORE_PASSWORD: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && (secrets.ALKKAGI_KEYSTORE_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD) || '' }}
+          ALKKAGI_KEY_ALIAS: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && (secrets.ALKKAGI_KEY_ALIAS || secrets.ANDROID_KEY_ALIAS) || '' }}
+          ALKKAGI_KEY_PASSWORD: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && (secrets.ALKKAGI_KEY_PASSWORD || secrets.ANDROID_KEY_PASSWORD) || '' }}
         run: |
           flutter pub get
-          BUILD_NUM=$((100 + GITHUB_RUN_NUMBER))
-          flutter build apk --release --flavor sideload --dart-define=APP_CHANNEL=sideload --target-platform android-arm64 --build-number "$BUILD_NUM"
-          flutter build apk --release --flavor play --dart-define=APP_CHANNEL=play --build-number "$BUILD_NUM"
-          flutter build appbundle --release --flavor play --dart-define=APP_CHANNEL=play --build-number "$BUILD_NUM"
-      - name: 플레이 스토어 꾸러미 권한 및 대상 버전 무결성 검수
+          DEFS="--build-number $BUILD_NUM --dart-define=APP_VERSION=$VERSION_NAME --dart-define=APP_BUILD=$BUILD_NUM"
+          flutter build apk --release --flavor sideload --target-platform android-arm64 $DEFS --dart-define=APP_CHANNEL=sideload
+          flutter build apk --release --flavor play $DEFS --dart-define=APP_CHANNEL=play
+          flutter build appbundle --release --flavor play $DEFS --dart-define=APP_CHANNEL=play
+      - name: 플레이 스토어 및 직접 설치판 권한·패키지 무결성 검수
         run: |
           AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -n 1)
           PLAY_APK="app/build/app/outputs/flutter-apk/app-play-release.apk"
+          SIDELOAD_APK="app/build/app/outputs/flutter-apk/app-sideload-release.apk"
           PERMS=$("$AAPT2" dump permissions "$PLAY_APK")
           BADGING=$("$AAPT2" dump badging "$PLAY_APK")
           echo "$PERMS"
           echo "$BADGING" | head -n 15
-          if echo "$PERMS" | grep -q "android.permission.INTERNET"; then
-            echo "오류: 플레이 스토어 빌드에 INTERNET 권한이 포함되었습니다!" >&2
-            exit 1
-          fi
-          if echo "$PERMS" | grep -q "android.permission.REQUEST_INSTALL_PACKAGES"; then
-            echo "오류: 플레이 스토어 빌드에 자가 설치 권한이 포함되었습니다!" >&2
-            exit 1
-          fi
+          for p in android.permission.INTERNET android.permission.REQUEST_INSTALL_PACKAGES android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION; do
+            if echo "$PERMS" | grep -q "$p"; then
+              echo "오류: 플레이 스토어 빌드에 $p 권한이 포함되었습니다!" >&2
+              exit 1
+            fi
+          done
           if ! echo "$BADGING" | grep -q "name='ttong.alkkagi.night'"; then
             echo "오류: 플레이 스토어 패키지 식별자가 일치하지 않습니다!" >&2
             exit 1
@@ -96,6 +119,13 @@ jobs:
             echo "오류: targetSdkVersion($TARGET_SDK)이 35 미만입니다!" >&2
             exit 1
           fi
+          SIDE_PERMS=$("$AAPT2" dump permissions "$SIDELOAD_APK")
+          for p in android.permission.INTERNET android.permission.REQUEST_INSTALL_PACKAGES android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION; do
+            if ! echo "$SIDE_PERMS" | grep -q "$p"; then
+              echo "오류: 직접 설치판(sideload)에 $p 권한이 누락되었습니다!" >&2
+              exit 1
+            fi
+          done
       - name: 빌드 산출물 해시 기록 및 업로드 준비
         run: |
           sha256sum \
@@ -105,9 +135,57 @@ jobs:
           cat SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: suho-alkkagi-night-releases
+          name: suho-alkkagi-night-releases-${{ env.BUILD_NUM }}
           path: |
             app/build/app/outputs/flutter-apk/app-sideload-release.apk
             app/build/app/outputs/flutter-apk/app-play-release.apk
             app/build/app/outputs/bundle/playRelease/app-play-release.aab
             SHA256SUMS.txt
+
+  test-latest:
+    needs: android_build
+    if: >-
+      ${{ needs.android_build.outputs.signed == 'true' &&
+          ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+           (github.event_name == 'workflow_dispatch' && inputs.make_release && github.ref == 'refs/heads/main')) }}
+    runs-on: ubuntu-latest
+    concurrency: test-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: suho-alkkagi-night-releases-${{ needs.android_build.outputs.build_number }}
+          path: out
+      - name: 고정 링크(test-latest) 및 version.json 갱신
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_NUMBER: ${{ needs.android_build.outputs.build_number }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          CUR=0
+          if gh release download test-latest --repo "$GITHUB_REPOSITORY" --pattern version.json --output cur.json 2>/dev/null; then
+            CUR=$(python3 -c "import json; print(int(json.load(open('cur.json')).get('build', 0)))" || echo 0)
+          fi
+          if [ "$BUILD_NUMBER" -le "$CUR" ]; then
+            echo "::notice::이미 더 높은 빌드($CUR)가 등록되어 있어 건너뜁니다."
+            exit 0
+          fi
+          cp out/app/build/app/outputs/flutter-apk/app-sideload-release.apk suho-alkkagi-night-test.apk
+          if [ -z "$HEAD_MSG" ]; then
+            HEAD_MSG=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.message || true)
+          fi
+          WHAT=$(printf '%s\n' "$HEAD_MSG" | awk 'NF && !/^Merge pull request/ {print; exit}')
+          printf '%s' "$WHAT" > what.txt
+          LINK="https://github.com/$GITHUB_REPOSITORY/releases/download/test-latest/suho-alkkagi-night-test.apk"
+          SHA=$(sha256sum suho-alkkagi-night-test.apk | cut -d' ' -f1)
+          SIZE=$(stat -c %s suho-alkkagi-night-test.apk)
+          python3 -c "import json,sys; json.dump({'build': int(sys.argv[1]), 'apk': sys.argv[2], 'sha256': sys.argv[3], 'size': int(sys.argv[4]), 'notes': open('what.txt', encoding='utf-8').read()}, open('version.json', 'w', encoding='utf-8'), ensure_ascii=False)" "$BUILD_NUMBER" "$LINK" "$SHA" "$SIZE"
+          NOTES="수호알까기 · 탄지무림 심야기습 직접 설치판 · 빌드 $BUILD_NUMBER (커밋 ${GITHUB_SHA::7})"
+          if ! gh release view test-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create test-latest --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --prerelease --title "수호알까기 직접 설치판 (늘 최신)" --notes "$NOTES"
+          fi
+          gh release upload test-latest suho-alkkagi-night-test.apk --clobber --repo "$GITHUB_REPOSITORY"
+          gh release upload test-latest version.json --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit test-latest --repo "$GITHUB_REPOSITORY" --notes "$NOTES"

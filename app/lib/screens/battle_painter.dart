@@ -28,6 +28,42 @@ class NightBattlePainter extends CustomPainter {
   final Vec2? zoomFocusPos;
   final double zoomScale;
   final NightBattleSprites sprites;
+  late final int _paintSignature = _computePaintSignature();
+
+  int _computePaintSignature() {
+    int launcherHash = 0;
+    for (final l in sim.launchers) {
+      launcherHash = Object.hash(
+        launcherHash,
+        l.slotIndex,
+        l.type,
+        l.tier,
+        l.isCorrupted,
+        l.isConstructing,
+      );
+    }
+    return Object.hash(
+      sim.elapsedSec,
+      sim.fieldTokens,
+      sim.shieldHp,
+      sim.towerHp,
+      sim.qiBars,
+      sim.centralManualMode,
+      sim.isFinished,
+      sim.currentWaveIndex,
+      sim.liveFirepowerLv,
+      sim.liveRangeLv,
+      sim.shieldMaxHpDynamic,
+      Object.hashAll(sim.excavatedSlots),
+      launcherHash,
+      manualAimPreviewAngleRad,
+      selectedSlotIndex,
+      zoomFocusPos?.x,
+      zoomFocusPos?.y,
+      zoomScale,
+      sprites.cachedCount,
+    );
+  }
 
   bool get _isPipZoom => zoomFocusPos != null && zoomScale > 1.01;
 
@@ -3199,5 +3235,7 @@ class NightBattlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant NightBattlePainter oldDelegate) => true;
+  bool shouldRepaint(covariant NightBattlePainter oldDelegate) =>
+      !identical(sim, oldDelegate.sim) ||
+      _paintSignature != oldDelegate._paintSignature;
 }

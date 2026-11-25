@@ -409,7 +409,7 @@ void main() {
       expect(p.stoneShards[StoneMaterial.onok], 0);
       expect(p.beastLevels[SpiritBeast.nalssaendol], 1);
       expect(p.beastLevels[SpiritBeast.geumryong], 10);
-      expect(p.companionLevels[CompanionHero.seokdu], 0);
+      expect(p.companionLevels[CompanionHero.seokdu], 1);
       expect(p.companionLevels[CompanionHero.yonga], 10);
       expect(p.coreStatLevels[CoreStatType.firepower], 0);
       expect(p.stageStars['1-1'], 3);
@@ -3290,6 +3290,31 @@ void main() {
       expect(decoded!.reincarnationCount, 2);
       expect(decoded.transcendenceLevel, 1);
       expect(decoded.reincarnationBossWins, 2);
+    });
+
+    test('손상된 세이브 복원 시 기본 동료 석두·영수 날쌘돌 최소 Lv.1 보호 및 조기 물결 호출 +18⚡ 일치 검증', () {
+      final corrupted = PlayerProgress.decodeJson(
+        '{"beasts":{"nalssaendol":0},"companions":{"seokdu":0},"presets":[{"name":"시험","companions":[]}]}',
+      );
+      expect(corrupted.beastLevels[SpiritBeast.nalssaendol], greaterThanOrEqualTo(1));
+      expect(corrupted.companionLevels[CompanionHero.seokdu], greaterThanOrEqualTo(1));
+      expect(corrupted.activePreset.companions, contains(CompanionHero.seokdu));
+
+      final sim = DefenseBattleSim(
+        stage: CampaignCatalog.stageAt(1, 2),
+        difficulty: DefenseDifficulty.normal,
+        progress: corrupted,
+        seed: 108,
+      );
+      sim.elapsedSec = 5.0;
+      sim.step(30.0);
+      while (!sim.canCallNextWaveEarly && sim.elapsedSec < 25.0) {
+        sim.step(0.5);
+      }
+      expect(sim.canCallNextWaveEarly, isTrue);
+      final beforeQi = sim.fieldTokens;
+      expect(sim.callNextWaveEarly(), isTrue);
+      expect(sim.fieldTokens, beforeQi + 18);
     });
   });
 }

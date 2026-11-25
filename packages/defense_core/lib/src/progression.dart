@@ -2155,14 +2155,19 @@ class PlayerProgress {
         }
       });
     }
+    p.beastLevels[SpiritBeast.nalssaendol] =
+        (p.beastLevels[SpiritBeast.nalssaendol] ?? 1).clamp(1, p.maxAllyLevel);
     if (j['companions'] is Map) {
       (j['companions'] as Map).forEach((k, v) {
         final ch = CompanionHero.values.where((e) => e.id == k || e.name == k).firstOrNull;
         if (ch != null) {
-          p.companionLevels[ch] = _safeInt(v, 0).clamp(0, p.maxAllyLevel);
+          final minLv = ch == CompanionHero.seokdu ? 1 : 0;
+          p.companionLevels[ch] = _safeInt(v, minLv).clamp(minLv, p.maxAllyLevel);
         }
       });
     }
+    p.companionLevels[CompanionHero.seokdu] =
+        (p.companionLevels[CompanionHero.seokdu] ?? 1).clamp(1, p.maxAllyLevel);
     if (j['coreStats'] is Map) {
       (j['coreStats'] as Map).forEach((k, v) {
         final cs = CoreStatType.values.where((e) => e.name == k).firstOrNull;

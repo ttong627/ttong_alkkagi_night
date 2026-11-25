@@ -1,4 +1,5 @@
 import 'package:alkkagi_night/audio/night_audio.dart';
+import 'package:alkkagi_night/audio/night_haptics.dart';
 import 'package:alkkagi_night/main.dart';
 import 'package:alkkagi_night/screens/battle_screen.dart';
 import 'package:alkkagi_night/screens/codex_and_endless_screens.dart';
@@ -10,10 +11,12 @@ import 'package:alkkagi_night/screens/settings_and_credits_screen.dart';
 import 'package:alkkagi_night/screens/stage_and_county_transitions.dart';
 import 'package:alkkagi_night/screens/training_screen.dart';
 import 'package:alkkagi_night/state/game_controller.dart';
+import 'package:alkkagi_night/theme/night_theme.dart';
 import 'package:alkkagi_night/ui/mutant_motion_engine.dart';
 import 'package:alkkagi_night/ui/night_art_registry.dart';
 import 'package:defense_core/defense_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -1950,5 +1953,74 @@ void main() {
     expect(ctrl.progress.reincarnationDifficultyMultiplier, closeTo(9.0, 1e-6));
     expect(find.textContaining('×9배'), findsWidgets);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('직접 설치판(sideload) 매니페스트 보안 검증 및 설정 화면 새 판 확인 타일 노출/숨김 검증',
+      (WidgetTester tester) async {
+    final validSha = 'a' * 64;
+    final okInfo = NightUpdateInfo.parse(
+      '{"build":120,"apk":"https://github.com/ttong627/ttong_alkkagi_night/releases/download/test-latest/suho-alkkagi-night-test.apk","sha256":"$validSha","size":140000000,"notes":"성능 개선"}',
+    );
+    expect(okInfo, isNotNull);
+    expect(okInfo!.newerThan(36), isTrue);
+
+    // 외부 도메인·타 저장소·HTTP·비정상 해시 차단 검증
+    expect(
+      NightUpdateInfo.parse(
+        '{"build":120,"apk":"https://evil.example.com/ttong627/ttong_alkkagi_night/releases/download/v1/a.apk","sha256":"$validSha","size":1000}',
+      ),
+      isNull,
+    );
+    expect(
+      NightUpdateInfo.parse(
+        '{"build":120,"apk":"https://github.com/other/repo/releases/download/v1/a.apk","sha256":"$validSha","size":1000}',
+      ),
+      isNull,
+    );
+    expect(
+      NightUpdateInfo.parse(
+        '{"build":120,"apk":"https://github.com/ttong627/ttong_alkkagi_night/releases/download/v1/a.apk","sha256":"bad","size":1000}',
+      ),
+      isNull,
+    );
+
+    const updaterChannel = MethodChannel('tanji/updater');
+    bool sideloadEnabled = false;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(updaterChannel, (call) async {
+      if (call.method == 'available') return sideloadEnabled;
+      if (call.method == 'canInstall') return true;
+      return null;
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(updaterChannel, null);
+    });
+
+    final ctrl = GameController(
+      initialProgress: PlayerProgress(tutorialSeen: true, bgmVolume: 0.0, sfxVolume: 0.0),
+    );
+
+    // 1) 플레이 스토어 판(available == false): 업데이트 타일이 숨겨져야 함
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: NightPalette.buildTheme(),
+        home: SettingsScreen(controller: ctrl),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('sideload_check_update_tile')), findsNothing);
+
+    // 2) 직접 설치판(available == true): 업데이트 타일이 표시되어야 함
+    sideloadEnabled = true;
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: NightPalette.buildTheme(),
+        home: SettingsScreen(controller: ctrl),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('sideload_check_update_tile')), findsOneWidget);
   });
 }
