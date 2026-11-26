@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:defense_core/defense_core.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'stage_and_county_transitions.dart';
+import '../i18n/tr_text.dart';
+import '../i18n/l10n.dart';
 
 /// 7일 순환 출석부 · 일일/주간/월간 수호 임무 · 전술 비약 제조 · 영구 업적 통합 화면.
 class DailyAndQuestsScreen extends StatefulWidget {
@@ -82,17 +84,17 @@ class _DailyAndQuestsScreenState extends State<DailyAndQuestsScreen> {
             appBar: AppBar(
               automaticallyImplyLeading: !embeddedInShell,
               title: const Text('출석 · 수호 임무 · 전술 비약'),
-              bottom: const TabBar(
+              bottom: TabBar(
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 indicatorColor: NightPalette.accentGold,
                 labelColor: NightPalette.accentGold,
                 unselectedLabelColor: NightPalette.textMuted,
                 tabs: [
-                  Tab(text: '7일 출석'),
-                  Tab(text: '수호 임무'),
-                  Tab(text: '비약 제조'),
-                  Tab(text: '영구 업적'),
+                  Tab(text: tr('7일 출석')),
+                  Tab(text: tr('수호 임무')),
+                  Tab(text: tr('비약 제조')),
+                  Tab(text: tr('영구 업적')),
                 ],
               ),
             ),

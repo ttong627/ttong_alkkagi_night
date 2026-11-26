@@ -84,7 +84,7 @@ def make_feature_graphic(src_icon: Image.Image) -> Image.Image:
 
     d.text((54, 86), "수호알까기", font=f_big, fill=(255, 214, 102), stroke_width=6, stroke_fill=(16, 12, 32))
     d.text((56, 190), "탄지무림 심야기습", font=f_mid, fill=(255, 255, 255), stroke_width=5, stroke_fill=(16, 12, 32))
-    d.text((58, 286), "자동 탄지 진법과 영수, 동료로 열 마을을 지켜라!", font=f_sub, fill=(144, 240, 228), stroke_width=4, stroke_fill=(12, 18, 30))
+    d.text((58, 286), "자동 탄지 진법으로 10현 100마을을 지켜라!", font=f_sub, fill=(144, 240, 228), stroke_width=4, stroke_fill=(12, 18, 30))
     d.text((58, 334), "실패 없는 경맥 수련 | 무림수호단 출두 | 오프라인 완결", font=f_corp, fill=(235, 238, 248), stroke_width=3, stroke_fill=(12, 18, 30))
     d.text((58, 434), "(주)웰쉐어로지스", font=f_corp, fill=(215, 222, 238), stroke_width=3, stroke_fill=(12, 18, 30))
     return canvas.convert("RGB")

@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:defense_core/defense_core.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'stage_and_county_transitions.dart';
+import '../i18n/tr_text.dart';
+import '../i18n/l10n.dart';
 
 typedef MeditationScreen = TrainingScreen;
 
@@ -151,14 +153,14 @@ class _TrainingScreenState extends State<TrainingScreen>
             appBar: AppBar(
               automaticallyImplyLeading: !widget.embeddedInShell,
               title: const Text('기명 심법 수련실 (실패 0%)'),
-              bottom: const TabBar(
+              bottom: TabBar(
                 indicatorColor: NightPalette.accentGold,
                 labelColor: NightPalette.accentGold,
                 unselectedLabelColor: NightPalette.textMuted,
                 tabs: [
-                  Tab(text: '① 단전 운기'),
-                  Tab(text: '② 십대 경맥(10단)'),
-                  Tab(text: '③ 능력치 단련'),
+                  Tab(text: tr('① 단전 운기')),
+                  Tab(text: tr('② 십대 경맥(10단)')),
+                  Tab(text: tr('③ 능력치 단련')),
                 ],
               ),
             ),

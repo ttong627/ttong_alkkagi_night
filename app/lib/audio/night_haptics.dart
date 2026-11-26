@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 /// 빌드 채널 및 판본 환경 변수 (`--dart-define` 미지정 시 기본값 사용).
 const String kNightAppChannel = String.fromEnvironment('APP_CHANNEL', defaultValue: 'dev');
 const String kNightAppVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
-const int kNightAppBuild = int.fromEnvironment('APP_BUILD', defaultValue: 36);
+const int kNightAppBuild = int.fromEnvironment('APP_BUILD', defaultValue: 37);
 const String kNightUpdateManifestUrl = String.fromEnvironment(
   'UPDATE_URL',
   defaultValue:

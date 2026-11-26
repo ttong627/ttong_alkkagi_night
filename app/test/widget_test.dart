@@ -278,7 +278,7 @@ void main() {
     }
     expect(controller.progress.openedMeridianStep, 6);
 
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 
@@ -288,7 +288,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
     expect(find.text('자동 수호 진법 편성실'), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 
@@ -301,7 +301,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
     expect(find.textContaining('내공 경지 승급'), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 
@@ -320,7 +320,7 @@ void main() {
 
     await tester.tap(find.text('기쁘게 수령'));
     await tester.pump();
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 
@@ -330,7 +330,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
     expect(find.textContaining('탄지무림 10현·100판 수호록'), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 
@@ -463,7 +463,7 @@ void main() {
     ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first)).clearSnackBars();
     await tester.pump();
 
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 
@@ -490,10 +490,10 @@ void main() {
     expect(find.text('확률 및 물리 수치 100% 공개'), findsOneWidget);
     expect(find.textContaining('35.0%'), findsOneWidget);
 
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 
@@ -507,7 +507,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 650));
     expect(find.text('심야 무한 혈전 · 한계 시험장'), findsOneWidget);
 
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 
@@ -534,7 +534,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 650));
     expect(find.textContaining('100판'), findsWidgets);
 
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
 

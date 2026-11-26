@@ -1,0 +1,14 @@
+{
+ "common": "Instrumental only, no vocals, no lyrics, no spoken words. Dark cinematic night-siege tower defense game soundtrack: East Asian wuxia fantasy fused with a modern hybrid orchestra and a subtle electronic pulse. No gayageum folk plucking lead, no festive samulnori. Starts immediately, steady energy, loop friendly, no fade out. ",
+ "tracks": {
+  "bgm_lobby": "Moonlit night-watch camp main menu theme: soft felt piano and a solo piri reed melody over a low warm synth pad, one distant temple bell, calm but watchful, D minor, 72 BPM.",
+  "bgm_dustyYard": "Midnight raid on a mountain village: driving low cello ostinato, frame drums, sharp bowed ajaeng accents, rising tension, E minor, 112 BPM.",
+  "bgm_oilyTable": "Sneaking night creatures around a granary and harbor: pizzicato strings, wood blocks, marimba pattern, low clarinet melody, mischievous but dangerous, G minor, 104 BPM.",
+  "bgm_turtleMarket": "Night market under siege: pulsing analog synth bass with huge war drums and short brass swells, urgent defense, A minor, 126 BPM.",
+  "bgm_kubiForest": "Beacon fortress in a dark pine forest: hollow ocarina-like clay flute, slow heartbeat taiko, tremolo strings in mist, ominous, C minor, 96 BPM.",
+  "bgm_logicMarble": "Clockwork trap mechanisms at night: precise ticking percussion, hammered dulcimer arpeggios, interlocking synth sequence and staccato strings, F sharp minor, 118 BPM.",
+  "bgm_murimIce": "Frozen two-front battle under the moon: glassy bells and celesta, wide cold string chords, martial snare and deep drum march, B minor, 108 BPM.",
+  "bgm_clash": "Volcanic sealed temple battle: aggressive low brass, anvil strikes, distorted synth bass, relentless drums, D phrygian, 138 BPM.",
+  "bgm_boss": "Final midnight boss siege: full epic orchestra, thunderous war drums, fast string ostinato, heroic French horn theme against dark choir-like synth pads without any voices, C sharp minor, 150 BPM."
+ }
+}

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import 'package:flutter/services.dart';
 
 import '../audio/night_haptics.dart';
@@ -7,6 +7,8 @@ import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'codex_and_endless_screens.dart';
 import 'splash_and_tutorial.dart';
+import '../i18n/l10n.dart';
+import '../i18n/tr_text.dart';
 
 /// 환경 설정 · 음향/진동 · 오프라인 백업 이전 · 만든 이 · 독자용 공개 제작노트 열람 화면.
 class SettingsScreen extends StatelessWidget {
@@ -380,6 +382,8 @@ class SettingsScreen extends StatelessWidget {
                       // 3. 교범 · 투명성 · 제작노트 · 만든 이
                       Column(
                         children: [
+                      const _LanguageTile(),
+                      const Divider(height: 1),
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: NightSpriteIcon(
@@ -849,6 +853,59 @@ class _SideloadUpdateTileState extends State<_SideloadUpdateTile> {
           },
         );
       },
+    );
+  }
+}
+
+/// 언어 고르기 — 「자동」은 휴대폰 언어를 따른다. 이름표는 어느 언어에서도 알아보게 두 언어로.
+class _LanguageTile extends StatelessWidget {
+  const _LanguageTile();
+
+  String _name(String code) =>
+      kNightLanguages.firstWhere((l) => l.$1 == code, orElse: () => ('ko', '한국어')).$2;
+
+  Future<void> _pick(BuildContext context) async {
+    final chosen = await NightLanguage.chosen();
+    if (!context.mounted) return;
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('🌐 언어 · Language'),
+        children: [
+          for (final (code, label) in [('', 'Auto · 휴대폰 언어'), ...kNightLanguages])
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(ctx).pop(code),
+              child: Row(
+                children: [
+                  Icon(
+                    code == chosen ? Icons.radio_button_checked : Icons.radio_button_off,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(label)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked == null) return;
+    await NightLanguage.choose(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String>(
+      valueListenable: L10n.lang,
+      builder: (context, lang, _) => ListTile(
+        key: const Key('language_tile'),
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.language_rounded, color: NightPalette.accentGold),
+        title: const Text('🌐 언어 · Language'),
+        subtitle: Text(_name(lang)),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => _pick(context),
+      ),
     );
   }
 }

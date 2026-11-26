@@ -2837,7 +2837,7 @@ class CampaignCatalog {
       subtitle:
           '$cycleLabel · 성공 확률 5% 미만 극한 10물결 결전 · 격파 시 능력치 100% 계승 환생(난이도 ×3배 상승) 개방!',
       tacticalHint:
-          '돌파 성공률 5% 미만의 신역 심판입니다! 14곳 전 초소 개척·연성 합체·실시간 4종 강화·돌파 비급·기연 돌림판·약점 저격·비약·지원패 출두가 모두 맞물려야 3,200타 혼돈 마갑을 파쇄할 수 있습니다! (패배 재도전 시 지원패·비약 자동 보존)',
+          '돌파 성공률 5% 미만의 신역 심판입니다! 14곳 전 초소 개척·연성 합체·실시간 4종 강화·돌파 비급·기연 기연판·약점 저격·비약·지원패 출두가 모두 맞물려야 3,200타 혼돈 마갑을 파쇄할 수 있습니다! (패배 재도전 시 지원패·비약 자동 보존)',
       recommendedStone: StoneMaterial.taegeuk,
       recommendedLaunchers: const [
         LauncherType.qiAmplifier,

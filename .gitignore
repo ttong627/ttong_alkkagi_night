@@ -18,3 +18,4 @@ __pycache__/
 **/build/
 app/tool/art/gen/
 app/tool/motion/out/
+app/tool/i18n/work/

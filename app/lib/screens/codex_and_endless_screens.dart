@@ -1,10 +1,12 @@
 import 'package:defense_core/defense_core.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'stage_and_county_transitions.dart';
+import '../i18n/tr_text.dart';
+import '../i18n/l10n.dart';
 
 /// 수호 도감(초정밀 돌연변이 해부 · 전신 영웅 갤러리 · 세트 도감력) · 확률 100% 공개 · 심야 무한 혈전.
 class CodexScreen extends StatelessWidget {
@@ -57,18 +59,18 @@ class CodexScreen extends StatelessWidget {
                   ),
                 ),
               ],
-              bottom: const TabBar(
+              bottom: TabBar(
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 indicatorColor: NightPalette.accentGold,
                 labelColor: NightPalette.accentGold,
                 unselectedLabelColor: NightPalette.textMuted,
                 tabs: [
-                  Tab(text: '수호석(13)'),
-                  Tab(text: '발사대(5)'),
-                  Tab(text: '영수(5)'),
-                  Tab(text: '동료(14)'),
-                  Tab(text: '변이체(14)'),
+                  Tab(text: tr('수호석(13)')),
+                  Tab(text: tr('발사대(5)')),
+                  Tab(text: tr('영수(5)')),
+                  Tab(text: tr('동료(14)')),
+                  Tab(text: tr('변이체(14)')),
                 ],
               ),
             ),
