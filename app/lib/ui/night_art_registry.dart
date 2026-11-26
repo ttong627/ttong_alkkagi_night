@@ -3,10 +3,11 @@ import 'dart:ui' as ui;
 
 import 'package:defense_core/defense_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import 'package:flutter/services.dart';
 
 import '../theme/night_theme.dart';
+import '../i18n/tr_text.dart';
 
 /// 《수호알까기 · 탄지무림 심야기습》 코덱스 대륙 지도 · 10대 전장 맵 · 디테일 캐릭터/돌연변이 4프레임 시트 · 3D 모션 루프 정본 레지스트리.
 class NightArtRegistry {

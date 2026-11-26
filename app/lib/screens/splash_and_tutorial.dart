@@ -1,12 +1,13 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../audio/night_audio.dart';
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'home_screen.dart';
+import '../i18n/tr_text.dart';
 
 /// 게임 시작 오프닝 스플래시 화면:
 /// - 영웅단(기명·검황·연비·금룡) 대 3페이즈 돌연변이 대수괴 결전 키아트(`bg_night_splash.webp`) 전면 노출
@@ -27,7 +28,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   static const List<String> _tips = [
     '본진 단독 방치로는 마을이 함락됩니다. 군수 기력을 모아 빛나는 빈 초소에 발사대를 배치하세요.',
-    '50 기력부터 도박 소환이나 ★추천 축조로 초소를 세우고, 같은 포탑 2기는 유료 연성 합체로 진화시켜 5형 태초 신기를 깨우세요.',
+    '50 기력부터 기연 소환이나 ★추천 축조로 초소를 세우고, 같은 포탑 2기는 유료 연성 합체로 진화시켜 5형 태초 신기를 깨우세요.',
     '중간보스는 2차 재변이를 일으키고, 3페이즈 대수괴는 회전 약점을 정밀 타격해야 외각 장갑이 파쇄됩니다.',
     '하단 5탭에서 진법 원터치 최적 편성과 도착 보상 일괄 수령으로 손쉽게 출정 준비를 마치세요.',
   ];
@@ -332,7 +333,7 @@ Future<void> showTutorialGuideDialog(
       emblemAsset: NightArtRegistry.iconLuckyDice,
       title: '2/4 · 실시간 전군 강화 4종 & 유료 연성 5형 신기 합체',
       body: '• 하단 [🔨추천축조 · ⚔️화력업 · ⚡연사업 · 🔭사거리업 · 🛡️결계업]을 누르면 멈춤 없이 즉시 반영됩니다.\n'
-          '• 이미 지은 같은 병종·같은 형 초소 2기는 연성 기력(24⚡~)으로 합쳐 상위 형 무작위 병종으로 진화하며, 4형 2기 합체 시 ★5형 태초 신기와 돌림판 +1회가 개방됩니다.',
+          '• 이미 지은 같은 병종·같은 형 초소 2기는 연성 기력(24⚡~)으로 합쳐 상위 형 무작위 병종으로 진화하며, 4형 2기 합체 시 ★5형 태초 신기와 기연판 +1회가 개방됩니다.',
     ),
     (
       speaker: '명궁 연비',

@@ -1,10 +1,12 @@
 import 'package:defense_core/defense_core.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'stage_and_county_transitions.dart';
+import '../i18n/tr_text.dart';
+import '../i18n/l10n.dart';
 
 typedef ForgeSanctuaryScreen = UpgradeScreen;
 
@@ -25,7 +27,7 @@ class LoadoutScreen extends StatelessWidget {
 
   static InputDecoration _darkFieldDecoration(String labelText) {
     return InputDecoration(
-      labelText: labelText,
+      labelText: tr(labelText),
       labelStyle: const TextStyle(fontSize: 12.8, color: NightPalette.textMuted),
       filled: true,
       fillColor: NightPalette.bgDeep.withValues(alpha: 0.84),
@@ -58,13 +60,13 @@ class LoadoutScreen extends StatelessWidget {
             appBar: AppBar(
               automaticallyImplyLeading: !embeddedInShell,
               title: const Text('자동 수호 진법 편성실'),
-              bottom: const TabBar(
+              bottom: TabBar(
                 indicatorColor: NightPalette.accentGold,
                 labelColor: NightPalette.accentGold,
                 unselectedLabelColor: NightPalette.textMuted,
                 tabs: [
-                  Tab(text: '☯️ 수호 알 · 내공 · 거점 발사대'),
-                  Tab(text: '🐾 영수 · 동료 · 출두 조건'),
+                  Tab(text: tr('☯️ 수호 알 · 내공 · 거점 발사대')),
+                  Tab(text: tr('🐾 영수 · 동료 · 출두 조건')),
                 ],
               ),
             ),
@@ -937,13 +939,13 @@ class UpgradeScreen extends StatelessWidget {
             appBar: AppBar(
               automaticallyImplyLeading: !embeddedInShell,
               title: const Text('대장간(증표) · 영약각(영약)'),
-              bottom: const TabBar(
+              bottom: TabBar(
                 indicatorColor: NightPalette.accentGold,
                 labelColor: NightPalette.accentGold,
                 unselectedLabelColor: NightPalette.textMuted,
                 tabs: [
-                  Tab(text: '🪙 증표 대장간 (발사대·알)'),
-                  Tab(text: '🧪 영약각 (영수·동료·내공)'),
+                  Tab(text: tr('🪙 증표 대장간 (발사대·알)')),
+                  Tab(text: tr('🧪 영약각 (영수·동료·내공)')),
                 ],
               ),
             ),

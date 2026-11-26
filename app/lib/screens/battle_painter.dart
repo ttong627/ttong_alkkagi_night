@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../theme/night_theme.dart';
 import '../ui/mutant_motion_engine.dart';
 import '../ui/night_art_registry.dart';
+import '../i18n/l10n.dart';
 
 /// 심야 수호 전장 60프레임 코덱스 원화 + 곡선 산길 + 직접 초소 배치 + 수동 도탄 조준선 + 6단계 체급 모션 페인터.
 class NightBattlePainter extends CustomPainter {
@@ -3204,7 +3205,7 @@ class NightBattlePainter extends CustomPainter {
   }) {
     final tp = TextPainter(
       text: TextSpan(
-        text: text,
+        text: tr(text),
         style: TextStyle(
           fontFamily: 'DoHyeon',
           fontFamilyFallback: const ['NotoKRFallback'],

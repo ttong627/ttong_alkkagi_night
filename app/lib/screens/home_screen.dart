@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:defense_core/defense_core.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../audio/night_audio.dart';
 import '../state/game_controller.dart';
@@ -16,6 +16,8 @@ import 'settings_and_credits_screen.dart';
 import 'splash_and_tutorial.dart';
 import 'stage_and_county_transitions.dart';
 import 'training_screen.dart';
+import '../i18n/tr_text.dart';
+import '../i18n/l10n.dart';
 
 /// 수호 본영 통합 5탭 메인 쉘 화면:
 /// 1) 출정 본영: 영웅 대 3페이즈 돌연변이 결전 지령대 + 원터치 일괄 보상 수령 + 6대 실전 전각 카드 덱
@@ -135,23 +137,23 @@ class _HomeScreenState extends State<HomeScreen>
                 setState(() => _selectedNavIndex = idx);
               },
               destinations: [
-                const NavigationDestination(
+                NavigationDestination(
                   key: Key('nav_tab_home'),
                   icon: Icon(Icons.shield_moon_outlined),
                   selectedIcon: Icon(
                     Icons.shield_moon_rounded,
                     color: NightPalette.accentGold,
                   ),
-                  label: '출정 본영',
+                  label: tr('출정 본영'),
                 ),
-                const NavigationDestination(
+                NavigationDestination(
                   key: Key('nav_tab_loadout'),
                   icon: Icon(Icons.groups_2_outlined),
                   selectedIcon: Icon(
                     Icons.groups_2_rounded,
                     color: NightPalette.accentGold,
                   ),
-                  label: '영웅·진법',
+                  label: tr('영웅·진법'),
                 ),
                 NavigationDestination(
                   key: const Key('nav_tab_forge'),
@@ -164,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Icons.precision_manufacturing_rounded,
                     color: NightPalette.accentGold,
                   ),
-                  label: '대장간·영약',
+                  label: tr('대장간·영약'),
                 ),
                 NavigationDestination(
                   key: const Key('nav_tab_supply'),
@@ -177,16 +179,16 @@ class _HomeScreenState extends State<HomeScreen>
                     Icons.self_improvement_rounded,
                     color: NightPalette.accentGold,
                   ),
-                  label: '수련·보급',
+                  label: tr('수련·보급'),
                 ),
-                const NavigationDestination(
+                NavigationDestination(
                   key: Key('nav_tab_codex'),
                   icon: Icon(Icons.menu_book_outlined),
                   selectedIcon: Icon(
                     Icons.menu_book_rounded,
                     color: NightPalette.accentGold,
                   ),
-                  label: '변이 도감',
+                  label: tr('변이 도감'),
                 ),
               ],
             ),
@@ -356,7 +358,7 @@ class _HomeScreenState extends State<HomeScreen>
                               IconButton(
                                 key: const Key('home_codex_btn'),
                                 visualDensity: VisualDensity.compact,
-                                tooltip: '수호 도감 및 확률 공개',
+                                tooltip: tr('수호 도감 및 확률 공개'),
                                 onPressed: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
@@ -377,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen>
                               IconButton(
                                 key: const Key('home_settings_btn'),
                                 visualDensity: VisualDensity.compact,
-                                tooltip: '환경 설정 · 백업 · 만든 이 · 제작노트',
+                                tooltip: tr('환경 설정 · 백업 · 만든 이 · 제작노트'),
                                 onPressed: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
@@ -898,7 +900,7 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                           ),
                           Text(
                             nextStage.title,
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontFamily: 'BlackHanSans',
@@ -909,8 +911,12 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    SegmentedButton<DefenseDifficulty>(
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<DefenseDifficulty>(
                       key: const Key('home_difficulty_selector'),
                       showSelectedIcon: false,
                       segments: const [
@@ -950,16 +956,15 @@ class _HeroVsBossCommandBanner extends StatelessWidget {
                           EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         ),
                         minimumSize:
-                            const WidgetStatePropertyAll(Size(30, 30)),
+                            const WidgetStatePropertyAll(Size(30, 36)),
                         textStyle: const WidgetStatePropertyAll(
                           TextStyle(
-                            fontSize: 11.2,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ),
-                  ],
                 ),
                 const SizedBox(height: 10),
 

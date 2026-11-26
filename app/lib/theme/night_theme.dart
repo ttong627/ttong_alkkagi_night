@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../i18n/tr_text.dart';
 
 /// 심야 무협 수묵·청람 석판·한지·황금·적염 정통 디자인 시스템
 /// - 클로드 디자인 하네스(`design.py` · 게슈탈트 · AI티 0건) 및 프로그램 제작 하네스(52px 대형 조작계) 동시 준수.

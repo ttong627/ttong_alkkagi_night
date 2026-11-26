@@ -1,10 +1,11 @@
 import 'package:defense_core/defense_core.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../state/game_controller.dart';
 import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'stage_and_county_transitions.dart';
+import '../i18n/tr_text.dart';
 
 typedef ConvoySerendipityScreen = ConvoyAndSerendipityScreen;
 

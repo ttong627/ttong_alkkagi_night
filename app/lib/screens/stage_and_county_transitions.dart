@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:defense_core/defense_core.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../audio/night_audio.dart';
 import '../state/game_controller.dart';
@@ -13,6 +13,7 @@ import 'codex_and_endless_screens.dart';
 import 'convoy_campaign_screens.dart';
 import 'loadout_upgrade_screens.dart';
 import 'training_screen.dart';
+import '../i18n/tr_text.dart';
 
 /// 일반 메뉴 화면 간 부드러운 페이드·슬라이드 전환 라우트.
 Route<T> buildSmoothScreenRoute<T>(Widget child, {RouteSettings? settings}) {

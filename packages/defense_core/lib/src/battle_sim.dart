@@ -1150,7 +1150,7 @@ class DefenseBattleSim {
         directBuildCost: recCost,
         chargeRatio: 1.0,
         shortBadge: '🔨축조($recCost⚡)',
-        detailReason: '개척 완료! 지정 포대($recCost⚡ · 2.2초 축조) 또는 도박 소환($luckyCost⚡)을 지휘하세요.',
+        detailReason: '개척 완료! 지정 포대($recCost⚡ · 2.2초 축조) 또는 기연 소환($luckyCost⚡)을 지휘하세요.',
       );
     }
 
@@ -1425,7 +1425,7 @@ class DefenseBattleSim {
       callouts.add(
         FloatingCallout(
           pos: slot.pos + const Vec2(0, -18),
-          text: '🎲 도박 소환: 1형 ${rolledType.name} 축조!',
+          text: '☯ 기연 소환: 1형 ${rolledType.name} 축조!',
           colorHex: rolledType.colorHex,
         ),
       );
@@ -1549,7 +1549,7 @@ class DefenseBattleSim {
       FloatingCallout(
         pos: target.pos + const Vec2(0, -24),
         text: isMythic5
-            ? '🌟 태초 신기 강림!! ★5형 ${target.type.name} 각성 + 🎰돌림판 개방!!'
+            ? '🌟 태초 신기 강림!! ★5형 ${target.type.name} 각성 + ☯기연판 개방!!'
             : '☯️ 합치기 각성 진화!! ${target.tier}형 ${target.type.name} 탄생!',
         colorHex: 0xFFFFD166,
         isBigBanner: true,
@@ -1757,7 +1757,7 @@ class DefenseBattleSim {
     callouts.add(
       FloatingCallout(
         pos: const Vec2(200, 175),
-        text: '🎰 돌림판 대박!! [${prize.title}] — ${prize.subtitle}',
+        text: '☯ 태극 기연판! [${prize.title}] — ${prize.subtitle}',
         colorHex: prize.colorHex,
         ttlSec: 2.3,
         isBigBanner: true,
@@ -1786,7 +1786,7 @@ class DefenseBattleSim {
           current: killCount,
           goal: 35,
           rewardQi: 45,
-          bonusLabel: '+45⚡ · 🎰돌림판+1',
+          bonusLabel: '+45⚡ · ☯기연판+1',
           allCleared: false,
         );
       case 2:
@@ -2732,7 +2732,7 @@ class DefenseBattleSim {
       callouts.add(
         FloatingCallout(
           pos: const Vec2(200, 142),
-          text: '🎰 우두머리 경보! [운명의 기연 돌림판 +1회] 지급!',
+          text: '☯ 우두머리 경보! [태극 기연판 +1회] 지급!',
           colorHex: 0xFFFFD166,
           ttlSec: 2.0,
           isBigBanner: true,
@@ -3684,6 +3684,8 @@ class DefenseBattleSim {
         ? _nightmareChapterDensityMult[chIdx]
         : 1.0;
     return baseCh *
+        // 9-1(9현 첫 마을)만 8현 끝보다 급히 어려워 보통 승률이 50%대였다 — 적 체력 12% 낮춤(측정: 보통 52.5% → 75%).
+        (stage.globalIndex == 81 ? 0.88 : 1.0) *
         (1.0 + (stage.stageNumber - 1) * 0.065) *
         waveEscalation *
         nmChTight *
@@ -7624,7 +7626,7 @@ class DefenseBattleSim {
           ? '완벽한 수호 진법입니다! 외곽 결계와 마을 3요소를 든든히 지켜냈습니다!'
           : '승리했습니다! 초소 조합 시너지와 돌파 비급·합치기 진화를 활용하면 ★3 만점 수호가 쉬워집니다.';
     } else if (launchers.isEmpty) {
-      tip = '길목 초소가 0곳이라 본진이 돌파당했습니다! 초반 군수 기력(⚡)으로 반드시 빈 초소에 지정 축조(45⚡~) 또는 도박 소환(50⚡~)을 실행하세요!';
+      tip = '길목 초소가 0곳이라 본진이 돌파당했습니다! 초반 군수 기력(⚡)으로 반드시 빈 초소에 지정 축조(45⚡~) 또는 기연 소환(50⚡~)을 실행하세요!';
     } else if (shieldYachaBlocks >= 6) {
       tip = '뼈방패 야차에게 정면 탄이 막혔습니다! 거점에 「곡사 회전기」를 세우거나 「파갑 멸마송」 비급을 선택해보세요.';
     } else if (heavyHitsOnShield >= 3) {

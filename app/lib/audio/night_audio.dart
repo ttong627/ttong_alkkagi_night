@@ -1,13 +1,54 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:defense_core/defense_core.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import 'night_haptics.dart';
 
 /// 3층 입체 음향 컨트롤러 (배경음악 + 타격 효과음 + 기계/결계/출두 모션음 + 손맛 진동 연동).
-class NightAudioController {
+class NightAudioController with WidgetsBindingObserver {
   NightAudioController._();
   static final NightAudioController instance = NightAudioController._();
+
+  /// 앱이 뒤로 가 있는 동안(홈 단추·화면 끔)에는 아무 소리도 내지 않는다.
+  bool _backgrounded = false;
+
+  /// 앱 시작 때 한 번(플레이어를 만들기 전).
+  /// 기본값은 플레이어마다 오디오 초점을 가져가서, 첫 효과음이 배경음악을 멈춘다 → 섞어 틀기.
+  Future<void> init() async {
+    WidgetsBinding.instance.addObserver(this);
+    try {
+      await AudioPlayer.global.setAudioContext(
+        AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers).build(),
+      );
+    } catch (e) {
+      debugPrint('소리 설정 생략: $e');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final away = state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached;
+    if (away && !_backgrounded) {
+      _backgrounded = true;
+      _pauseAll();
+    } else if (state == AppLifecycleState.resumed && _backgrounded) {
+      _backgrounded = false;
+      final bgm = _currentBgm;
+      if (bgm != null) playBgm(bgm);
+    }
+  }
+
+  Future<void> _pauseAll() async {
+    ++_bgmOpSeq;
+    try {
+      await _bgmPlayer?.pause();
+      for (final p in _sfxPool) {
+        await p.stop();
+      }
+    } catch (_) {}
+  }
 
   bool soundEnabled = true;
   bool bgmEnabled = true;
@@ -40,7 +81,7 @@ class NightAudioController {
     try {
       if (!bgmEnabled) {
         await _bgmPlayer?.pause();
-      } else if (_currentBgm != null) {
+      } else if (_currentBgm != null && !_backgrounded) {
         if (_bgmPlayer == null || _loadedBgmSource != _currentBgm) {
           await _playBgmInternal(_currentBgm!, opSeq);
         } else {
@@ -59,7 +100,7 @@ class NightAudioController {
   }
 
   Future<void> _playBgmInternal(String assetFileName, int opSeq) async {
-    if (!bgmEnabled) {
+    if (!bgmEnabled || _backgrounded) {
       _currentBgm = assetFileName;
       return;
     }
@@ -102,7 +143,7 @@ class NightAudioController {
   }
 
   Future<void> playAsset(String fileName, {double volume = 0.65, int minGapMs = 75}) async {
-    if (!soundEnabled) return;
+    if (!soundEnabled || _backgrounded) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     final prev = _lastPlayedMs[fileName] ?? 0;
     if (now - prev < minGapMs) return;

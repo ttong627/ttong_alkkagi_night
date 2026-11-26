@@ -2,7 +2,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:defense_core/defense_core.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 import 'package:flutter/scheduler.dart';
 
 import '../audio/night_audio.dart';
@@ -12,6 +12,8 @@ import '../theme/night_theme.dart';
 import '../ui/night_art_registry.dart';
 import 'battle_painter.dart';
 import 'stage_and_county_transitions.dart';
+import '../i18n/tr_text.dart';
+import '../i18n/l10n.dart';
 
 /// 실시간 수호 전장 화면:
 /// - 초기 길목 무배치(0기) → 개방된 빈 초소(`2~10곳`) 터치 직접 배치·승급·교체·철거
@@ -583,7 +585,7 @@ class _BattleScreenState extends State<BattleScreen>
                           Text(
                             summary.victory
                                 ? '기존의 모든 능력치·동료·영수·수호석·재화를 100% 그대로 계승한 채 1-1부터 다시 출발하되, 전 난이도가 기존 대비 3배(누적 ×${(widget.controller.progress.reincarnationDifficultyMultiplier * 3).round()}배) 상승합니다!'
-                                : '성공 확률 5% 미만의 극한 결전입니다! 패배해도 보유 지원패와 전술 비약은 차감되지 않고 100% 보존되었으니, 비급·돌림판·약점 저격 기연을 노려 즉시 재도전하세요!',
+                                : '성공 확률 5% 미만의 극한 결전입니다! 패배해도 보유 지원패와 전술 비약은 차감되지 않고 100% 보존되었으니, 비급·기연판·약점 저격 기연을 노려 즉시 재도전하세요!',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 12.4,
@@ -749,13 +751,13 @@ class _BattleScreenState extends State<BattleScreen>
                                           ),
                                           children: [
                                             TextSpan(
-                                              text: '${line.speaker}: ',
+                                              text: '${tr(line.speaker)}: ',
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 color: Color(0xFF14213D),
                                               ),
                                             ),
-                                            TextSpan(text: line.text),
+                                            TextSpan(text: tr(line.text)),
                                           ],
                                         ),
                                       ),
@@ -1142,7 +1144,7 @@ class _BattleScreenState extends State<BattleScreen>
                               key: const Key('battle_pause_btn'),
                               padding: EdgeInsets.zero,
                               visualDensity: VisualDensity.compact,
-                              tooltip: '본영으로 즉시 복귀',
+                              tooltip: tr('본영으로 즉시 복귀'),
                               onPressed: () =>
                                   _confirmExitOrRestart(isRestart: false),
                               icon: const Icon(
@@ -1158,7 +1160,7 @@ class _BattleScreenState extends State<BattleScreen>
                               key: const Key('battle_quick_restart_btn'),
                               padding: EdgeInsets.zero,
                               visualDensity: VisualDensity.compact,
-                              tooltip: '멈춤 없이 즉시 처음부터 재개시',
+                              tooltip: tr('멈춤 없이 즉시 처음부터 재개시'),
                               onPressed: () =>
                                   _confirmExitOrRestart(isRestart: true),
                               icon: const Icon(Icons.refresh_rounded, size: 19),
@@ -2884,7 +2886,7 @@ class _BattleScreenState extends State<BattleScreen>
                                                       NightPalette.accentGold,
                                                 ),
                                                 label: Text(
-                                                  '🎲도박 ${_sim.currentLuckySummonCost}⚡',
+                                                  '☯기연 ${_sim.currentLuckySummonCost}⚡',
                                                   style: const TextStyle(
                                                     fontSize: 11.2,
                                                     fontWeight: FontWeight.bold,
@@ -3467,7 +3469,7 @@ class _BattleScreenState extends State<BattleScreen>
                                   buttonKey:
                                       const Key('quick_lucky_summon_btn'),
                                   label: readyEmptySlot != null
-                                      ? '🎲도박소환($luckyCost⚡)'
+                                      ? '☯기연소환($luckyCost⚡)'
                                       : (unexcavatedSlot != null
                                           ? '🪨개척후소환'
                                           : '🎲초소만석'),
@@ -3634,7 +3636,7 @@ class _BattleScreenState extends State<BattleScreen>
                                               width: 1.4,
                                             ),
                                             label: Text(
-                                              '🎰돌림판(${_sim.rouletteSpinsAvailable})',
+                                              '☯기연판(${_sim.rouletteSpinsAvailable})',
                                               style: const TextStyle(
                                                 fontSize: 10.8,
                                                 fontWeight: FontWeight.bold,
